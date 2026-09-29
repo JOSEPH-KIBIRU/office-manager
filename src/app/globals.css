@@ -1,8 +1,54 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---------- Design tokens ---------- */
+:root {
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-elevated: #f8f9fb;
+  --text-primary: #0a0a0b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --border: #e4e4e7;
+  --border-subtle: #f4f4f5;
+  --primary: #4f46e5;
+  --primary-hover: #4338ca;
+  --success: #16a34a;
+  --warning: #d97706;
+  --destructive: #dc2626;
+  --soft-indigo: #eef2ff;
+  --soft-green: #f0fdf4;
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+  --shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+::selection {
+  background-color: #c7d2fe;
+  color: #1e1b4b;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Visible keyboard focus everywhere (mouse clicks are unaffected). */
+:where(a, button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 body {
   background: #f1f5f9;
   color: #0f172a;
+  /* `clip` prevents horizontal scrolling WITHOUT creating a scroll container,
+     which would break `position: sticky` on the navbar (unlike `hidden`). */
+  overflow-x: clip;
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes fadeup {
@@ -16,15 +62,146 @@ body {
   }
 }
 
+@keyframes pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.pop-in {
+  animation: pop-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes floaty {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.float-slow {
+  animation: floaty 8s ease-in-out infinite;
+}
+
+@keyframes orbit-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.orbit-spin {
+  animation: orbit-spin var(--orbit-duration, 34s) linear infinite;
+}
+
+.orbit-spin-reverse {
+  animation: orbit-spin var(--orbit-duration, 34s) linear infinite reverse;
+}
+
+@keyframes halo-pulse {
+  0%, 100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.18);
+  }
+}
+
+.halo-pulse {
+  animation: halo-pulse 3.6s ease-in-out infinite;
+}
+
+@keyframes node-float {
+  0%, 100% {
+    transform: translateY(-4%);
+  }
+  50% {
+    transform: translateY(4%);
+  }
+}
+
+.node-float {
+  animation: node-float var(--node-dur, 8s) ease-in-out infinite;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee var(--marquee-duration, 30s) linear infinite;
+  will-change: transform;
+}
+
+@keyframes marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.marquee-right {
+  animation: marquee-right var(--marquee-duration, 45s) linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-slow {
+    animation: none;
+  }
+  .orbit-spin,
+  .orbit-spin-reverse {
+    animation: none;
+  }
+  .halo-pulse {
+    animation: none;
+  }
+  .node-float {
+    animation: none;
+  }
+  .marquee-track {
+    animation: none;
+  }
+  .marquee-right {
+    animation: none;
+  }
+}
+
+
 @layer components {
   .card {
-    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm;
+  }
+  .card-hover {
+    @apply transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-900/5;
   }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed bg-blue-700 text-white hover:bg-blue-800;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.98];
   }
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border border-slate-300 bg-white text-slate-700 hover:bg-slate-100;
@@ -34,6 +211,13 @@ body {
   }
   .btn-danger {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700;
+  }
+  /* Size modifiers — apply after a colour variant to shrink it. */
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+  .btn-xs {
+    @apply px-2.5 py-1.5 text-xs;
   }
   .input {
     @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100;
@@ -58,5 +242,94 @@ body {
   }
   .table-base tbody td {
     @apply border-b border-slate-100 px-4 py-3 align-middle;
+  }
+}
+
+/* ---------- Modern marketing UI helpers ---------- */
+@layer components {
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-zinc-300 backdrop-blur;
+  }
+  .eyebrow-dark {
+    @apply inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-200 backdrop-blur;
+  }
+  .card-lift {
+    @apply rounded-3xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl;
+  }
+  .btn-grad {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/25 transition hover:from-blue-500 hover:to-indigo-500 hover:shadow-blue-500/30;
+  }
+  .btn-ghost-dark {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20;
+  }
+  .text-grad {
+    @apply bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400 bg-clip-text text-transparent;
+  }
+  .text-grad-light {
+    @apply bg-gradient-to-r from-blue-400 via-sky-400 to-indigo-400 bg-clip-text text-transparent;
+  }
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  .card-premium {
+    @apply rounded-3xl;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+  }
+  .card-premium:hover {
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 20px 50px -20px rgba(2, 6, 23, 0.9);
+    transform: translateY(-4px);
+  }
+  .display {
+    @apply font-semibold tracking-[-0.035em];
+  }
+  /* Landing-only dark form styling (scoped so app forms stay light). */
+  .landing-form .input {
+    @apply border-white/15 bg-white/5 text-white placeholder:text-zinc-500;
+  }
+  .landing-form .input:focus {
+    @apply border-indigo-400 ring-2 ring-indigo-500/20;
+  }
+  .landing-form label {
+    color: #d4d4d8;
+  }
+  .section {
+    @apply py-12 sm:py-16;
+  }
+}
+
+/* Print / Save-as-PDF: hide app chrome and interaction controls. */
+@page {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+.payslip-print {
+  page-break-inside: avoid;
+}
+
+@media print {
+  body {
+    background: #fff !important;
+  }
+  aside,
+  header {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .payslip-print {
+    min-height: auto !important;
+    padding: 0 !important;
   }
 }

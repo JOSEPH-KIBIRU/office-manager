@@ -4,6 +4,7 @@ import { handle, ok, readJson } from "@/lib/api";
 import { notifyLeaveDecision } from "@/lib/notify";
 import { LEAVE_TYPES } from "@/lib/types";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { queueCalendarSync } from "@/lib/calendar/enqueue";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
@@ -45,7 +46,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         });
         if (updatedUser) {
           await notifyLeaveDecision(
-            { id: updatedUser._id as unknown as number, name: updatedUser.name, email: updatedUser.email, phone: updatedUser.phone ?? null },
+            { id: updatedUser._id as unknown as number, name: updatedUser.name, email: updatedUser.email, phone: updatedUser.phone ?? null, leave_balance: updatedUser.leaveBalance },
             body.action === "approve" ? "approved" : "rejected",
             leave.start_date,
             leave.end_date,
@@ -71,6 +72,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       return mapConvexError(e);
     }
 
+    // Push the (possibly changed) leave to the requester's connected calendars.
+    await queueCalendarSync(session.orgId as string, [leave.user_id as string], "leave", id, "upsert");
+
     const row = await cx().query(api.leaves.getLeave, {
       secret: secret(),
       orgId: session.orgId as never,
@@ -82,17 +86,36 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requireUser();
     const { id } = await ctx.params;
+
+    const existing = await cx().query(api.leaves.getLeave, {
+      secret: secret(),
+      orgId: session.orgId as never,
+      id: id as never,
+    });
+    if (!existing) throw new HttpError(404, "Leave request not found");
+
+    // Admins can delete any request; employees may withdraw only their own,
+    // and only while it is still pending.
+    if (session.role !== "admin") {
+      if (existing.user_id !== session.id) throw new HttpError(403, "You can only withdraw your own requests");
+      if (existing.status !== "pending") throw new HttpError(403, "Only pending requests can be withdrawn");
+    }
+
     try {
       await cx().mutation(api.leaves.deleteLeave, {
         secret: secret(),
         orgId: session.orgId as never,
         id: id as never,
       });
-      return ok();
     } catch (e) {
       return mapConvexError(e);
     }
+
+    if (existing) {
+      await queueCalendarSync(session.orgId as string, [existing.user_id as string], "leave", id, "delete");
+    }
+    return ok();
   });
 }

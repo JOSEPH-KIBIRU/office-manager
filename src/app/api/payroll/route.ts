@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requireUser, HttpError } from "@/lib/auth";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { recordAudit } from "@/lib/audit";
 
 export async function GET() {
   return handle(async () => {
@@ -27,7 +28,13 @@ export async function POST(req: NextRequest) {
       year: number;
       employeeIds?: string[];
       allowances?: Array<{ userId: string; amount: number }>;
+      perDiems?: Array<{ userId: string; amount: number }>;
+      overtime?: Array<{ userId: string; hours: number; rate: number }>;
+      bonuses?: Array<{ userId: string; amount: number }>;
+      otherDeductions?: Array<{ userId: string; amount: number }>;
       leaveDaysPayouts?: Array<{ userId: string; amount: number }>;
+      casuals?: Array<{ casualId: string; days: number; statutory: boolean; perDiem?: number }>;
+      encashmentIds?: string[];
     }>(req);
     requireFields(body, ["month", "year"]);
     const month = Number(body.month);
@@ -48,7 +55,18 @@ export async function POST(req: NextRequest) {
         year,
         employeeIds: body.employeeIds as never,
         allowances: body.allowances as never,
+        perDiems: body.perDiems as never,
+        overtime: body.overtime as never,
+        bonuses: body.bonuses as never,
+        otherDeductions: body.otherDeductions as never,
         leaveDaysPayouts: body.leaveDaysPayouts as never,
+        casuals: body.casuals as never,
+        encashmentIds: body.encashmentIds as never,
+      });
+      await recordAudit(session, {
+        action: "payroll.run",
+        module: "payroll",
+        summary: `Ran payroll for ${month}/${year}`,
       });
       return ok(result);
     } catch (e) {

@@ -1,11 +1,16 @@
 import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
-import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, tsString, fmtCreated } from "./lib";
+import { QueryCtx, MutationCtx } from "./_generated/server";
+import { assertSecret, tsNow, tsString, fmtCreated, requireMember } from "./lib";
+import { tryPostJournalForSource } from "./accounting";
 import { notifyStaff, pushNotification } from "./notifications";
 
 type PettyDoc = Doc<"pettyCash">;
+
+// Petty cash requests at or below this amount are auto-approved; anything
+// higher requires manager/admin approval.
+const AUTO_APPROVE_LIMIT = 5000;
 
 async function enrich(ctx: QueryCtx, p: PettyDoc) {
   const requester = await ctx.db.get(p.requestedBy);
@@ -35,6 +40,7 @@ export const listPettyCash = query({
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    if (args.userId) await requireMember(ctx, args.orgId, args.userId);
     const all = await ctx.db
       .query("pettyCash")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
@@ -95,6 +101,97 @@ export const createPettyCash = mutation({
   },
 });
 
+/**
+ * Create several petty cash lines at once. Each line is auto-approved when its
+ * amount is at or below AUTO_APPROVE_LIMIT, otherwise it is left pending for
+ * manager/admin review. Returns the created rows (enriched).
+ */
+export const createPettyCashBatch = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    requestedBy: v.id("users"),
+    items: v.array(
+      v.object({
+        amount: v.number(),
+        purpose: v.string(),
+        dateNeeded: v.string(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    if (args.items.length === 0) throw new Error("At least one line item is required");
+    if (args.items.length > 50) throw new Error("Too many line items (max 50)");
+
+    const existing = await ctx.db
+      .query("pettyCash")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const startNo = existing.length + 1;
+
+    const requester = await ctx.db.get(args.requestedBy);
+    const created: string[] = [];
+
+    for (let i = 0; i < args.items.length; i++) {
+      const item = args.items[i];
+      if (item.amount <= 0) throw new Error(`Line ${i + 1}: amount must be greater than zero`);
+      if (!item.purpose.trim()) throw new Error(`Line ${i + 1}: purpose is required`);
+      const autoApproved = item.amount <= AUTO_APPROVE_LIMIT;
+      const reqNo = `RQ-PC-${String(startNo + i).padStart(4, "0")}`;
+
+      const id = await ctx.db.insert("pettyCash", {
+        orgId: args.orgId,
+        requestedBy: args.requestedBy,
+        amount: item.amount,
+        purpose: item.purpose.trim(),
+        dateNeeded: item.dateNeeded,
+        status: autoApproved ? "approved" : "pending",
+        approvedBy: autoApproved ? args.requestedBy : undefined,
+        approvedAt: autoApproved ? tsString() : undefined,
+        requisitionNo: reqNo,
+        createdAt: tsNow(),
+      });
+      created.push(id);
+
+      if (autoApproved) {
+        await tryPostJournalForSource(ctx, {
+          orgId: args.orgId,
+          source: "petty_cash",
+          sourceId: id,
+          date: item.dateNeeded,
+          description: `Petty cash ${reqNo} · ${item.purpose}`,
+          lines: [
+            { accountCode: "5990", debit: item.amount, credit: 0, memo: reqNo },
+            { accountCode: "1010", debit: 0, credit: item.amount, memo: reqNo },
+          ],
+          postedByName: "Auto (petty cash approved)",
+        });
+      }
+
+      await pushNotification(ctx, args.orgId as unknown as string, {
+        userId: args.requestedBy as unknown as string,
+        type: "petty",
+        title: autoApproved ? "Petty cash auto-approved" : "Petty cash needs approval",
+        body: autoApproved
+          ? `Your request for KSh ${item.amount} (${item.purpose}) was auto-approved (within the KSh ${AUTO_APPROVE_LIMIT.toLocaleString()} limit).`
+          : `Your request for KSh ${item.amount} (${item.purpose}) is pending manager approval.`,
+        link: "/petty-cash",
+      });
+    }
+
+    await notifyStaff(ctx, args.orgId, {
+      userId: args.requestedBy as unknown as string,
+      type: "petty",
+      title: `Petty cash request: ${created.length} line${created.length > 1 ? "s" : ""}`,
+      body: `${requester?.name ?? "Someone"} submitted ${created.length} petty cash line(s).`,
+      link: "/petty-cash",
+    });
+
+    return { ids: created };
+  },
+});
+
 export const reviewPettyCash = mutation({
   args: {
     secret: v.string(),
@@ -116,6 +213,18 @@ export const reviewPettyCash = mutation({
         approvedBy: args.reviewerId,
         approvedAt: tsString(),
         note: args.note ?? row.note,
+      });
+      await tryPostJournalForSource(ctx, {
+        orgId: args.orgId,
+        source: "petty_cash",
+        sourceId: row._id,
+        date: row.dateNeeded,
+        description: `Petty cash ${row.requisitionNo ?? ""} · ${row.purpose}`.trim(),
+        lines: [
+          { accountCode: "5990", debit: row.amount, credit: 0, memo: row.requisitionNo ?? undefined },
+          { accountCode: "1010", debit: 0, credit: row.amount, memo: row.requisitionNo ?? undefined },
+        ],
+        postedByName: "Auto (petty cash approved)",
       });
       await pushNotification(ctx, args.orgId as unknown as string, {
         userId: row.requestedBy as unknown as string,
@@ -151,5 +260,115 @@ export const reviewPettyCash = mutation({
       });
     }
     return true;
+  },
+});
+
+/* ------------------------------------------------------------------ *
+ * Monthly petty-cash allocation (budget) + float funding
+ * ------------------------------------------------------------------ */
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Monthly allocation vs spend for a period (YYYY-MM). */
+export const getBudget = query({
+  args: { secret: v.string(), orgId: v.id("organizations"), period: v.string() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const budget = await ctx.db
+      .query("pettyCashBudgets")
+      .withIndex("by_org_period", (q) => q.eq("orgId", args.orgId).eq("period", args.period))
+      .first();
+    const all = await ctx.db.query("pettyCash").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const month = all.filter((p) => (p.dateNeeded ?? "").slice(0, 7) === args.period);
+    const spent = month
+      .filter((p) => p.status === "approved" || p.status === "paid")
+      .reduce((s, p) => s + p.amount, 0);
+    const pending = month.filter((p) => p.status === "pending").reduce((s, p) => s + p.amount, 0);
+    const amount = round2(budget?.amount ?? 0);
+    return {
+      period: args.period,
+      amount,
+      spent: round2(spent),
+      pending: round2(pending),
+      remaining: round2(amount - spent),
+      set_at: budget ? fmtCreated(budget.setAt) : null,
+    };
+  },
+});
+
+/** Post the float funding/adjustment transfer (Dr Petty cash / Cr Bank). */
+async function fundFloat(
+  ctx: MutationCtx,
+  orgId: Id<"organizations">,
+  period: string,
+  delta: number,
+  suffix: string
+) {
+  const amt = Math.abs(round2(delta));
+  if (amt === 0) return;
+  const date = `${period}-01`;
+  const lines =
+    delta > 0
+      ? [
+          { accountCode: "1010", debit: amt, credit: 0, memo: "Petty cash float" },
+          { accountCode: "1020", debit: 0, credit: amt, memo: "Petty cash float" },
+        ]
+      : [
+          { accountCode: "1020", debit: amt, credit: 0, memo: "Petty cash float adjustment" },
+          { accountCode: "1010", debit: 0, credit: amt, memo: "Petty cash float adjustment" },
+        ];
+  await tryPostJournalForSource(ctx, {
+    orgId,
+    source: "petty_cash_fund",
+    sourceId: `budget${suffix}`,
+    date,
+    description: `Petty cash allocation ${period}`,
+    lines,
+    postedByName: "Auto (petty cash allocation)",
+  });
+}
+
+/** Set/update the monthly petty-cash allocation (funds the float in the ledger). */
+export const setBudget = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    period: v.string(),
+    amount: v.number(),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    if (!/^\d{4}-\d{2}$/.test(args.period)) throw new ConvexError("Invalid month");
+    if (!(args.amount >= 0) || args.amount > 100_000_000) throw new ConvexError("Enter a valid amount");
+    await requireMember(ctx, args.orgId, args.userId);
+
+    const now = tsNow();
+    const existing = await ctx.db
+      .query("pettyCashBudgets")
+      .withIndex("by_org_period", (q) => q.eq("orgId", args.orgId).eq("period", args.period))
+      .first();
+
+    if (!existing) {
+      const id = await ctx.db.insert("pettyCashBudgets", {
+        orgId: args.orgId,
+        period: args.period,
+        amount: round2(args.amount),
+        setBy: args.userId,
+        setAt: now,
+        updatedAt: now,
+      });
+      await fundFloat(ctx, args.orgId, args.period, args.amount, `:${id}`);
+      return id;
+    }
+
+    const delta = round2(args.amount - existing.amount);
+    await ctx.db.patch(existing._id, { amount: round2(args.amount), setBy: args.userId, updatedAt: now });
+    if (delta !== 0) {
+      await fundFloat(ctx, args.orgId, args.period, delta, `:${existing._id}:${existing.amount}->${args.amount}`);
+    }
+    return existing._id;
   },
 });

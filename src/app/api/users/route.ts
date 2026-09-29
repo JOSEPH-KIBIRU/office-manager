@@ -5,6 +5,7 @@ import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { sendNewUserCredentials } from "@/lib/notify";
 import { generateTempPassword } from "@/lib/passwords";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { recordAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -30,13 +31,14 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     const session = await requireUser(["admin"]);
-    const body = await readJson<{ name: string; email: string; phone?: string; role: string }>(req);
+    const body = await readJson<{ name: string; email: string; phone?: string; role: string; employment_type?: string; bank_name?: string; bank_account?: string; mpesa_number?: string }>(req);
     requireFields(body, ["name", "email", "role"]);
 
     const email = String(body.email).toLowerCase().trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Invalid email address");
 
     const tempPassword = generateTempPassword();
+    const employmentType = body.employment_type === "permanent_pensionable" ? "permanent_pensionable" : "permanent";
 
     let id: string;
     try {
@@ -47,6 +49,10 @@ export async function POST(req: NextRequest) {
         email,
         phone: body.phone?.trim() || undefined,
         role: body.role as "admin" | "secretary" | "manager" | "employee",
+        employmentType,
+        bankName: body.bank_name?.trim() || undefined,
+        bankAccount: body.bank_account?.trim() || undefined,
+        mpesaNumber: body.mpesa_number?.trim() || undefined,
         passwordHash: bcrypt.hashSync(tempPassword, 10),
       });
     } catch (e) {
@@ -64,6 +70,14 @@ export async function POST(req: NextRequest) {
       tempPassword
     );
 
+    await recordAudit(session, {
+      action: "user.create",
+      module: "team",
+      summary: `Created user ${user!.name} (${email})`,
+      targetType: "user",
+      targetId: user!._id,
+    });
+
     return ok({
       user: {
         id: user!._id,
@@ -71,6 +85,7 @@ export async function POST(req: NextRequest) {
         email: user!.email,
         phone: user!.phone ?? null,
         role: user!.role,
+        employment_type: user!.employmentType ?? "permanent",
         leave_balance: user!.leaveBalance,
         must_change_password: user!.mustChangePassword ? 1 : 0,
         active: user!.active ? 1 : 0,

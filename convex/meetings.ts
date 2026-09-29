@@ -48,6 +48,13 @@ export const getMeeting = query({
   },
 });
 
+async function assertOrgMembers(ctx: QueryCtx, orgId: Id<"organizations">, ids: Array<Id<"users">>) {
+  for (const id of ids) {
+    const u = await ctx.db.get(id);
+    if (!u || u.orgId !== orgId) throw new Error("One or more attendees do not belong to your organization");
+  }
+}
+
 export const createMeeting = mutation({
   args: {
     secret: v.string(),
@@ -62,6 +69,11 @@ export const createMeeting = mutation({
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    await assertOrgMembers(ctx, args.orgId, [
+      args.createdBy,
+      ...args.attendeeIds,
+      ...(args.directorId ? [args.directorId] : []),
+    ]);
     const creator = await ctx.db.get(args.createdBy);
     const id = await ctx.db.insert("meetings", {
       orgId: args.orgId,
@@ -111,6 +123,10 @@ export const updateMeeting = mutation({
     if (!row || row.orgId !== args.orgId) throw new Error("Meeting not found");
     if (args.status && !["scheduled", "completed", "cancelled"].includes(args.status)) {
       throw new Error("Invalid status");
+    }
+    if (args.attendeeIds !== undefined) await assertOrgMembers(ctx, args.orgId, args.attendeeIds);
+    if (args.directorIdSet && args.directorId) {
+      await assertOrgMembers(ctx, args.orgId, [args.directorId]);
     }
 
     const patch: Record<string, unknown> = {};

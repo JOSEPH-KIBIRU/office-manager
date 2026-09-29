@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET() {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("minutes", ["admin", "secretary", "manager", "employee"]);
     try {
       const minutes = await cx().query(api.minutes.listMinutes, {
         secret: secret(),
@@ -20,7 +20,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary"]);
+    const session = await requirePermission("minutes", ["admin", "secretary"]);
     const body = await readJson<{
       title: string;
       meeting_date?: string;

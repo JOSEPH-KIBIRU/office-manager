@@ -1,6 +1,6 @@
 import { query, mutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { assertSecret, tsNow } from "./lib";
+import { assertSecret, requireMember, tsNow } from "./lib";
 
 type Push = {
   userId: string;
@@ -46,12 +46,16 @@ export const listForUser = query({
   args: { secret: v.string(), orgId: v.id("organizations"), userId: v.id("users") },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.userId);
     const all = await ctx.db
       .query("notifications")
       .withIndex("by_user_unread", (q) => q.eq("userId", args.userId as never))
-      .order("desc")
       .collect();
-    const mine = all.filter((n) => n.orgId === args.orgId).slice(0, 50);
+    // Newest first (the index groups by read status, so sort by time here).
+    const mine = all
+      .filter((n) => n.orgId === args.orgId)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 50);
     return {
       unread_count: mine.filter((n) => !n.read).length,
       items: mine.map((n) => ({
@@ -68,11 +72,14 @@ export const listForUser = query({
 });
 
 export const markRead = mutation({
-  args: { secret: v.string(), orgId: v.id("organizations"), id: v.id("notifications") },
+  args: { secret: v.string(), orgId: v.id("organizations"), id: v.id("notifications"), userId: v.id("users") },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.userId);
     const n = await ctx.db.get(args.id);
-    if (!n || n.orgId !== args.orgId) throw new Error("Notification not found");
+    // Only the notification's owner may mark it read.
+    if (!n || n.orgId !== args.orgId || n.userId !== args.userId)
+      throw new Error("Notification not found");
     await ctx.db.patch(args.id, { read: true });
     return true;
   },
@@ -82,6 +89,7 @@ export const markAllRead = mutation({
   args: { secret: v.string(), orgId: v.id("organizations"), userId: v.id("users") },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.userId);
     const all = await ctx.db
       .query("notifications")
       .withIndex("by_user_unread", (q) => q.eq("userId", args.userId as never))
@@ -92,22 +100,58 @@ export const markAllRead = mutation({
   },
 });
 
-/** Cross-module recent activity feed for the dashboard. */
+/** Cross-module recent activity feed for the dashboard, scoped to what the viewer may access. */
 export const activityFeed = query({
-  args: { secret: v.string(), orgId: v.id("organizations") },
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    role: v.union(
+      v.literal("admin"),
+      v.literal("secretary"),
+      v.literal("manager"),
+      v.literal("employee"),
+      v.literal("super_admin")
+    ),
+    userId: v.id("users"),
+  },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    // The viewer is loaded from the DB so a stale/forged role claim cannot widen scope.
+    const me = await requireMember(ctx, args.orgId, args.userId);
+    const role = me.role;
+    const viewerId = me._id;
+    // Mirror the sidebar's feature-access model:
+    //   leaves + petty cash  -> everyone (employees see only their own)
+    //   car logs             -> admin + manager
+    //   meetings + minutes   -> admin + secretary
+    //   payroll              -> admin only
+    const canAllLeaves = role !== "employee";
+    const canCars = role === "admin" || role === "manager";
+    const canAllPetty = role !== "employee";
+    const canMeetings = role === "admin" || role === "secretary";
+    const canMinutes = role === "admin" || role === "secretary";
+    const canPayroll = role === "admin";
 
     const orgQ = (q: any) => q.eq("orgId", args.orgId as never);
-    const leaves = await ctx.db
-      .query("leaves")
-      .filter((q) => q.eq(q.field("orgId"), args.orgId))
-      .collect();
-    const cars = await ctx.db.query("carLogs").withIndex("by_org", orgQ).collect();
-    const petty = await ctx.db.query("pettyCash").withIndex("by_org", orgQ).collect();
-    const meetings = await ctx.db.query("meetings").withIndex("by_org", orgQ).collect();
-    const payrolls = await ctx.db.query("payrolls").withIndex("by_org", orgQ).collect();
-    const minutes = await ctx.db.query("minutes").withIndex("by_org", orgQ).collect();
+
+    const [leaves, cars, petty, meetings, payrolls, minutes] = await Promise.all([
+      ctx.db.query("leaves").withIndex("by_org", orgQ).collect(),
+      ctx.db.query("carLogs").withIndex("by_org", orgQ).collect(),
+      ctx.db.query("pettyCash").withIndex("by_org", orgQ).collect(),
+      ctx.db.query("meetings").withIndex("by_org", orgQ).collect(),
+      ctx.db.query("payrolls").withIndex("by_org", orgQ).collect(),
+      ctx.db.query("minutes").withIndex("by_org", orgQ).collect(),
+    ]);
+
+    // Per-authorization subsets.
+    const myLeaves = canAllLeaves ? leaves : leaves.filter((l) => l.userId === viewerId);
+    const myCars = canCars ? cars : [];
+    const myPetty = canAllPetty ? petty : petty.filter((p) => p.requestedBy === viewerId);
+    const myMeetings = canMeetings
+      ? meetings
+      : [];
+    const myMinutes = canMinutes ? minutes : [];
+    const myPayrolls = canPayroll ? payrolls : [];
 
     const userNames = new Map<string, string>();
     const collect = async (ids: Array<string | null | undefined>) => {
@@ -118,13 +162,19 @@ export const activityFeed = query({
       }
     };
     await collect([
-      ...leaves.map((l) => l.userId),
-      ...cars.map((c) => c.requestedBy),
-      ...petty.map((p) => p.requestedBy),
-      ...meetings.map((m) => m.createdBy),
-      ...payrolls.map((p) => p.runBy),
-      ...minutes.map((m) => m.writtenBy),
+      ...myLeaves.map((l) => l.userId),
+      ...myCars.map((c) => c.requestedBy),
+      ...myPetty.map((p) => p.requestedBy),
+      ...myMeetings.map((m) => m.createdBy),
+      ...myPayrolls.map((p) => p.runBy),
+      ...myMinutes.map((m) => m.writtenBy),
     ].map((x) => x as string));
+
+    // If we only collated a user's own records, resolve their own name too.
+    if (role === "employee" && !userNames.has(viewerId as string)) {
+      const u = (await ctx.db.get(viewerId)) as { name?: string } | null;
+      if (u?.name) userNames.set(viewerId as string, u.name);
+    }
 
     const name = (id: unknown) => userNames.get(id as string) ?? "Someone";
     const time = (t: number) => new Date(t).toISOString().replace("T", " ").slice(0, 16);
@@ -141,7 +191,7 @@ export const activityFeed = query({
       link: string;
     }> = [];
 
-    for (const l of leaves) {
+    for (const l of myLeaves) {
       items.push({
         id: "leave-" + l._id,
         type: "leave",
@@ -152,7 +202,7 @@ export const activityFeed = query({
         link: "/leave",
       });
     }
-    for (const c of cars) {
+    for (const c of myCars) {
       items.push({
         id: "car-" + c._id,
         type: "car",
@@ -163,7 +213,7 @@ export const activityFeed = query({
         link: "/cars",
       });
     }
-    for (const p of petty) {
+    for (const p of myPetty) {
       items.push({
         id: "petty-" + p._id,
         type: "petty",
@@ -174,7 +224,7 @@ export const activityFeed = query({
         link: "/petty-cash",
       });
     }
-    for (const m of meetings) {
+    for (const m of myMeetings) {
       items.push({
         id: "meeting-" + m._id,
         type: "meeting",
@@ -185,7 +235,7 @@ export const activityFeed = query({
         link: "/meetings",
       });
     }
-    for (const p of payrolls) {
+    for (const p of myPayrolls) {
       items.push({
         id: "payroll-" + p._id,
         type: "payroll",
@@ -196,7 +246,7 @@ export const activityFeed = query({
         link: "/payroll",
       });
     }
-    for (const m of minutes) {
+    for (const m of myMinutes) {
       items.push({
         id: "minute-" + m._id,
         type: "minutes",

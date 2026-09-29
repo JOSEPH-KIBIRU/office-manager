@@ -1,14 +1,24 @@
 import { NextRequest } from "next/server";
 import { requireUser } from "@/lib/auth";
-import { handle, ok, readJson, requireFields, fail } from "@/lib/api";
+import { handle, ok, readJson, requireFields, fail, maxLen, validDate } from "@/lib/api";
 import { notifyAdminsOfLeaveRequest, notifyLeaveDecision } from "@/lib/notify";
 import { LEAVE_TYPES, type LeaveType } from "@/lib/types";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
-function daysBetween(start: string, end: string): number {
+/** Actual leave days: only working weekdays, excluding public holidays. */
+function workingLeaveDays(start: string, end: string, workingDays: number[], holidays: Set<string>): number {
+  const wd = new Set(workingDays && workingDays.length ? workingDays : [1, 2, 3, 4, 5]);
   const s = new Date(start + "T00:00:00");
   const e = new Date(end + "T00:00:00");
-  return Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
+  let count = 0;
+  const dt = new Date(s);
+  while (dt <= e) {
+    const dow = dt.getDay();
+    const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    if (wd.has(dow) && !holidays.has(iso)) count += 1;
+    dt.setDate(dt.getDate() + 1);
+  }
+  return count;
 }
 
 export async function GET(req: NextRequest) {
@@ -44,12 +54,26 @@ export async function POST(req: NextRequest) {
       ? (body.leave_type as LeaveType)
       : "annual";
 
-    const start = String(body.start_date);
-    const end = String(body.end_date);
+    const start = validDate(body.start_date, "Start date");
+    const end = validDate(body.end_date, "End date");
+    maxLen(body.reason, "Reason", 500);
     if (end < start) return fail(400, "End date cannot be before the start date");
 
-    const days = daysBetween(start, end);
-    if (days <= 0 || days > 365) return fail(400, "Invalid leave duration");
+    let wdArr = [1, 2, 3, 4, 5];
+    let holDates: string[] = [];
+    try {
+      const orgCfg = await cx().query(api.organizations.getOrganization, { secret: secret(), orgId: session.orgId as never });
+      wdArr = orgCfg.workingDays ?? [1, 2, 3, 4, 5];
+      const hols = await cx().query(api.holidays.listHolidays, { secret: secret(), orgId: session.orgId as never });
+      holDates = hols.map((h) => h.date);
+    } catch {
+      /* fall back to Mon–Fri if config can't be read */
+    }
+    const days = workingLeaveDays(start, end, wdArr, new Set(holDates));
+    if (days <= 0) {
+      return fail(400, "Those dates fall entirely on weekends or public holidays — there are no leave days to deduct.");
+    }
+    if (days > 365) return fail(400, "Invalid leave duration");
 
     let newId;
     try {

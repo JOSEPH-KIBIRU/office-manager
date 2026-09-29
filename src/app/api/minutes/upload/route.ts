@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import path from "path";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -9,7 +9,10 @@ const ALLOWED = [".pdf", ".doc", ".docx", ".txt", ".md", ".png", ".jpg", ".jpeg"
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    await requireUser(["admin", "secretary"]);
+    const session = await requirePermission("minutes", ["admin", "secretary"]);
+
+    const cl = Number(req.headers.get("content-length") || 0);
+    if (cl && cl > MAX_SIZE + 1024 * 1024) return fail(413, "Request body too large");
 
     const form = await req.formData();
     const file = form.get("file");
@@ -31,6 +34,13 @@ export async function POST(req: NextRequest) {
       });
       if (!res.ok) throw new Error(`File upload failed (${res.status})`);
       const { storageId } = (await res.json()) as { storageId: string };
+
+      await cx().mutation(api.storage.registerFile, {
+        secret: secret(),
+        orgId: session.orgId as never,
+        storageId: storageId as never,
+        kind: "minutes",
+      });
 
       return ok({ file_name: file.name, file_path: storageId });
     } catch (e) {

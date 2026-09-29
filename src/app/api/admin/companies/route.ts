@@ -4,6 +4,7 @@ import { requireUser, HttpError } from "@/lib/auth";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { generateTempPassword } from "@/lib/passwords";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { recordAudit } from "@/lib/audit";
 
 export async function GET() {
   return handle(async () => {
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
       name: string;
       adminName: string;
       adminEmail: string;
+      workingDays?: number[];
     }>(req);
     requireFields(body, ["name", "adminName", "adminEmail"]);
 
@@ -46,7 +48,16 @@ export async function POST(req: NextRequest) {
         adminName: String(body.adminName).trim(),
         adminEmail: email,
         adminPasswordHash: bcrypt.hashSync(tempPassword, 10),
+        workingDays: Array.isArray(body.workingDays)
+          ? body.workingDays.map(Number).filter((d) => d >= 0 && d <= 6)
+          : undefined,
       });
+      await recordAudit(
+        session,
+        { action: "company.create", module: "platform", summary: `Created company ${name}` },
+        null,
+        result.orgId
+      );
       return ok({ ...result, tempPassword });
     } catch (e) {
       return mapConvexError(e);

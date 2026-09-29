@@ -2,9 +2,19 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, fmtCreated } from "./lib";
+import { assertSecret, tsNow, fmtCreated, requireMember } from "./lib";
 
 type MinuteDoc = Doc<"minutes">;
+
+async function assertMeetingInOrg(
+  ctx: QueryCtx,
+  orgId: Id<"organizations">,
+  meetingId: Id<"meetings"> | undefined
+) {
+  if (!meetingId) return;
+  const m = await ctx.db.get(meetingId);
+  if (!m || m.orgId !== orgId) throw new Error("Meeting does not belong to your organization");
+}
 
 async function enrich(ctx: QueryCtx, m: MinuteDoc) {
   const author = await ctx.db.get(m.writtenBy);
@@ -67,6 +77,8 @@ export const createMinute = mutation({
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.writtenBy);
+    await assertMeetingInOrg(ctx, args.orgId, args.meetingId);
     return ctx.db.insert("minutes", {
       orgId: args.orgId,
       title: args.title,
@@ -109,6 +121,9 @@ export const updateMinute = mutation({
     const row = await ctx.db.get(args.id);
     if (!row || row.orgId !== args.orgId) throw new Error("Minutes not found");
     if (args.status && !["draft", "final"].includes(args.status)) throw new Error("Invalid status");
+    if (args.meetingIdSet && args.meetingId) {
+      await assertMeetingInOrg(ctx, args.orgId, args.meetingId);
+    }
 
     const patch: Record<string, unknown> = {};
     if (args.title !== undefined) patch.title = args.title;

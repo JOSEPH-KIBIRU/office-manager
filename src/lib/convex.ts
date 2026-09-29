@@ -23,7 +23,14 @@ export function secret(): string {
 export { api };
 
 export function mapConvexError(e: unknown): never {
-  let msg = e instanceof Error ? e.message : String(e);
+  let msg = "";
+  if (e && typeof e === "object" && "data" in (e as Record<string, unknown>)) {
+    msg = String((e as Record<string, unknown>).data);
+  } else if (e instanceof Error) {
+    msg = e.message;
+  } else {
+    msg = String(e);
+  }
   msg = msg.replace(/^Uncaught Error: /, "").replace(/^Error: /, "");
   let status = 400;
   if (/not found/i.test(msg)) status = 404;
@@ -32,16 +39,23 @@ export function mapConvexError(e: unknown): never {
 }
 
 export async function ensureAppInit(): Promise<void> {
+  const isProd = process.env.NODE_ENV === "production";
+  const adminPassword = process.env.ADMIN_PASSWORD || (isProd ? "" : "ChangeMe123!");
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
+  if (!adminPassword) {
+    throw new Error("ADMIN_PASSWORD environment variable is required in production");
+  }
   await cx().mutation(api.seed.ensureAppInit, {
     secret: secret(),
     orgName: process.env.ORG_NAME || "Office",
     adminName: process.env.ADMIN_NAME || "Director",
     adminEmail: process.env.ADMIN_EMAIL || "director@office.local",
-    adminPasswordHash: bcrypt.hashSync(process.env.ADMIN_PASSWORD || "ChangeMe123!", 10),
+    adminPasswordHash: bcrypt.hashSync(adminPassword, 10),
+    adminPhone: process.env.ADMIN_PHONE || undefined,
     superAdminEmail: process.env.SUPER_ADMIN_EMAIL,
     superAdminName: process.env.SUPER_ADMIN_NAME,
-    superAdminPasswordHash: process.env.SUPER_ADMIN_PASSWORD
-      ? bcrypt.hashSync(process.env.SUPER_ADMIN_PASSWORD, 10)
+    superAdminPasswordHash: superAdminPassword
+      ? bcrypt.hashSync(superAdminPassword, 10)
       : undefined,
   });
 }

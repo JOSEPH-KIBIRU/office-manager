@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { Alert, api } from "@/components/ui";
+import { OrgHeader, OrgFooter, type OrgBrandingData } from "@/components/OrgBranding";
 
 interface LineItem {
   description: string;
@@ -13,6 +14,7 @@ interface LineItem {
 
 interface InvoiceRow {
   id: string;
+  org: OrgBrandingData | null;
   contact_id: string;
   contact_name: string;
   contact_company: string | null;
@@ -26,11 +28,16 @@ interface InvoiceRow {
   status: string;
   line_items: LineItem[];
   note: string | null;
+  payment_details: string | null;
+  terms: string | null;
   subtotal: number;
   tax_total: number;
   total: number;
   recurring_frequency: string | null;
   created_at: string;
+  etims_status: string;
+  etims_control_number: string | null;
+  etims_qr_data: string | null;
 }
 
 const fmtMoney = (n: number) => n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -38,29 +45,58 @@ const fmtMoney = (n: number) => n.toLocaleString("en-KE", { minimumFractionDigit
 function InvoicePrint({ id }: { id: string }) {
   const [inv, setInv] = useState<InvoiceRow | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const printed = useRef(false);
 
   useEffect(() => {
     api<{ invoice: InvoiceRow }>(`/api/invoices/${id}`)
-      .then((d) => setInv(d.invoice))
+      .then((d) => {
+        setInv(d.invoice);
+        // Print only once the invoice has actually rendered (avoids a blank page).
+        if (!printed.current) {
+          printed.current = true;
+          setTimeout(() => window.print(), 400);
+        }
+      })
       .catch((e) => setErr(e.message));
   }, [id]);
 
+  // Render the eTIMS QR (if the invoice was submitted to KRA) on the client.
+  useEffect(() => {
+    const data = inv?.etims_qr_data;
+    if (!data) {
+      setQrUrl(null);
+      return;
+    }
+    let active = true;
+    import("qrcode")
+      .then((QR) => QR.toDataURL(data, { margin: 1, width: 160 }))
+      .then((u) => {
+        if (active) setQrUrl(u);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [inv?.etims_qr_data]);
+
   return (
-    <div className="payslip-print mx-auto max-w-3xl p-6 text-slate-900">
+    <>
+      <div className="no-print fixed right-4 top-4 z-50 flex gap-2">
+        <button onClick={() => window.print()} className="btn-primary px-3 py-1.5 text-sm">
+          🖨 Print / Save as PDF
+        </button>
+      </div>
+      <div className="payslip-print mx-auto max-w-3xl p-6 text-slate-900">
       {err && <Alert kind="error">{err}</Alert>}
       {!inv && !err && <p className="text-sm text-slate-500">Loading invoice… (printing will open momentarily)</p>}
       {inv && (
         <>
-          <div className="mb-6 flex items-start justify-between border-b-2 border-slate-900 pb-4">
-            <div>
-              <h1 className="text-2xl font-black tracking-tight">Office Manager</h1>
-              <p className="text-xs text-slate-500">Business Invoicing</p>
-            </div>
-            <div className="text-right">
-              <p className="font-mono text-lg font-bold">INVOICE</p>
-              <p className="font-mono text-sm text-indigo-700">{inv.number}</p>
-            </div>
-          </div>
+          <OrgHeader
+            org={inv.org ?? null}
+            rightLabel="INVOICE"
+            rightSub={inv.number}
+          />
 
           <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
             <div className="rounded-lg border border-slate-300 bg-slate-50 p-3">
@@ -111,26 +147,52 @@ function InvoicePrint({ id }: { id: string }) {
             <div className="flex justify-between border-t-2 border-slate-900 py-2 text-base font-bold"><span>Total (KES)</span><span>{fmtMoney(inv.total)}</span></div>
           </div>
 
+          {inv.etims_control_number && (
+            <div className="mb-4 flex items-center gap-4 rounded-lg border border-slate-300 bg-slate-50 p-3">
+              {qrUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrUrl} alt="eTIMS QR code" className="h-24 w-24 flex-none" />
+              )}
+              <div className="text-xs text-slate-600">
+                <p className="font-semibold uppercase tracking-wide text-slate-500">eTIMS (KRA)</p>
+                <p className="mt-1">
+                  Control number:{" "}
+                  <span className="font-mono font-semibold text-slate-800">{inv.etims_control_number}</span>
+                </p>
+                <p className="mt-0.5">Scan the QR to verify this invoice on the KRA eTIMS portal.</p>
+              </div>
+            </div>
+          )}
+
+          {inv.payment_details && (
+            <div className="mb-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-xs">
+              <p className="mb-1 font-semibold uppercase tracking-wide text-slate-500">Payment instructions</p>
+              <p className="whitespace-pre-line text-slate-700">{inv.payment_details}</p>
+            </div>
+          )}
+
           {inv.note && (
             <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
               <span className="font-semibold">Note: </span>{inv.note}
             </div>
           )}
 
-          <p className="mt-8 text-center text-xs text-slate-400">
-            Thank you for your business. This is an official invoice from Office Manager. Generated {new Date().toLocaleDateString("en-KE")}.
-          </p>
+          {inv.terms && (
+            <div className="mb-4 rounded-lg border border-slate-200 p-3 text-[11px] leading-relaxed text-slate-500">
+              <p className="mb-1 font-semibold uppercase tracking-wide text-slate-500">Terms &amp; conditions</p>
+              <p className="whitespace-pre-line">{inv.terms}</p>
+            </div>
+          )}
+
+          <OrgFooter org={inv.org ?? null} text="Thank you for your business." />
         </>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 
 function Inner({ id }: { id: string }) {
-  useEffect(() => {
-    const t = setTimeout(() => window.print(), 600);
-    return () => clearTimeout(t);
-  }, []);
   return <InvoicePrint id={id} />;
 }
 

@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("bills", ["admin", "manager", "secretary"]);
     const { id } = await ctx.params;
     const body = await readJson<{ status: "pending" | "paid" | "overdue" }>(req);
     if (!body.status) throw new Error("Status is required");

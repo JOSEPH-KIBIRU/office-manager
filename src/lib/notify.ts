@@ -1,8 +1,22 @@
 import "server-only";
 import { Resend } from "resend";
 import { cx, secret, api } from "./convex";
+import { siteUrl } from "./siteUrl";
 
 const TALKSASA_DEFAULT_BASE = "https://bulksms.talksasa.com/api/v3";
+
+function toInternationalSMSNumber(phone: string | null | undefined): string {
+  if (!phone) return "";
+  let digits = phone.replace(/[^0-9]/g, "");
+  if (digits.startsWith("0")) {
+    digits = "254" + digits.slice(1); // Kenyan local -> international
+  } else if (digits.startsWith("254") && digits.length === 12) {
+    // already international
+  } else if (digits.length === 9) {
+    digits = "254" + digits; // e.g. "798118515" -> "254798118515"
+  }
+  return digits;
+}
 
 interface NotifyUser {
   id?: string | number;
@@ -12,7 +26,7 @@ interface NotifyUser {
   leave_balance?: number;
 }
 
-async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.warn(`[email] RESEND_API_KEY not set — skipped email "${subject}" to ${to}`);
@@ -37,7 +51,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<boo
   }
 }
 
-async function sendSMS(to: string | null | undefined, message: string): Promise<boolean> {
+export async function sendSMS(to: string | null | undefined, message: string): Promise<boolean> {
   const key = process.env.TALKSASA_API_KEY;
   if (!to) return false;
   if (!key) {
@@ -54,14 +68,14 @@ async function sendSMS(to: string | null | undefined, message: string): Promise<
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        recipient: to,
+        recipient: toInternationalSMSNumber(to),
         sender_id: process.env.TALKSASA_SENDER_ID || "OFFICE",
         type: "plain",
         message,
       }),
     });
     if (!res.ok) {
-      console.error(`[sms] Failed to ${to}: HTTP ${res.status} - ${await res.text()}`);
+      console.error(`[sms] Failed to ${toInternationalSMSNumber(to)}: HTTP ${res.status} - ${await res.text()}`);
       return false;
     }
     return true;
@@ -134,7 +148,7 @@ export async function notifyLeaveDecision(
 }
 
 export async function sendNewUserCredentials(user: NotifyUser, tempPassword: string) {
-  const loginUrl = `${process.env.APP_URL || "http://localhost:3000"}/login`;
+  const loginUrl = `${siteUrl()}/login`;
   const title = "Your Office Account Has Been Created";
   const body = `<p>Hello <strong>${user.name}</strong>,</p>
   <p>An account has been created for you on the Office Management System.</p>
@@ -197,5 +211,67 @@ export async function notifyMeetingScheduled(
       `<p>You have been invited to a meeting.</p><p><strong>${title}</strong><br/>When: ${scheduledAt}<br/>Where: ${location || "TBD"}</p>`,
       `Meeting: ${title} on ${scheduledAt}${location ? " at " + location : ""}. Check the office system for the agenda.`
     );
+  }
+}
+
+function taskLink(taskId: string): string {
+  return `${siteUrl()}/tasks/${taskId}`;
+}
+
+/** SMS + email to the assignee when a task is issued. */
+export async function notifyTaskAssigned(
+  orgId: string,
+  assigneeId: string,
+  issuerName: string,
+  title: string,
+  taskId: string
+) {
+  const link = taskLink(taskId);
+  await notifyUser(
+    orgId,
+    assigneeId,
+    `New task from ${issuerName}: ${title}`,
+    `<p><strong>${issuerName}</strong> has assigned you a task:</p>
+     <p style="font-size:16px"><strong>${title}</strong></p>
+     <p>Open the task here: <a href="${link}">${link}</a></p>`,
+    `${issuerName} assigned you a task: "${title}". Open: ${link}`
+  );
+}
+
+/** SMS + email to the issuer when a report is submitted. */
+export async function notifyTaskReportSubmitted(
+  orgId: string,
+  creatorId: string,
+  submitterName: string,
+  title: string,
+  taskId: string
+) {
+  const link = taskLink(taskId);
+  await notifyUser(
+    orgId,
+    creatorId,
+    `Task report from ${submitterName}: ${title}`,
+    `<p><strong>${submitterName}</strong> submitted a report for the task:</p>
+     <p style="font-size:16px"><strong>${title}</strong></p>
+     <p>Review and acknowledge it here: <a href="${link}">${link}</a></p>`,
+    `${submitterName} submitted a report for "${title}". Review: ${link}`
+  );
+}
+
+/** Superadmin phone numbers that receive an SMS when a contact form is submitted. */
+const SUPERADMIN_ALERT_PHONES = ["0798118515", "0708769459"];export async function notifySuperAdminOfEnquiry(enquiry: {
+  name: string;
+  email: string;
+  phone: string;
+  company?: string | null;
+  subject?: string | null;
+  message: string;
+}) {
+  const from = enquiry.company ? `${enquiry.name} (${enquiry.company})` : enquiry.name;
+  const message = `New enquiry: ${from}\nEmail: ${enquiry.email}\nPhone: ${enquiry.phone}\n${
+    enquiry.subject ? "Subject: " + enquiry.subject + "\n" : ""
+  }Message: ${enquiry.message}`;
+  for (const phone of SUPERADMIN_ALERT_PHONES) {
+    await sendSMS(phone, message);
   }
 }

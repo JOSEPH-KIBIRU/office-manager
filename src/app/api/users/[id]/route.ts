@@ -5,6 +5,7 @@ import { handle, ok, readJson } from "@/lib/api";
 import { sendNewUserCredentials, notifyUser } from "@/lib/notify";
 import { generateTempPassword } from "@/lib/passwords";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { recordAudit } from "@/lib/audit";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
@@ -30,7 +31,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       employee_number?: string;
       basic_salary?: number | null;
       statutory_number?: string;
+      employment_type?: string;
       helb_deduction?: number | null;
+      bank_name?: string;
+      bank_account?: string;
+      mpesa_number?: string;
+      department_id?: string | null;
     }>(req);
 
     if (target._id === session.id && (body.role || body.active === false)) {
@@ -59,9 +65,20 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             : undefined,
         statutoryNumber:
           body.statutory_number !== undefined ? String(body.statutory_number).trim() : undefined,
+        employmentType:
+          body.employment_type === "permanent_pensionable" ? "permanent_pensionable" : body.employment_type !== undefined ? "permanent" : undefined,
         helbDeduction:
           body.helb_deduction !== undefined && body.helb_deduction !== null
             ? Number(body.helb_deduction)
+            : undefined,
+        bankName: body.bank_name !== undefined ? String(body.bank_name).trim() : undefined,
+        bankAccount: body.bank_account !== undefined ? String(body.bank_account).trim() : undefined,
+        mpesaNumber: body.mpesa_number !== undefined ? String(body.mpesa_number).trim() : undefined,
+        departmentId:
+          body.department_id !== undefined
+            ? body.department_id === null || body.department_id === ""
+              ? null
+              : (body.department_id as never)
             : undefined,
         newPasswordHash: tempPassword ? bcrypt.hashSync(tempPassword, 10) : undefined,
         mustChangePassword: body.resetPassword ? true : undefined,
@@ -91,6 +108,29 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         `<p>Your role on the Office Management System has been changed from <strong>${target.role}</strong> to <strong>${body.role}</strong>.</p>`,
         `Your office system role changed to ${body.role}. Log in to see your new access.`
       );
+      await recordAudit(session, {
+        action: "user.role_change",
+        module: "team",
+        summary: `Changed ${target.name}'s role from ${target.role} to ${body.role}`,
+        targetType: "user",
+        targetId: target._id,
+      });
+    } else if (body.active === false) {
+      await recordAudit(session, {
+        action: "user.deactivate",
+        module: "team",
+        summary: `Deactivated ${target.name}`,
+        targetType: "user",
+        targetId: target._id,
+      });
+    } else {
+      await recordAudit(session, {
+        action: "user.update",
+        module: "team",
+        summary: `Updated ${target.name}`,
+        targetType: "user",
+        targetId: target._id,
+      });
     }
 
     return ok({
@@ -105,6 +145,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         basic_salary: updated.basicSalary ?? null,
         statutory_number: updated.statutoryNumber ?? null,
         helb_deduction: updated.helbDeduction ?? null,
+        bank_name: updated.bankName ?? null,
+        bank_account: updated.bankAccount ?? null,
+        mpesa_number: updated.mpesaNumber ?? null,
+        employment_type: updated.employmentType ?? "permanent",
+        department_id: updated.departmentId ?? null,
         must_change_password: updated.mustChangePassword ? 1 : 0,
         active: updated.active ? 1 : 0,
         created_at: new Date(updated.createdAt).toISOString().replace("T", " ").slice(0, 19),
@@ -125,6 +170,13 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
         secret: secret(),
         orgId: session.orgId as never,
         id: idStr as never,
+      });
+      await recordAudit(session, {
+        action: "user.delete",
+        module: "team",
+        summary: `Removed user ${idStr}`,
+        targetType: "user",
+        targetId: idStr,
       });
       return ok(result);
     } catch (e) {

@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("bills", ["admin", "manager", "secretary"]);
     const rows = await cx().query(api.bills.listBills, {
       secret: secret(),
       orgId: session.orgId as never,
@@ -16,12 +16,13 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("bills", ["admin", "manager", "secretary"]);
     const body = await readJson<{
       contactId: string;
       billDate: string;
       dueDate: string;
       amount: number;
+      vatRate?: number;
       description?: string;
     }>(req);
     if (!body.contactId || !body.billDate || !body.dueDate) {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
         billDate: body.billDate,
         dueDate: body.dueDate,
         amount: Number(body.amount),
+        vatRate: body.vatRate !== undefined ? Number(body.vatRate) : undefined,
         description: body.description ?? undefined,
         createdBy: session.id as never,
       });

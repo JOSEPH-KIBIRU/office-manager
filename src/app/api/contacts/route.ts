@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("invoices", ["admin", "manager", "secretary"]);
     const url = new URL(req.url);
     const type = url.searchParams.get("type");
     const rows = await cx().query(api.invoicing.listContacts, {
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("invoices", ["admin", "manager", "secretary"]);
     const body = await readJson<{
       type: "customer" | "supplier";
       name: string;

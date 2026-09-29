@@ -2,7 +2,8 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader, StatusBadge, Modal, Alert, FieldError, inputCls, api } from "@/components/ui";
+import { PageHeader, StatusBadge, Modal, Alert, FieldError, inputCls, ConfirmDialog, api } from "@/components/ui";
+import { useToast } from "@/components/toast";
 import { validate, required, pastOrToday, type Errors } from "@/lib/validation";
 import type { MinuteRow } from "@/lib/types";
 
@@ -12,6 +13,9 @@ export default function MinutesPage() {
   const [showNew, setShowNew] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const toast = useToast();
 
   const [title, setTitle] = useState("");
   const [meetingDate, setMeetingDate] = useState("");
@@ -60,13 +64,19 @@ export default function MinutesPage() {
     }
   }
 
-  async function remove(id: string) {
-    if (!confirm("Delete these minutes?")) return;
+  async function remove() {
+    const id = deletingId;
+    if (!id) return;
+    setDeleteBusy(true);
     try {
       await api(`/api/minutes/${id}`, { method: "DELETE" });
+      toast.success("Minutes deleted.");
+      setDeletingId(null);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Delete failed");
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -110,8 +120,9 @@ export default function MinutesPage() {
                 </td>
                 <td>{m.author_name}</td>
                 <td className="space-x-2 whitespace-nowrap text-right">
-                  <a href={`/minutes/${m.id}`} className="btn-secondary px-2.5 py-1 text-xs">Open</a>
-                  <button onClick={() => remove(m.id)} className="btn-secondary px-2.5 py-1 text-xs text-red-600">Del</button>
+                  <a href={`/minutes/${m.id}`} className="btn-secondary btn-xs">Open</a>
+                  <a href={`/minutes/${m.id}/print`} target="_blank" className="btn-secondary btn-xs">PDF</a>
+                  <button onClick={() => setDeletingId(m.id)} className="btn-secondary btn-xs text-red-600">Del</button>
                 </td>
               </tr>
             ))}
@@ -123,21 +134,21 @@ export default function MinutesPage() {
         <Modal title="New minutes" onClose={() => setShowNew(false)}>
           <form onSubmit={create} className="space-y-3">
             <div>
-              <label className="label">Title</label>
-              <input className={inputCls(errors.title)} value={title}
+              <label className="label" htmlFor="mn-title">Title</label>
+              <input id="mn-title" className={inputCls(errors.title)} value={title}
                 onChange={(e) => { setTitle(e.target.value); clearError("title"); }}
                 placeholder="e.g. Staff Meeting — August 2026" required autoFocus />
               <FieldError msg={errors.title} />
             </div>
             <div>
-              <label className="label">Meeting date</label>
-              <input type="date" className={inputCls(errors.meetingDate)} value={meetingDate}
+              <label className="label" htmlFor="mn-date">Meeting date</label>
+              <input id="mn-date" type="date" className={inputCls(errors.meetingDate)} value={meetingDate}
                 onChange={(e) => { setMeetingDate(e.target.value); clearError("meetingDate"); }} />
               <FieldError msg={errors.meetingDate} />
             </div>
             <div>
-              <label className="label">Attendees</label>
-              <textarea className="input min-h-16" value={attendees} onChange={(e) => setAttendees(e.target.value)}
+              <label className="label" htmlFor="mn-attendees">Attendees</label>
+              <textarea id="mn-attendees" className="input min-h-16" value={attendees} onChange={(e) => setAttendees(e.target.value)}
                 placeholder="Names of members present, one per line" />
             </div>
             <button type="submit" className="btn-primary w-full" disabled={busy}>
@@ -146,6 +157,15 @@ export default function MinutesPage() {
           </form>
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={!!deletingId}
+        title="Delete minutes"
+        message="Delete these minutes? This cannot be undone."
+        busy={deleteBusy}
+        onConfirm={remove}
+        onCancel={() => setDeletingId(null)}
+      />
     </>
   );
 }

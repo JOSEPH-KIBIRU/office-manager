@@ -2,7 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, tsString, fmtCreated } from "./lib";
+import { assertSecret, tsNow, tsString, fmtCreated, requireMember } from "./lib";
 import { notifyStaff, pushNotification } from "./notifications";
 
 type LeaveDoc = Doc<"leaves">;
@@ -37,6 +37,7 @@ export const listLeaves = query({
     assertSecret(args.secret);
     let docs: LeaveDoc[];
     if (args.userId) {
+      await requireMember(ctx, args.orgId, args.userId);
       docs = await ctx.db
         .query("leaves")
         .withIndex("by_user", (q) => q.eq("userId", args.userId as never))
@@ -46,15 +47,9 @@ export const listLeaves = query({
     } else {
       docs = await ctx.db
         .query("leaves")
-        .withIndex("by_org_status", (q) =>
-          q.eq("orgId", args.orgId).eq("status", "pending" as never)
-        )
+        .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
         .collect();
-      const others = await ctx.db
-        .query("leaves")
-        .filter((q) => q.eq(q.field("orgId"), args.orgId))
-        .collect();
-      docs = [...others].sort((a, b) => b.createdAt - a.createdAt);
+      docs = [...docs].sort((a, b) => b.createdAt - a.createdAt);
     }
     return Promise.all(docs.map((d) => enrich(ctx, d)));
   },
@@ -235,5 +230,30 @@ export const deleteLeave = mutation({
       }
     }
     return true;
+  },
+});
+
+/** Unpaid leave-encashment days for a year (used to pay them via payroll). */
+export const listEncashments = query({
+  args: { secret: v.string(), orgId: v.id("organizations"), year: v.number() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const rows = await ctx.db
+      .query("leaveCarryOvers")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const users = await ctx.db
+      .query("users")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const names = new Map(users.map((u) => [u._id as string, u.name]));
+    return rows
+      .filter((r) => r.year === args.year && r.encashedDays > 0 && !r.paidAt)
+      .map((r) => ({
+        id: r._id,
+        user_id: r.userId,
+        name: names.get(r.userId as string) ?? "Unknown",
+        days: r.encashedDays,
+      }));
   },
 });

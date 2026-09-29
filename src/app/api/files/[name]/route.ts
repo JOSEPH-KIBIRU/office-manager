@@ -15,8 +15,9 @@ const MIME: Record<string, string> = {
 };
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ name: string }> }) {
+  let session;
   try {
-    await requireUser();
+    session = await requireUser();
   } catch {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -31,6 +32,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ name: stri
   try {
     url = await cx().mutation(api.storage.getFileUrl, {
       secret: secret(),
+      orgId: session.orgId as never,
       id: name as never,
     });
   } catch {

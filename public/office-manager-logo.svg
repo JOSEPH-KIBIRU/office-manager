@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">Office Manager</title>
+  <desc id="desc">Office Manager SaaS logo with blue and cyan document management emblem on a deep navy background.</desc>
+
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#168BFF"/>
+      <stop offset="55%" stop-color="#0B5CFF"/>
+      <stop offset="100%" stop-color="#1244D8"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5CEBFF"/>
+      <stop offset="100%" stop-color="#08BFEA"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0%" stop-color="#18D9FF" stop-opacity=".22"/>
+      <stop offset="100%" stop-color="#18D9FF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark background -->
+  <rect width="1200" height="400" rx="28" fill="#06142F"/>
+  <ellipse cx="270" cy="205" rx="230" ry="190" fill="url(#glow)"/>
+
+  <!-- Main rounded C/frame -->
+  <path
+    d="M300 72
+       C350 72 391 113 391 163
+       L391 187
+       C391 201 380 212 366 212
+       C352 212 341 201 341 187
+       L341 164
+       C341 141 323 123 300 123
+       L252 123
+       L252 277
+       L300 277
+       C323 277 341 259 341 236
+       L341 225
+       C341 211 352 200 366 200
+       C380 200 391 211 391 225
+       L391 237
+       C391 288 350 329 300 329
+       L224 329
+       C211 329 201 319 201 306
+       L201 94
+       C201 82 211 72 224 72 Z"
+    fill="url(#blue)"
+  />
+
+  <!-- Dark inner cutout -->
+  <path
+    d="M252 123 H300 C323 123 341 141 341 164 V187
+       C341 201 352 212 366 212
+       C352 212 341 223 341 237
+       C341 259 323 277 300 277 H252 Z"
+    fill="#06142F"
+  />
+
+  <!-- Layered documents -->
+  <path
+    d="M270 151
+       L329 117
+       C337 112 347 118 347 127
+       V188
+       L288 222
+       C280 227 270 221 270 212 Z"
+    fill="url(#cyan)"
+  />
+
+  <path
+    d="M292 177
+       L351 143
+       C359 138 369 144 369 153
+       V214
+       L310 248
+       C302 253 292 247 292 238 Z"
+    fill="#17C9F1"
+  />
+
+  <path
+    d="M314 203
+       L373 169
+       C381 164 391 170 391 179
+       V240
+       L332 274
+       C324 279 314 273 314 264 Z"
+    fill="#08B8E8"
+  />
+
+  <!-- Check badge -->
+  <circle cx="393" cy="272" r="43" fill="#19D3FF" filter="url(#softGlow)" opacity=".35"/>
+  <circle cx="393" cy="272" r="37" fill="url(#cyan)"/>
+  <path d="M375 272 L388 285 L414 255"
+        fill="none"
+        stroke="#06142F"
+        stroke-width="10"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Wordmark -->
+  <text x="470" y="181"
+        font-family="Inter, Geist, Arial, sans-serif"
+        font-size="86"
+        font-weight="400"
+        letter-spacing="-3"
+        fill="#FFFFFF">Office</text>
+
+  <text x="470" y="278"
+        font-family="Inter, Geist, Arial, sans-serif"
+        font-size="92"
+        font-weight="750"
+        letter-spacing="-4"
+        fill="#FFFFFF">Manager</text>
+</svg>

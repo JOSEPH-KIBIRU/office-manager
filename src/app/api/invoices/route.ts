@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("invoices", ["admin", "manager", "secretary"]);
     const rows = await cx().query(api.invoicing.listInvoices, {
       secret: secret(),
       orgId: session.orgId as never,
@@ -16,13 +16,15 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("invoices", ["admin", "manager", "secretary"]);
     const body = await readJson<{
       contactId: string;
       issueDate: string;
       dueDate: string;
       lineItems: Array<{ description: string; qty: number; unitPrice: number; taxRate: number }>;
       note?: string;
+      paymentDetails?: string;
+      terms?: string;
       recurringFrequency?: "weekly" | "monthly" | "quarterly" | "yearly";
       recurringActive?: boolean;
     }>(req);
@@ -41,6 +43,8 @@ export async function POST(req: NextRequest) {
         dueDate: body.dueDate,
         lineItems: body.lineItems,
         note: body.note ?? undefined,
+        paymentDetails: body.paymentDetails ?? undefined,
+        terms: body.terms ?? undefined,
         recurringFrequency: body.recurringFrequency as never,
         recurringActive: body.recurringActive ?? false,
         createdBy: session.id as never,

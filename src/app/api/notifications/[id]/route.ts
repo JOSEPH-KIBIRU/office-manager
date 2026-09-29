@@ -13,6 +13,7 @@ export async function PATCH(_req: NextRequest, ctx: { params: Promise<{ id: stri
         secret: secret(),
         orgId: session.orgId as never,
         id: id as never,
+        userId: session.id as never,
       });
       return ok({ read: true });
     } catch (e) {

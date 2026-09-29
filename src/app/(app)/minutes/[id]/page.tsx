@@ -128,21 +128,21 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
         <section className="card space-y-3 p-5">
           <h2 className="font-semibold">Meeting details</h2>
           <div>
-            <label className="label">Title</label>
-            <input className={inputCls(errors.title)} value={title}
+            <label className="label" htmlFor="md-title">Title</label>
+            <input id="md-title" className={inputCls(errors.title)} value={title}
               onChange={(e) => { setTitle(e.target.value); clearError("title"); }} />
             <FieldError msg={errors.title} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="label">Date</label>
-              <input type="date" className={inputCls(errors.meetingDate)} value={meetingDate}
+              <label className="label" htmlFor="md-date">Date</label>
+              <input id="md-date" type="date" className={inputCls(errors.meetingDate)} value={meetingDate}
                 onChange={(e) => { setMeetingDate(e.target.value); clearError("meetingDate"); }} />
               <FieldError msg={errors.meetingDate} />
             </div>
             <div>
-              <label className="label">Attachment</label>
-              <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg" className="input py-1.5"
+              <label className="label" htmlFor="md-attach">Attachment</label>
+              <input id="md-attach" ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg" className="input py-1.5"
                 onChange={(e) => e.target.files?.[0] && uploadFile(e.target.files[0])} />
               {m?.file_path && (
                 <a href={`/api/files/${m.file_path}`} className="mt-1 inline-block text-xs text-blue-700 hover:underline">
@@ -152,20 +152,21 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
           <div>
-            <label className="label">Attendees</label>
-            <textarea className="input min-h-20" value={attendees} onChange={(e) => setAttendees(e.target.value)}
+            <label className="label" htmlFor="md-attendees">Attendees</label>
+            <textarea id="md-attendees" className="input min-h-20" value={attendees} onChange={(e) => setAttendees(e.target.value)}
               placeholder="Members present, one per line" />
           </div>
 
           <hr className="border-slate-100" />
           <div>
             <div className="flex items-center justify-between">
-              <label className="label">Rough points</label>
+              <label className="label" htmlFor="md-points">Rough points</label>
               <button onClick={generate} className="btn-primary px-3 py-1.5 text-xs" disabled={generating}>
                 {generating ? "Generating…" : "✨ Generate minutes with AI"}
               </button>
             </div>
             <textarea
+              id="md-points"
               className="input min-h-64 font-mono text-xs leading-relaxed"
               value={points}
               onChange={(e) => setPoints(e.target.value)}
@@ -188,8 +189,9 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
           <div className="flex flex-wrap gap-2">
             <button onClick={() => save("draft")} className="btn-secondary" disabled={busy}>Save draft</button>
             <button onClick={() => save("final")} className="btn-success" disabled={busy}>Mark final</button>
+            <a href={`/minutes/${id}/print`} target="_blank" className="btn-secondary ml-auto">Download / print as PDF</a>
             {m?.file_path && (
-              <a href={`/api/files/${m.file_path}`} className="btn-secondary ml-auto">Download attachment</a>
+              <a href={`/api/files/${m.file_path}`} className="btn-secondary">Download attachment</a>
             )}
           </div>
         </section>

@@ -21,16 +21,20 @@ interface MyPayslip {
 
 export default function MyPayslipsPage() {
   const [payslips, setPayslips] = useState<MyPayslip[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MyPayslip | null>(null);
   const [detail, setDetail] = useState<PayslipDetail | null>(null);
 
   async function load() {
+    setLoading(true);
     try {
       const data = await api<{ payslips: MyPayslip[] }>("/api/payroll/my");
       setPayslips(data.payslips);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load payslips");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -53,10 +57,24 @@ export default function MyPayslipsPage() {
     <>
       <PageHeader
         title="My Payslips"
-        subtitle="View your monthly salary statements. Open a payslip to print or save it as a PDF."
+        subtitle="View your monthly salary statements. Open a payslip to print or save it as a PDF, and pull your annual P9 tax card per year."
       />
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
+
+      {payslips.length > 0 && (
+        <div className="card mb-6 p-5">
+          <h2 className="text-sm font-semibold text-slate-600">Annual P9 returns</h2>
+          <p className="mt-1 text-xs text-slate-500">Download your Kenya P9 tax deduction card for each year you have payslips.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[...new Set(payslips.map((p) => p.year))].sort((a, b) => b - a).map((y) => (
+              <button key={y} className="btn-secondary" onClick={() => window.open(`/p9?year=${y}`, "_blank")}>
+                P9 — {y}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card overflow-x-auto">
         <table className="table-base">
@@ -70,18 +88,21 @@ export default function MyPayslipsPage() {
             </tr>
           </thead>
           <tbody>
-            {payslips.map((p) => (
+            {loading && (
+              <tr><td colSpan={5} className="py-6 text-center text-sm text-slate-500">Loading payslips…</td></tr>
+            )}
+            {!loading && payslips.map((p) => (
               <tr key={p.id}>
                 <td className="font-medium">{MONTHS[p.month - 1]} {p.year}</td>
                 <td className="text-right">{fmt(p.grossPay)}</td>
                 <td className="text-right text-emerald-700">{fmt(p.netPay)}</td>
                 <td className="text-slate-500">{p.created_at}</td>
                 <td className="whitespace-nowrap text-right">
-                  <button onClick={() => open(p)} className="btn-secondary px-3 py-1 text-xs">View</button>
+                  <button onClick={() => open(p)} className="btn-secondary btn-xs">View</button>
                 </td>
               </tr>
             ))}
-            {payslips.length === 0 && (
+            {!loading && payslips.length === 0 && (
               <tr><td colSpan={5} className="py-6 text-center text-sm text-slate-500">No payslips have been generated for you yet.</td></tr>
             )}
           </tbody>

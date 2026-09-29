@@ -8,6 +8,57 @@ export default defineSchema(
     slug: v.string(),
     active: v.boolean(),
     createdAt: v.number(),
+    logoFileId: v.optional(v.union(v.id("_storage"), v.null())),
+    address: v.optional(v.string()),
+    city: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    taxNumber: v.optional(v.string()),
+    website: v.optional(v.string()),
+    // Working week: 0 = Sunday … 6 = Saturday. Used to compute actual leave
+    // days (weekends and public holidays excluded). Defaults to Mon–Fri.
+    workingDays: v.optional(v.array(v.number())),
+    // KRA eTIMS (electronic tax invoice) settings.
+    etimsEnabled: v.optional(v.boolean()),
+    etimsEnv: v.optional(v.union(v.literal("sandbox"), v.literal("production"))),
+    etimsBaseUrl: v.optional(v.string()),
+    etimsTin: v.optional(v.string()),
+    etimsBhfId: v.optional(v.string()),
+    etimsDeviceSerial: v.optional(v.string()),
+    etimsApiKey: v.optional(v.string()),
+    etimsApiSecret: v.optional(v.string()),
+    // Invoice payment reminders (dunning).
+    remindersEnabled: v.optional(v.boolean()),
+    reminderIntervalDays: v.optional(v.number()),
+    reminderMax: v.optional(v.number()),
+    // Leave policy.
+    leaveEntitlement: v.optional(v.number()),
+    leaveCarryOverMax: v.optional(v.number()),
+    leaveEncashment: v.optional(v.boolean()),
+    // Attendance / time clock.
+    workStartTime: v.optional(v.string()),
+    workEndTime: v.optional(v.string()),
+    graceMinutes: v.optional(v.number()),
+    // Fine-grained per-role module access. Keys are roles ("secretary",
+    // "manager", "employee"); values are the granted module keys. "admin" is
+    // always full access and is never stored here. A role with no entry keeps
+    // its defaults.
+    rolePermissions: v.optional(v.record(v.string(), v.array(v.string()))),
+    // Platform feature cap set by the super admin. When present, only these
+    // modules are available to the company at all — they cannot be granted in
+    // the company's Roles & permissions tab and are hidden from every role.
+    // Absent/undefined means "all modules enabled" (the default).
+    enabledModules: v.optional(v.array(v.string())),
+    // Invoice defaults (entered once per company; applied to every invoice
+    // unless a specific invoice overrides them).
+    paymentDetails: v.optional(v.string()),
+    invoiceNotes: v.optional(v.string()),
+    invoiceTerms: v.optional(v.string()),
+    // Soft delete: when set, the company is archived (hidden + login blocked) but
+    // all of its data is retained and it can be restored.
+    deletedAt: v.optional(v.number()),
+    deletedBy: v.optional(v.id("users")),
+    lastAccessedAt: v.optional(v.number()),
   }).index("by_slug", ["slug"]),
 
   users: defineTable({
@@ -29,14 +80,35 @@ export default defineSchema(
     employeeNumber: v.optional(v.string()),
     basicSalary: v.optional(v.number()),
     statutoryNumber: v.optional(v.string()),
+    bankName: v.optional(v.string()),
+    bankAccount: v.optional(v.string()),
+    mpesaNumber: v.optional(v.string()),
+    employmentType: v.optional(
+      v.union(v.literal("permanent"), v.literal("permanent_pensionable"))
+    ),
     helbDeduction: v.optional(v.number()),
+    departmentId: v.optional(v.id("departments")),
+    termsAgreedAt: v.optional(v.number()),
+    termsVersion: v.optional(v.string()),
     leaveBalance: v.number(),
     mustChangePassword: v.boolean(),
     active: v.boolean(),
+    lastLoginAt: v.optional(v.number()),
+    twoFactorSecret: v.optional(v.string()),
+    twoFactorEnabledAt: v.optional(v.number()),
+    twoFactorRecoveryHashes: v.optional(v.array(v.string())),
+    sessionVersion: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_email", ["email"])
-    .index("by_org", ["orgId"]),
+    .index("by_org", ["orgId"])
+    .index("by_org_department", ["orgId", "departmentId"]),
+
+  departments: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    createdAt: v.number(),
+  }).index("by_org", ["orgId"]),
 
   leaves: defineTable({
     orgId: v.id("organizations"),
@@ -53,7 +125,71 @@ export default defineSchema(
     createdAt: v.number(),
   })
     .index("by_user", ["userId"])
+    .index("by_org", ["orgId"])
     .index("by_org_status", ["orgId", "status"]),
+
+  leaveCarryOvers: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    year: v.number(),
+    carriedDays: v.number(),
+    encashedDays: v.number(),
+    paidAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_user", ["orgId", "userId"]),
+
+  attendance: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    date: v.string(),
+    clockInAt: v.number(),
+    clockOutAt: v.optional(v.number()),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_user", ["orgId", "userId"])
+    .index("by_org_date", ["orgId", "date"]),
+
+  documents: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.optional(v.id("users")),
+    title: v.string(),
+    category: v.union(
+      v.literal("contract"),
+      v.literal("license"),
+      v.literal("insurance"),
+      v.literal("certificate"),
+      v.literal("other")
+    ),
+    issuedDate: v.optional(v.string()),
+    expiryDate: v.optional(v.string()),
+    fileName: v.optional(v.string()),
+    fileId: v.optional(v.id("_storage")),
+    notes: v.optional(v.string()),
+    remLastAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_expiry", ["orgId", "expiryDate"]),
+
+  checklistItems: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    kind: v.union(v.literal("onboarding"), v.literal("offboarding")),
+    title: v.string(),
+    done: v.boolean(),
+    doneBy: v.optional(v.id("users")),
+    doneAt: v.optional(v.number()),
+    sortOrder: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_user", ["orgId", "userId"]),
 
   carLogs: defineTable({
     orgId: v.id("organizations"),
@@ -139,30 +275,63 @@ export default defineSchema(
     runAt: v.optional(v.number()),
   }),
 
+  rateLimitBuckets: defineTable({
+    key: v.string(),
+    windowStart: v.number(),
+    count: v.number(),
+  }).index("by_key", ["key"]),
+
+  migrations: defineTable({
+    name: v.string(),
+    runAt: v.number(),
+  }).index("by_name", ["name"]),
+
   payrolls: defineTable({
     orgId: v.id("organizations"),
     month: v.number(),
     year: v.number(),
     runBy: v.id("users"),
     createdAt: v.number(),
+    paidAt: v.optional(v.number()),
+    paidBy: v.optional(v.id("users")),
+    paymentMethod: v.optional(v.string()),
     payslips: v.array(
       v.object({
-        userId: v.id("users"),
+        userId: v.optional(v.id("users")),
+        casualId: v.optional(v.id("casuals")),
+        personType: v.optional(v.union(v.literal("employee"), v.literal("casual"))),
         name: v.string(),
         employeeNumber: v.optional(v.string()),
         role: v.string(),
+        employmentType: v.optional(
+          v.union(v.literal("permanent"), v.literal("permanent_pensionable"), v.literal("casual"))
+        ),
         basicSalary: v.number(),
         allowances: v.number(),
+        perDiem: v.optional(v.number()),
+        overtimeHours: v.optional(v.number()),
+        overtimeRate: v.optional(v.number()),
+        overtimePay: v.optional(v.number()),
+        bonus: v.optional(v.number()),
         leaveDaysPayout: v.number(),
+        daysWorked: v.optional(v.number()),
+        dailyRate: v.optional(v.number()),
+        statutory: v.optional(v.boolean()),
         grossPay: v.number(),
         nssf: v.number(),
+        nssfTier1: v.optional(v.number()),
+        nssfTier2: v.optional(v.number()),
         sha: v.number(),
         housingLevy: v.number(),
+        pension: v.optional(v.number()),
         taxablePay: v.optional(v.number()),
         incomeTax: v.optional(v.number()),
         personalRelief: v.optional(v.number()),
         paye: v.number(),
         helb: v.number(),
+        loanRepayment: v.optional(v.number()),
+        loanId: v.optional(v.id("staffLoans")),
+        otherDeductions: v.optional(v.number()),
         totalDeductions: v.number(),
         netPay: v.number(),
       })
@@ -170,6 +339,83 @@ export default defineSchema(
   })
     .index("by_org_month_year", ["orgId", "month", "year"])
     .index("by_org", ["orgId"]),
+
+  staffLoans: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    kind: v.union(v.literal("loan"), v.literal("advance")),
+    principal: v.number(),
+    balance: v.number(),
+    monthlyDeduction: v.number(),
+    description: v.optional(v.string()),
+    active: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_user", ["orgId", "userId"]),
+
+  casualAttendance: defineTable({
+    orgId: v.id("organizations"),
+    casualId: v.id("casuals"),
+    date: v.string(),
+    days: v.number(),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_casual", ["orgId", "casualId"]),
+
+  assets: defineTable({
+    orgId: v.id("organizations"),
+    tag: v.string(),
+    name: v.string(),
+    category: v.optional(v.string()),
+    serialNumber: v.optional(v.string()),
+    condition: v.optional(v.string()),
+    status: v.union(
+      v.literal("available"),
+      v.literal("assigned"),
+      v.literal("maintenance"),
+      v.literal("retired")
+    ),
+    currentHolderId: v.optional(v.id("users")),
+    currentHolderName: v.optional(v.string()),
+    currentCheckedOutAt: v.optional(v.number()),
+    active: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_tag", ["orgId", "tag"]),
+
+  assetMovements: defineTable({
+    orgId: v.id("organizations"),
+    assetId: v.id("assets"),
+    assetName: v.string(),
+    assetTag: v.string(),
+    action: v.union(v.literal("checkout"), v.literal("checkin")),
+    holderId: v.id("users"),
+    holderName: v.string(),
+    recordedBy: v.optional(v.id("users")),
+    recordedByName: v.optional(v.string()),
+    at: v.number(),
+    destination: v.optional(v.string()),
+    condition: v.optional(v.string()),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_asset", ["orgId", "assetId"])
+    .index("by_org_holder", ["orgId", "holderId"]),
+
+  casuals: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    phone: v.optional(v.string()),
+    idNumber: v.optional(v.string()),
+    dailyRate: v.number(),
+    active: v.boolean(),
+    createdAt: v.number(),
+  }).index("by_org", ["orgId"]),
 
   notifications: defineTable({
     orgId: v.id("organizations"),
@@ -218,6 +464,8 @@ export default defineSchema(
       })
     ),
     note: v.optional(v.string()),
+    paymentDetails: v.optional(v.string()),
+    terms: v.optional(v.string()),
     subtotal: v.number(),
     taxTotal: v.number(),
     total: v.number(),
@@ -228,6 +476,17 @@ export default defineSchema(
     createdBy: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),
+    // eTIMS (KRA) submission state.
+    etimsStatus: v.optional(
+      v.union(v.literal("not_sent"), v.literal("pending"), v.literal("submitted"), v.literal("failed"))
+    ),
+    etimsControlNumber: v.optional(v.string()),
+    etimsQrData: v.optional(v.string()),
+    etimsSubmittedAt: v.optional(v.number()),
+    etimsError: v.optional(v.string()),
+    // Payment-reminder (dunning) bookkeeping.
+    remLastAt: v.optional(v.number()),
+    remCount: v.optional(v.number()),
   }).index("by_org", ["orgId"]),
 
   bills: defineTable({
@@ -237,6 +496,7 @@ export default defineSchema(
     billDate: v.string(),
     dueDate: v.string(),
     amount: v.number(),
+    vatRate: v.optional(v.number()),
     description: v.optional(v.string()),
     status: v.union(v.literal("pending"), v.literal("paid"), v.literal("overdue")),
     paidAt: v.optional(v.string()),
@@ -244,4 +504,301 @@ export default defineSchema(
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_org", ["orgId"]),
+
+  storedFiles: defineTable({
+    orgId: v.id("organizations"),
+    storageId: v.id("_storage"),
+    kind: v.union(v.literal("logo"), v.literal("minutes"), v.literal("task"), v.literal("other")),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_storage", ["storageId"]),
+
+  tasks: defineTable({
+    orgId: v.id("organizations"),
+    title: v.string(),
+    description: v.string(),
+    priority: v.union(v.literal("low"), v.literal("normal"), v.literal("high"), v.literal("urgent")),
+    dueDate: v.optional(v.string()),
+    status: v.union(
+      v.literal("open"),
+      v.literal("in_progress"),
+      v.literal("submitted"),
+      v.literal("acknowledged"),
+      v.literal("reopened"),
+      v.literal("cancelled")
+    ),
+    createdBy: v.id("users"),
+    assigneeId: v.id("users"),
+    acknowledgedBy: v.optional(v.id("users")),
+    acknowledgedAt: v.optional(v.string()),
+    remark: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_assignee", ["orgId", "assigneeId"])
+    .index("by_org_creator", ["orgId", "createdBy"]),
+
+  taskUpdates: defineTable({
+    orgId: v.id("organizations"),
+    taskId: v.id("tasks"),
+    userId: v.id("users"),
+    kind: v.union(v.literal("report"), v.literal("comment")),
+    description: v.optional(v.string()),
+    doing: v.optional(v.string()),
+    location: v.optional(v.string()),
+    photos: v.array(v.object({ url: v.string(), name: v.string() })),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_task", ["taskId"]),
+
+  pettyCashBudgets: defineTable({
+    orgId: v.id("organizations"),
+    period: v.string(),
+    amount: v.number(),
+    setBy: v.id("users"),
+    setAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_period", ["orgId", "period"]),
+
+  ledgerAccounts: defineTable({
+    orgId: v.id("organizations"),
+    code: v.string(),
+    name: v.string(),
+    type: v.union(
+      v.literal("asset"),
+      v.literal("liability"),
+      v.literal("equity"),
+      v.literal("income"),
+      v.literal("expense")
+    ),
+    group: v.string(),
+    isCash: v.optional(v.boolean()),
+    isVat: v.optional(v.boolean()),
+    statutory: v.optional(v.boolean()),
+    active: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_code", ["orgId", "code"]),
+
+  accountingPeriods: defineTable({
+    orgId: v.id("organizations"),
+    period: v.string(),
+    label: v.string(),
+    start: v.string(),
+    end: v.string(),
+    status: v.union(v.literal("open"), v.literal("locked"), v.literal("future")),
+    lockedAt: v.optional(v.string()),
+    lockedBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_period", ["orgId", "period"]),
+
+  journals: defineTable({
+    orgId: v.id("organizations"),
+    date: v.string(),
+    period: v.string(),
+    ref: v.string(),
+    source: v.union(
+      v.literal("opening"),
+      v.literal("invoice"),
+      v.literal("bill"),
+      v.literal("payroll"),
+      v.literal("petty_cash"),
+      v.literal("petty_cash_fund"),
+      v.literal("car_log"),
+      v.literal("bank"),
+      v.literal("vat"),
+      v.literal("depreciation"),
+      v.literal("manual")
+    ),
+    sourceId: v.optional(v.string()),
+    description: v.string(),
+    lines: v.array(
+      v.object({
+        accountCode: v.string(),
+        debit: v.number(),
+        credit: v.number(),
+        memo: v.optional(v.string()),
+      })
+    ),
+    postedBy: v.optional(v.id("users")),
+    postedByName: v.optional(v.string()),
+    postedAt: v.number(),
+    reversedBy: v.optional(v.id("journals")),
+    reversesId: v.optional(v.id("journals")),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_period", ["orgId", "period"])
+    .index("by_source", ["orgId", "source", "sourceId"]),
+
+  bankLines: defineTable({
+    orgId: v.id("organizations"),
+    accountCode: v.string(),
+    date: v.string(),
+    description: v.string(),
+    amount: v.number(),
+    reference: v.optional(v.string()),
+    status: v.union(v.literal("unmatched"), v.literal("matched"), v.literal("ignored")),
+    journalId: v.optional(v.id("journals")),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_account", ["orgId", "accountCode"])
+    .index("by_org_status", ["orgId", "status"]),
+
+  calendarConnections: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    provider: v.union(v.literal("google"), v.literal("microsoft")),
+    email: v.optional(v.string()),
+    accessToken: v.string(),
+    refreshToken: v.optional(v.string()),
+    expiresAt: v.number(),
+    scope: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("error")),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_org", ["orgId"])
+    .index("by_user_provider", ["userId", "provider"]),
+
+  calendarEvents: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    provider: v.string(),
+    sourceType: v.string(),
+    sourceId: v.string(),
+    externalEventId: v.string(),
+    calendarId: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_source", ["sourceType", "sourceId"])
+    .index("by_user", ["userId"]),
+
+  calendarSyncJobs: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    provider: v.string(),
+    sourceType: v.string(),
+    sourceId: v.string(),
+    action: v.union(v.literal("upsert"), v.literal("delete")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("done"),
+      v.literal("error")
+    ),
+    attempts: v.number(),
+    lastError: v.optional(v.string()),
+    runAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status_runAt", ["status", "runAt"])
+    .index("by_source", ["sourceType", "sourceId"]),
+
+  announcements: defineTable({
+    message: v.string(),
+    type: v.union(
+      v.literal("info"),
+      v.literal("maintenance"),
+      v.literal("training"),
+      v.literal("offer"),
+      v.literal("outage")
+    ),
+    link: v.optional(v.string()),
+    active: v.boolean(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+    color: v.optional(v.string()),
+  }).index("by_active", ["active"]),
+
+  enquiries: defineTable({
+    name: v.string(),
+    email: v.string(),
+    phone: v.string(),
+    company: v.optional(v.string()),
+    subject: v.optional(v.string()),
+    message: v.string(),
+    status: v.union(v.literal("new"), v.literal("contacted"), v.literal("closed")),
+    createdAt: v.number(),
+  }).index("by_status", ["status"]),
+
+  visitors: defineTable({
+    orgId: v.id("organizations"),
+    visitorName: v.string(),
+    phone: v.string(),
+    carReg: v.optional(v.string()),
+    visitorTo: v.id("users"),
+    status: v.union(v.literal("pending"), v.literal("seen"), v.literal("completed")),
+    createdAt: v.number(),
+  }).index("by_org", ["orgId"]),
+
+  holidays: defineTable({
+    orgId: v.id("organizations"),
+    date: v.string(),
+    name: v.string(),
+    createdAt: v.number(),
+  }).index("by_org", ["orgId"]),
+
+  backups: defineTable({
+    orgId: v.id("organizations"),
+    orgName: v.string(),
+    kind: v.union(v.literal("manual"), v.literal("pre_delete"), v.literal("pre_restore")),
+    storageId: v.id("_storage"),
+    size: v.number(),
+    counts: v.any(),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+  }).index("by_org", ["orgId"]),
+
+  passwordResets: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    codeHash: v.string(),
+    expiresAt: v.number(),
+    attempts: v.number(),
+    usedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_org", ["orgId"]),
+
+  auditLogs: defineTable({
+    orgId: v.id("organizations"),
+    actorId: v.optional(v.id("users")),
+    actorName: v.string(),
+    actorRole: v.string(),
+    action: v.string(),
+    module: v.string(),
+    targetType: v.optional(v.string()),
+    targetId: v.optional(v.string()),
+    summary: v.string(),
+    metadata: v.optional(v.any()),
+    ip: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_module", ["orgId", "module"])
+    .index("by_org_action", ["orgId", "action"]),
+
+  healthChecks: defineTable({
+    status: v.union(v.literal("up"), v.literal("down")),
+    source: v.optional(v.string()),
+    latencyMs: v.optional(v.number()),
+    error: v.optional(v.string()),
+    checkedAt: v.number(),
+  }).index("by_checkedAt", ["checkedAt"]),
 });

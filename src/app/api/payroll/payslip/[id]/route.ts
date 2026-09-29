@@ -14,6 +14,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     const { id } = await ctx.params;
     const url = new URL(req.url);
     const requestedUserId = url.searchParams.get("userId");
+    const requestedCasualId = url.searchParams.get("casualId");
 
     let row;
     try {
@@ -21,8 +22,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
         secret: secret(),
         orgId: session.orgId as never,
         id: id as never,
+        viewerId: session.id as never,
         admin: session.role === "admin" && !!requestedUserId,
         userId: (session.role === "admin" && requestedUserId ? requestedUserId : session.id) as never,
+        casualId: (session.role === "admin" && requestedCasualId ? requestedCasualId : undefined) as never,
       });
     } catch (e) {
       return mapConvexError(e);

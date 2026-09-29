@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields, fail } from "@/lib/api";
 import { notifyAdmins } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET() {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager"]);
+    const session = await requirePermission("cars", ["admin", "manager"]);
     try {
       const carLogs = await cx().query(api.carLogs.listCarLogs, {
         secret: secret(),
@@ -21,7 +22,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager"]);
+    const session = await requirePermission("cars", ["admin", "manager"]);
     const body = await readJson<{
       vehicle_reg: string;
       category: string;

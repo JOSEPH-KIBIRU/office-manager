@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
-import { handle, ok, readJson, requireFields } from "@/lib/api";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
+import { handle, ok, readJson, requireFields, maxLen } from "@/lib/api";
 import { notifyMeetingScheduled } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { queueCalendarSync } from "@/lib/calendar/enqueue";
 
 export async function GET() {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("meetings", ["admin", "secretary", "manager", "employee"]);
     try {
       const meetings = await cx().query(api.meetings.listMeetings, {
         secret: secret(),
@@ -21,7 +23,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary"]);
+    const session = await requirePermission("meetings", ["admin", "secretary"]);
     const body = await readJson<{
       title: string;
       agenda?: string;
@@ -31,9 +33,12 @@ export async function POST(req: NextRequest) {
       director_id?: string | number | null;
     }>(req);
     requireFields(body, ["title", "scheduled_at"]);
+    maxLen(body.title, "Title", 200);
+    if (body.agenda !== undefined) maxLen(body.agenda, "Agenda", 2000);
+    if (body.location !== undefined) maxLen(body.location, "Location", 200);
 
     const attendeeIds = Array.isArray(body.attendees)
-      ? body.attendees.map(String).filter((s) => s.length > 0)
+      ? body.attendees.map(String).filter((s) => s.length > 0).slice(0, 100)
       : [];
 
     // Attendees must belong to the same organization.
@@ -72,6 +77,14 @@ export async function POST(req: NextRequest) {
         body.location ?? null
       );
     }
+
+    await queueCalendarSync(
+      session.orgId as string,
+      [session.id, ...attendeeIds, body.director_id ? String(body.director_id) : null],
+      "meeting",
+      id,
+      "upsert"
+    );
 
     return ok({ meetingId: id });
   });

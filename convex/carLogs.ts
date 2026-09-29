@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
 import { assertSecret, tsNow, tsString, fmtCreated } from "./lib";
+import { tryPostJournalForSource } from "./accounting";
 import { notifyStaff, pushNotification } from "./notifications";
 
 type CarLogDoc = Doc<"carLogs">;
@@ -125,6 +126,21 @@ export const updateCarLog = mutation({
         approvedAt: tsString(),
         note: args.note ?? row.note,
       });
+      if (status === "approved") {
+        const expenseCode = row.category === "insurance" ? "5120" : "5110";
+        await tryPostJournalForSource(ctx, {
+          orgId: args.orgId,
+          source: "car_log",
+          sourceId: row._id,
+          date: row.logDate,
+          description: `Car ${row.category} · ${row.vehicleReg}`,
+          lines: [
+            { accountCode: expenseCode, debit: row.amount, credit: 0, memo: row.vehicleReg },
+            { accountCode: "1020", debit: 0, credit: row.amount, memo: row.vehicleReg },
+          ],
+          postedByName: "Auto (car log approved)",
+        });
+      }
       await pushNotification(ctx, args.orgId as unknown as string, {
         userId: row.requestedBy as unknown as string,
         type: "car",

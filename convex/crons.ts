@@ -33,10 +33,26 @@ export const annualLeaveReset = internalMutation({
         .withIndex("by_org", (q) => q.eq("orgId", org._id))
         .collect();
 
+      const entitlement = org.leaveEntitlement ?? 21;
+      const carryMax = org.leaveCarryOverMax ?? 0;
+
       for (const u of users) {
-        if (u.active && u.leaveBalance !== 21) {
-          await ctx.db.patch(u._id, { leaveBalance: 21 });
+        if (!u.active) continue;
+        const remaining = Math.max(0, u.leaveBalance);
+        const carried = Math.min(remaining, carryMax);
+        const encashed = org.leaveEncashment ? Math.max(0, remaining - carryMax) : 0;
+        const newBalance = entitlement + carried;
+        if (u.leaveBalance !== newBalance) {
+          await ctx.db.patch(u._id, { leaveBalance: newBalance });
         }
+        await ctx.db.insert("leaveCarryOvers", {
+          orgId: org._id,
+          userId: u._id,
+          year,
+          carriedDays: carried,
+          encashedDays: encashed,
+          createdAt: tsNow(),
+        });
       }
       resetUsers += users.length;
 

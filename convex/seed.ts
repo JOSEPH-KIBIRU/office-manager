@@ -14,6 +14,7 @@ export const ensureAppInit = mutation({
     adminName: v.string(),
     adminEmail: v.string(),
     adminPasswordHash: v.string(),
+    adminPhone: v.optional(v.string()),
     superAdminEmail: v.optional(v.string()),
     superAdminName: v.optional(v.string()),
     superAdminPasswordHash: v.optional(v.string()),
@@ -52,7 +53,7 @@ export const ensureAppInit = mutation({
           platformRole: "platform_owner",
           passwordHash: args.superAdminPasswordHash,
           leaveBalance: 0,
-          mustChangePassword: false,
+          mustChangePassword: true,
           active: true,
           createdAt: tsNow(),
         });
@@ -85,13 +86,22 @@ export const ensureAppInit = mutation({
         orgId: org._id,
         name: args.adminName,
         email: args.adminEmail.toLowerCase().trim(),
+        phone: args.adminPhone || undefined,
         role: "admin",
         passwordHash: args.adminPasswordHash,
         leaveBalance: 21,
-        mustChangePassword: false,
+        mustChangePassword: true,
         active: true,
         createdAt: tsNow(),
       });
+    } else if (
+      args.adminPhone &&
+      existingUsers.role === "admin" &&
+      existingUsers.email === args.adminEmail.toLowerCase().trim() &&
+      !existingUsers.phone
+    ) {
+      // Backfill the phone number for installs seeded before ADMIN_PHONE was set.
+      await ctx.db.patch(existingUsers._id, { phone: args.adminPhone });
     }
 
     return true;

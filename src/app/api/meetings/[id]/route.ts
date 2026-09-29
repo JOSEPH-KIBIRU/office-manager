@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { notifyMeetingScheduled } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { queueCalendarSync } from "@/lib/calendar/enqueue";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary"]);
+    const session = await requirePermission("meetings", ["admin", "secretary"]);
     const { id } = await ctx.params;
 
     const row = await cx().query(api.meetings.getMeeting, {
@@ -34,6 +36,16 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const attendees = Array.isArray(body.attendees)
       ? body.attendees.map(String).filter((s) => s.length > 0)
       : prevAttendees;
+
+    // Attendees and director must belong to the same organization (same rule as create).
+    for (const aId of [...attendees, ...(body.director_id ? [String(body.director_id)] : [])]) {
+      const u = await cx().query(api.auth.getUserById, {
+        secret: secret(),
+        id: aId as never,
+        orgId: session.orgId as never,
+      });
+      if (!u) throw new HttpError(400, "One or more attendees do not belong to your organization");
+    }
 
     let result;
     try {
@@ -67,23 +79,44 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       );
     }
 
+    const directorId = body.director_id ? String(body.director_id) : (row.director_id as string | null);
+    await queueCalendarSync(session.orgId as string, [...attendees, directorId], "meeting", id, "upsert");
+
     return ok({ meetingId: id });
   });
 }
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary"]);
+    const session = await requirePermission("meetings", ["admin", "secretary"]);
     const { id } = await ctx.params;
+
+    const row = await cx().query(api.meetings.getMeeting, {
+      secret: secret(),
+      orgId: session.orgId as never,
+      id: id as never,
+    });
+
     try {
       await cx().mutation(api.meetings.deleteMeeting, {
         secret: secret(),
         orgId: session.orgId as never,
         id: id as never,
       });
-      return ok();
     } catch (e) {
       return mapConvexError(e);
     }
+
+    if (row) {
+      const prev: string[] = JSON.parse(String(row.attendees || "[]"));
+      await queueCalendarSync(
+        session.orgId as string,
+        [...prev, row.director_id as string | null],
+        "meeting",
+        id,
+        "delete"
+      );
+    }
+    return ok();
   });
 }

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/components/ui";
+import Spinner from "@/components/Spinner";
 
 interface NotifItem {
   id: string;
@@ -39,6 +40,7 @@ export default function NotificationBell() {
   const router = useRouter();
   const [data, setData] = useState<NotifData | null>(null);
   const [open, setOpen] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   async function load() {
@@ -79,10 +81,12 @@ export default function NotificationBell() {
   }
 
   async function markAll() {
+    setMarkingAll(true);
     try {
       await api("/api/notifications", { method: "POST" });
       await load();
     } catch {}
+    setMarkingAll(false);
   }
 
   return (
@@ -105,7 +109,8 @@ export default function NotificationBell() {
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <h3 className="text-sm font-bold text-slate-800">Notifications</h3>
             {unread > 0 && (
-              <button onClick={markAll} className="text-xs font-medium text-blue-600 hover:underline">
+              <button onClick={markAll} disabled={markingAll} className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:underline disabled:opacity-60">
+                {markingAll && <Spinner className="h-3 w-3" />}
                 Mark all read
               </button>
             )}

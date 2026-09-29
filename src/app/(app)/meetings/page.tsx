@@ -2,7 +2,8 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useSession } from "@/components/SessionProvider";
-import { PageHeader, StatusBadge, Modal, Alert, FieldError, inputCls, api } from "@/components/ui";
+import { PageHeader, StatusBadge, Modal, Alert, FieldError, inputCls, ConfirmDialog, api } from "@/components/ui";
+import { useToast } from "@/components/toast";
 import { validate, required, notInPast, type Errors } from "@/lib/validation";
 
 interface Meeting {
@@ -34,8 +35,15 @@ export default function MeetingsPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [pendingStatus, setPendingStatus] = useState<{ id: string; status: string } | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const toast = useToast();
+
+  const isScheduler = session.role === "admin" || session.role === "secretary";
 
   const [title, setTitle] = useState("");
   const [agenda, setAgenda] = useState("");
@@ -50,20 +58,29 @@ export default function MeetingsPage() {
   }
 
   async function load() {
+    setLoading(true);
     try {
-      const [m, u] = await Promise.all([
-        api<{ meetings: Meeting[] }>("/api/meetings"),
-        api<{ users: StaffMember[] }>("/api/users"),
-      ]);
+      const m = await api<{ meetings: Meeting[] }>("/api/meetings");
       setMeetings(m.meetings);
-      setStaff(u.users);
+      // Only schedulers may read the staff directory; others just view meetings.
+      if (isScheduler) {
+        try {
+          const u = await api<{ users: StaffMember[] }>("/api/users");
+          setStaff(u.users);
+        } catch {
+          /* attendee list is optional */
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
+    } finally {
+      setLoading(false);
     }
   }
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function toggleAttendee(id: string) {
@@ -102,7 +119,7 @@ export default function MeetingsPage() {
       setLocation("");
       setScheduledAt("");
       setAttendeeIds([]);
-      setNotice("Meeting scheduled. Invited members have been notified by email and SMS.");
+      toast.success("Meeting scheduled. Invited members have been notified by email and SMS.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to schedule");
@@ -112,21 +129,31 @@ export default function MeetingsPage() {
   }
 
   async function setStatus(id: string, status: string) {
+    setStatusBusy(true);
     try {
       await api(`/api/meetings/${id}`, { method: "PATCH", json: { status } });
+      setPendingStatus(null);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Update failed");
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setStatusBusy(false);
     }
   }
 
-  async function remove(id: string) {
-    if (!confirm("Delete this meeting?")) return;
+  async function remove() {
+    const id = deletingId;
+    if (!id) return;
+    setDeleteBusy(true);
     try {
       await api(`/api/meetings/${id}`, { method: "DELETE" });
+      toast.success("Meeting deleted.");
+      setDeletingId(null);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Delete failed");
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -135,15 +162,15 @@ export default function MeetingsPage() {
       <PageHeader
         title="Meetings"
         subtitle="Schedule board and directors' meetings and notify attendees."
-        action={<button className="btn-primary" onClick={() => setShowNew(true)}>+ Schedule meeting</button>}
+        action={isScheduler ? <button className="btn-primary" onClick={() => setShowNew(true)}>+ Schedule meeting</button> : undefined}
       />
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
-      {notice && <div className="mb-4"><Alert kind="success">{notice}</Alert></div>}
 
       <div className="space-y-4">
-        {meetings.length === 0 && <p className="card p-8 text-center text-slate-400">No meetings scheduled yet.</p>}
-        {meetings.map((m) => {
+        {loading && <p className="card p-8 text-center text-slate-500">Loading meetings…</p>}
+        {!loading && meetings.length === 0 && <p className="card p-8 text-center text-slate-500">No meetings scheduled yet.</p>}
+        {!loading && meetings.map((m) => {
           const ids = JSON.parse(m.attendees || "[]") as number[];
           return (
             <div key={m.id} className="card p-5">
@@ -152,22 +179,24 @@ export default function MeetingsPage() {
                   <h3 className="font-semibold">{m.title}</h3>
                   <p className="mt-0.5 text-sm text-slate-500">{fmtDate(m.scheduled_at)} · {m.location || "Location TBD"}</p>
                   {m.agenda && <p className="mt-2 max-w-2xl text-sm text-slate-600 whitespace-pre-wrap">{m.agenda}</p>}
-                  <p className="mt-2 text-xs text-slate-400">
+                  <p className="mt-2 text-xs text-slate-500">
                     Chair: {m.director_name || "—"} · Attendees invited: {ids.length} · Created by {m.created_by_name}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={m.status} />
-                  {m.status === "scheduled" && (
+                  {isScheduler && m.status === "scheduled" && (
                     <>
-                      <button onClick={() => setStatus(m.id, "completed")} className="btn-success px-2.5 py-1 text-xs">Complete</button>
-                      <button onClick={() => setStatus(m.id, "cancelled")} className="btn-danger px-2.5 py-1 text-xs">Cancel</button>
+                      <button onClick={() => setPendingStatus({ id: m.id, status: "completed" })} className="btn-success btn-xs">Complete</button>
+                      <button onClick={() => setPendingStatus({ id: m.id, status: "cancelled" })} className="btn-danger btn-xs">Cancel</button>
                     </>
                   )}
-                  {(session.role === "admin" || session.role === "secretary") && (
-                    <a href="/minutes" className="btn-secondary px-2.5 py-1 text-xs">Minutes →</a>
+                  {isScheduler && (
+                    <a href="/minutes" className="btn-secondary btn-xs">Minutes →</a>
                   )}
-                  <button onClick={() => remove(m.id)} className="btn-secondary px-2.5 py-1 text-xs text-red-600">Del</button>
+                  {isScheduler && (
+                    <button onClick={() => setDeletingId(m.id)} className="btn-secondary btn-xs text-red-600">Del</button>
+                  )}
                 </div>
               </div>
             </div>
@@ -179,33 +208,33 @@ export default function MeetingsPage() {
         <Modal title="Schedule a meeting" onClose={() => setShowNew(false)}>
           <form onSubmit={submit} className="space-y-3">
             <div>
-              <label className="label">Title</label>
-              <input className={inputCls(errors.title)} value={title}
+              <label className="label" htmlFor="mt-title">Title</label>
+              <input id="mt-title" className={inputCls(errors.title)} value={title}
                 onChange={(e) => { setTitle(e.target.value); clearError("title"); }}
                 placeholder="e.g. Monthly Board Meeting" required />
               <FieldError msg={errors.title} />
             </div>
             <div>
-              <label className="label">Agenda</label>
-              <textarea className="input min-h-24" value={agenda} onChange={(e) => setAgenda(e.target.value)}
+              <label className="label" htmlFor="mt-agenda">Agenda</label>
+              <textarea id="mt-agenda" className="input min-h-24" value={agenda} onChange={(e) => setAgenda(e.target.value)}
                 placeholder="One item per line…" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="label">Date & time</label>
-                <input type="datetime-local" className={inputCls(errors.scheduledAt)} value={scheduledAt}
+                <label className="label" htmlFor="mt-when">Date &amp; time</label>
+                <input id="mt-when" type="datetime-local" className={inputCls(errors.scheduledAt)} value={scheduledAt}
                   onChange={(e) => { setScheduledAt(e.target.value); clearError("scheduledAt"); }} required />
                 <FieldError msg={errors.scheduledAt} />
               </div>
               <div>
-                <label className="label">Location</label>
-                <input className="input" value={location} onChange={(e) => setLocation(e.target.value)}
+                <label className="label" htmlFor="mt-location">Location</label>
+                <input id="mt-location" className="input" value={location} onChange={(e) => setLocation(e.target.value)}
                   placeholder="Boardroom / Google Meet" />
               </div>
             </div>
             <div>
-              <label className="label">Chairing director</label>
-              <select className="input" value={directorId} onChange={(e) => setDirectorId(e.target.value)}>
+              <label className="label" htmlFor="mt-director">Chairing director</label>
+              <select id="mt-director" className="input" value={directorId} onChange={(e) => setDirectorId(e.target.value)}>
                 <option value="">— None —</option>
                 {staff.filter((s) => s.role === "admin").map((s) => (
                   <option key={s.id} value={s.id}>{s.name} (Director)</option>
@@ -230,6 +259,30 @@ export default function MeetingsPage() {
           </form>
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={!!deletingId}
+        title="Delete meeting"
+        message="Delete this meeting? This cannot be undone."
+        busy={deleteBusy}
+        onConfirm={remove}
+        onCancel={() => setDeletingId(null)}
+      />
+
+      <ConfirmDialog
+        open={!!pendingStatus}
+        title={pendingStatus?.status === "completed" ? "Mark meeting completed" : "Cancel meeting"}
+        message={
+          pendingStatus?.status === "completed"
+            ? "Mark this meeting as completed?"
+            : "Cancel this meeting? This cannot be undone."
+        }
+        confirmLabel={pendingStatus?.status === "completed" ? "Mark completed" : "Cancel meeting"}
+        tone={pendingStatus?.status === "cancelled" ? "danger" : "default"}
+        busy={statusBusy}
+        onConfirm={() => pendingStatus && setStatus(pendingStatus.id, pendingStatus.status)}
+        onCancel={() => setPendingStatus(null)}
+      />
     </>
   );
 }

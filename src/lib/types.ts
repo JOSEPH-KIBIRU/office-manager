@@ -8,6 +8,15 @@ export const ROLE_LABELS: Record<Role, string> = {
   super_admin: "Platform Owner",
 };
 
+export interface ImpersonationMeta {
+  originalId: string;
+  originalOrgId: string;
+  originalRole: Role;
+  originalName: string;
+  originalEmail: string;
+  companyName: string;
+}
+
 export interface SessionPayload {
   id: string;
   orgId: string;
@@ -15,6 +24,9 @@ export interface SessionPayload {
   email: string;
   role: Role;
   mustChangePassword: boolean;
+  termsAgreedAt?: boolean;
+  termsVersion?: string;
+  impersonating?: ImpersonationMeta;
 }
 
 export interface UserRow {
@@ -122,6 +134,27 @@ export interface PettyCashRow {
   created_at: string;
   updated_at: string;
   requester_name?: string;
+}
+
+export interface DepartmentMember {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+export interface DepartmentRow {
+  id: string;
+  name: string;
+  createdAt: string;
+  memberCount: number;
+  members: DepartmentMember[];
+}
+
+export interface DepartmentEmployee {
+  id: string;
+  name: string;
+  role: Role;
+  departmentId: string | null;
 }
 
 export interface MeetingRow {

@@ -22,6 +22,8 @@ export async function GET() {
       const feed = await cx().query(api.notifications.activityFeed, {
         secret: secret(),
         orgId: session.orgId as never,
+        role: session.role as never,
+        userId: session.id as never,
       });
       return ok({ ...data, activity: feed.items });
     } catch (e) {

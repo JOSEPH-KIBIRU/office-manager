@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { notifyUser } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager"]);
+    const session = await requirePermission("cars", ["admin", "manager"]);
     const { id } = await ctx.params;
 
     const row = await cx().query(api.carLogs.getCarLog, {
@@ -76,7 +77,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager"]);
+    const session = await requirePermission("cars", ["admin", "manager"]);
     const { id } = await ctx.params;
     try {
       await cx().mutation(api.carLogs.deleteCarLog, {

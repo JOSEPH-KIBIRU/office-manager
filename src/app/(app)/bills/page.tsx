@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
-import { PageHeader, StatusBadge, Alert, FieldError, inputCls, Modal, api } from "@/components/ui";
-import { validate, required, minNum, type Errors } from "@/lib/validation";
+import { PageHeader, StatusBadge, Alert, FieldError, inputCls, Modal, ConfirmDialog, api } from "@/components/ui";
+import ShareButton from "@/components/ShareButton";
+import { useToast } from "@/components/toast";
+import { validate, required, minNum, dateOrder, type Errors } from "@/lib/validation";
 
 interface ContactRow {
   id: string;
@@ -20,6 +22,9 @@ interface BillRow {
   bill_date: string;
   due_date: string;
   amount: number;
+  vat_rate: number;
+  net_amount: number;
+  vat_amount: number;
   description: string | null;
   status: "pending" | "paid" | "overdue";
   paid_at: string | null;
@@ -31,9 +36,12 @@ const fmtMoney = (n: number) => n.toLocaleString("en-KE", { minimumFractionDigit
 export default function BillsPage() {
   const [bills, setBills] = useState<BillRow[]>([]);
   const [suppliers, setSuppliers] = useState<ContactRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const toast = useToast();
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<BillRow | null>(null);
@@ -42,19 +50,28 @@ export default function BillsPage() {
   const [billDate, setBillDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [amount, setAmount] = useState("");
+  const [vatRate, setVatRate] = useState("0");
   const [description, setDescription] = useState("");
   const [errors, setErrors] = useState<Errors>({});
+
+  const billGross = Number(amount) || 0;
+  const billVatRate = Number(vatRate) || 0;
+  const billVat = billVatRate > 0 ? Math.round((billGross - billGross / (1 + billVatRate / 100)) * 100) / 100 : 0;
+  const billNet = Math.round((billGross - billVat) * 100) / 100;
 
   function clearError(field: string) {
     setErrors((p) => ({ ...p, [field]: undefined }));
   }
 
   async function load() {
+    setLoading(true);
     try {
       const data = await api<{ bills: BillRow[] }>("/api/bills");
       setBills(data.bills);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load bills");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -79,6 +96,7 @@ export default function BillsPage() {
     setBillDate("");
     setDueDate("");
     setAmount("");
+    setVatRate("0");
     setDescription("");
     setErrors({});
     setShowModal(true);
@@ -90,6 +108,7 @@ export default function BillsPage() {
     setBillDate(b.bill_date);
     setDueDate(b.due_date);
     setAmount(String(b.amount));
+    setVatRate(String(b.vat_rate ?? 0));
     setDescription(b.description ?? "");
     setErrors({});
     setShowModal(true);
@@ -104,7 +123,7 @@ export default function BillsPage() {
       {
         contactId: [required("Supplier")],
         billDate: [required("Bill date")],
-        dueDate: [required("Due date")],
+        dueDate: [required("Due date"), dateOrder("billDate", "dueDate", "Due date", "bill date")],
         amount: [required("Amount"), minNum(0.01, "Amount")],
       }
     );
@@ -119,15 +138,16 @@ export default function BillsPage() {
       billDate,
       dueDate,
       amount: Number(amount),
+      vatRate: Number(vatRate) || 0,
       description: description || undefined,
     };
     try {
       if (editing) {
         await api(`/api/bills/${editing.id}`, { method: "PATCH", json: payload });
-        setNotice("Bill updated.");
+        toast.success("Bill updated.");
       } else {
         await api("/api/bills", { method: "POST", json: payload });
-        setNotice("Bill added.");
+        toast.success("Bill added.");
       }
       setShowModal(false);
       await load();
@@ -141,21 +161,26 @@ export default function BillsPage() {
   async function setStatus(id: string, status: string) {
     try {
       await api(`/api/bills/${id}/status`, { method: "PATCH", json: { status } });
-      setNotice(status === "paid" ? "Bill marked as paid." : "Bill status updated.");
+      toast.success(status === "paid" ? "Bill marked as paid." : "Bill status updated.");
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Action failed");
+      toast.error(err instanceof Error ? err.message : "Action failed");
     }
   }
 
-  async function remove(id: string) {
-    if (!confirm("Delete this bill?")) return;
+  async function remove() {
+    const id = deletingId;
+    if (!id) return;
+    setDeleteBusy(true);
     try {
       await api(`/api/bills/${id}`, { method: "DELETE" });
-      setNotice("Bill deleted.");
+      toast.success("Bill deleted.");
+      setDeletingId(null);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Delete failed");
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -192,7 +217,6 @@ export default function BillsPage() {
       </div>
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
-      {notice && <div className="mb-4"><Alert kind="success">{notice}</Alert></div>}
 
       <div className="card overflow-x-auto">
         <table className="table-base">
@@ -200,42 +224,51 @@ export default function BillsPage() {
             <tr>
               <th>Ref</th>
               <th>Supplier</th>
-              <th>Bill date</th>
+              <th className="hidden sm:table-cell">Bill date</th>
               <th>Due</th>
               <th>Amount (KES)</th>
+              <th>VAT</th>
               <th>Status</th>
               <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {bills.length === 0 && (
-              <tr><td colSpan={7} className="py-8 text-center text-slate-400">No bills yet. Add a supplier bill to get started.</td></tr>
+            {loading && (
+              <tr><td colSpan={8} className="py-8 text-center text-slate-500">Loading bills…</td></tr>
             )}
-            {bills.map((b) => (
+            {!loading && bills.length === 0 && (
+              <tr><td colSpan={8} className="py-8 text-center text-slate-500">No bills yet. Add a supplier bill to get started.</td></tr>
+            )}
+            {!loading && bills.map((b) => (
               <tr key={b.id}>
                 <td className="font-mono text-xs font-semibold text-indigo-600">{b.number}</td>
                 <td>
                   <span className="font-medium">{b.contact_company || b.contact_name}</span>
                   {b.description && <div className="max-w-xs truncate text-xs text-slate-500" title={b.description}>{b.description}</div>}
                 </td>
-                <td>{b.bill_date}</td>
+                <td className="hidden sm:table-cell">{b.bill_date}</td>
                 <td>{b.due_date}</td>
                 <td className="font-semibold">{fmtMoney(b.amount)}</td>
+                <td className="text-slate-500">
+                  {b.vat_amount > 0 ? <span title={`${b.vat_rate}% on ${fmtMoney(b.net_amount)}`}>{fmtMoney(b.vat_amount)}</span> : "—"}
+                </td>
                 <td>
                   <StatusBadge status={b.status} />
-                  {b.paid_at && <div className="text-xs text-slate-400">Paid {b.paid_at}</div>}
+                  {b.paid_at && <div className="text-xs text-slate-500">Paid {b.paid_at}</div>}
                 </td>
                 <td className="space-x-1.5 whitespace-nowrap text-right">
+                  <a href={`/bill/${b.id}`} target="_blank" className="btn-secondary btn-xs">⬇ Download</a>
+                  <ShareButton url={`/bill/${b.id}`} title={`${b.contact_company || b.contact_name} — ${b.number}`} text={`Bill ${b.number} for KES ${fmtMoney(b.amount)}`} />
                   {b.status === "paid" ? (
-                    <button onClick={() => setStatus(b.id, "pending")} className="btn-secondary px-2 py-1 text-xs">Reopen</button>
+                    <button onClick={() => setStatus(b.id, "pending")} className="btn-secondary btn-xs">Reopen</button>
                   ) : (
                     <>
-                      <button onClick={() => setStatus(b.id, "paid")} className="btn-success px-2 py-1 text-xs">Mark paid</button>
-                      {b.status !== "overdue" && <button onClick={() => setStatus(b.id, "overdue")} className="btn-secondary px-2 py-1 text-xs">Overdue</button>}
+                      <button onClick={() => setStatus(b.id, "paid")} className="btn-success btn-xs">Mark paid</button>
+                      {b.status !== "overdue" && <button onClick={() => setStatus(b.id, "overdue")} className="btn-secondary btn-xs">Overdue</button>}
                     </>
                   )}
-                  {b.status !== "paid" && <button onClick={() => openEdit(b)} className="btn-secondary px-2 py-1 text-xs">Edit</button>}
-                  {b.status !== "paid" && <button onClick={() => remove(b.id)} className="btn-danger px-2 py-1 text-xs">Delete</button>}
+                  {b.status !== "paid" && <button onClick={() => openEdit(b)} className="btn-secondary btn-xs">Edit</button>}
+                  {b.status !== "paid" && <button onClick={() => setDeletingId(b.id)} className="btn-danger btn-xs">Delete</button>}
                 </td>
               </tr>
             ))}
@@ -247,39 +280,63 @@ export default function BillsPage() {
         <Modal title={editing ? `Edit ${editing.number}` : "Add bill"} onClose={() => setShowModal(false)}>
           <form onSubmit={submit} className="space-y-3">
             <div>
-              <label className="label">Supplier</label>
-              <select className={inputCls(errors.contactId)} value={contactId} onChange={(e) => { setContactId(e.target.value); clearError("contactId"); }}>
+              <label className="label" htmlFor="bl-supplier">Supplier</label>
+              <select id="bl-supplier" className={inputCls(errors.contactId)} value={contactId} onChange={(e) => { setContactId(e.target.value); clearError("contactId"); }}>
                 <option value="">Select a supplier…</option>
                 {suppliers.map((c) => <option key={c.id} value={c.id}>{c.company || c.name}</option>)}
               </select>
               {suppliers.length === 0 && <p className="mt-1 text-xs text-amber-600">No suppliers yet. Add one on the Invoicing → Contacts page.</p>}
               <FieldError msg={errors.contactId} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
-                <label className="label">Bill date</label>
-                <input type="date" className={inputCls(errors.billDate)} value={billDate} onChange={(e) => { setBillDate(e.target.value); clearError("billDate"); }} />
+                <label className="label" htmlFor="bl-date">Bill date</label>
+                <input id="bl-date" type="date" className={inputCls(errors.billDate)} value={billDate} onChange={(e) => { setBillDate(e.target.value); clearError("billDate"); }} />
                 <FieldError msg={errors.billDate} />
               </div>
               <div>
-                <label className="label">Due date</label>
-                <input type="date" className={inputCls(errors.dueDate)} value={dueDate} onChange={(e) => { setDueDate(e.target.value); clearError("dueDate"); }} />
+                <label className="label" htmlFor="bl-due">Due date</label>
+                <input id="bl-due" type="date" className={inputCls(errors.dueDate)} value={dueDate} onChange={(e) => { setDueDate(e.target.value); clearError("dueDate"); }} />
                 <FieldError msg={errors.dueDate} />
               </div>
             </div>
             <div>
-              <label className="label">Amount (KES)</label>
-              <input type="number" min="0.01" step="0.01" className={inputCls(errors.amount)} value={amount} onChange={(e) => { setAmount(e.target.value); clearError("amount"); }} />
+              <label className="label" htmlFor="bl-amount">Amount (KES) — total incl. VAT</label>
+              <input id="bl-amount" type="number" min="0.01" step="0.01" className={inputCls(errors.amount)} value={amount} onChange={(e) => { setAmount(e.target.value); clearError("amount"); }} />
               <FieldError msg={errors.amount} />
             </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="bl-vat">VAT rate</label>
+                <select id="bl-vat" className="input" value={vatRate} onChange={(e) => setVatRate(e.target.value)}>
+                  <option value="0">0% — no VAT</option>
+                  <option value="16">16% — standard VAT</option>
+                  <option value="8">8% — reduced</option>
+                </select>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3 text-sm">
+                <div className="flex justify-between text-slate-500"><span>Net</span><span>{fmtMoney(billNet)}</span></div>
+                <div className="flex justify-between text-slate-500"><span>VAT input</span><span>{fmtMoney(billVat)}</span></div>
+                <div className="flex justify-between font-semibold text-slate-800"><span>Total</span><span>{fmtMoney(Number(amount) || 0)}</span></div>
+              </div>
+            </div>
             <div>
-              <label className="label">Description (optional)</label>
-              <input className={inputCls()} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. October electricity" />
+              <label className="label" htmlFor="bl-desc">Description (optional)</label>
+              <input id="bl-desc" className={inputCls()} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. October electricity" />
             </div>
             <button type="submit" className="btn-primary w-full" disabled={busy}>{busy ? "Saving…" : editing ? "Save changes" : "Add bill"}</button>
           </form>
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={!!deletingId}
+        title="Delete bill"
+        message="Delete this bill? This cannot be undone."
+        busy={deleteBusy}
+        onConfirm={remove}
+        onCancel={() => setDeletingId(null)}
+      />
     </>
   );
 }

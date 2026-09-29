@@ -9,3 +9,7 @@ next-env.d.ts
 uploads/
 *.log
 .DS_Store
+
+.vercel
+.env*
+*.pid

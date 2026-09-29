@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { assertSecret, fmtCreated } from "./lib";
+import { assertSecret, fmtCreated, requireMember } from "./lib";
 
 export const dashboardStats = query({
   args: {
@@ -12,7 +12,10 @@ export const dashboardStats = query({
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    const me = await ctx.db.get(args.viewerId);
+    // Verify the viewer belongs to the org and derive admin from the stored
+    // role so a stale/forged isAdmin flag cannot widen the returned data.
+    const me = await requireMember(ctx, args.orgId, args.viewerId);
+    const isAdmin = me.role === "admin";
 
     const pendingLeaves = await ctx.db
       .query("leaves")
@@ -25,7 +28,7 @@ export const dashboardStats = query({
 
     const allOrgLeaves = await ctx.db
       .query("leaves")
-      .filter((q) => q.eq(q.field("orgId"), args.orgId))
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .collect();
 
     const approvedThisYear = allOrgLeaves.filter(
@@ -48,7 +51,7 @@ export const dashboardStats = query({
       .collect();
 
     let pendingLeavesList: Array<Record<string, unknown>> = [];
-    if (args.isAdmin) {
+    if (isAdmin) {
       const oldestFirst = [...pendingLeaves].sort((a, b) => a.createdAt - b.createdAt).slice(0, 5);
       pendingLeavesList = await Promise.all(
         oldestFirst.map(async (l) => {
@@ -125,17 +128,17 @@ export const dashboardStats = query({
         my_pending_leaves: myPending,
         days_taken_this_year: daysTaken,
         leave_taken_pct: Math.min(100, Math.round(((daysTaken + myPending) / 21) * 100)),
-        pending_approvals: args.isAdmin ? pendingCount + pendingCars.length + pendingPetty.length : 0,
+        pending_approvals: isAdmin ? pendingCount + pendingCars.length + pendingPetty.length : 0,
         pending_leaves: pendingCount,
-        pending_car_logs: args.isAdmin ? pendingCars.length : 0,
-        pending_petty_cash: args.isAdmin ? pendingPetty.length : 0,
-        pending_petty_cash_amount: args.isAdmin ? pendingPetty.reduce((s, p) => s + p.amount, 0) : 0,
-        pending_car_logs_amount: args.isAdmin ? pendingCars.reduce((s, c) => s + c.amount, 0) : 0,
+        pending_car_logs: isAdmin ? pendingCars.length : 0,
+        pending_petty_cash: isAdmin ? pendingPetty.length : 0,
+        pending_petty_cash_amount: isAdmin ? pendingPetty.reduce((s, p) => s + p.amount, 0) : 0,
+        pending_car_logs_amount: isAdmin ? pendingCars.reduce((s, c) => s + c.amount, 0) : 0,
         team_size: teamSize,
         meetings_this_week: meetingsThisWeek,
         meetings_total: allMeetings.length,
-        petty_cash_this_month: args.isAdmin ? pettyCashMonthly : 0,
-        car_logs_this_month: args.isAdmin ? carLogsMonthly : 0,
+        petty_cash_this_month: isAdmin ? pettyCashMonthly : 0,
+        car_logs_this_month: isAdmin ? carLogsMonthly : 0,
         leave_requests_total: allOrgLeaves.filter((l) => l.startDate.slice(0, 4) === yearPrefix).length,
       },
       pending_leaves_list: pendingLeavesList,

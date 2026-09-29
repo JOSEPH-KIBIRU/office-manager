@@ -2,7 +2,8 @@ import { query, mutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, tsString, fmtCreated } from "./lib";
+import { assertSecret, tsNow, tsString, fmtCreated, orgBranding } from "./lib";
+import { tryPostJournalForSource, reverseJournalInternal } from "./accounting";
 
 type ContactDoc = Doc<"contacts">;
 type InvoiceDoc = Doc<"invoices">;
@@ -31,8 +32,10 @@ function computeTotals(items: Array<{ description: string; qty: number; unitPric
 
 async function enrichInvoice(ctx: QueryCtx, inv: InvoiceDoc) {
   const contact = await ctx.db.get(inv.contactId);
+  const org = await orgBranding(ctx, inv.orgId);
   return {
     id: inv._id,
+    org,
     contact_id: inv.contactId,
     contact_name: contact?.name ?? "—",
     contact_company: contact?.company ?? null,
@@ -45,12 +48,19 @@ async function enrichInvoice(ctx: QueryCtx, inv: InvoiceDoc) {
     due_date: inv.dueDate,
     status: inv.status,
     line_items: inv.lineItems,
-    note: inv.note ?? null,
+    note: inv.note ?? org?.invoiceNotes ?? null,
+    payment_details: inv.paymentDetails ?? org?.paymentDetails ?? null,
+    terms: inv.terms ?? org?.invoiceTerms ?? null,
     subtotal: inv.subtotal,
     tax_total: inv.taxTotal,
     total: inv.total,
     recurring_frequency: inv.recurringFrequency ?? null,
     recurring_active: inv.recurringActive ?? false,
+    etims_status: inv.etimsStatus ?? "not_sent",
+    etims_control_number: inv.etimsControlNumber ?? null,
+    etims_qr_data: inv.etimsQrData ?? null,
+    etims_submitted_at: inv.etimsSubmittedAt ?? null,
+    etims_error: inv.etimsError ?? null,
     created_by: inv.createdBy,
     created_at: fmtCreated(inv.createdAt),
     updated_at: fmtCreated(inv.updatedAt),
@@ -199,6 +209,8 @@ export const createInvoice = mutation({
       v.object({ description: v.string(), qty: v.number(), unitPrice: v.number(), taxRate: v.number() })
     ),
     note: v.optional(v.string()),
+    paymentDetails: v.optional(v.string()),
+    terms: v.optional(v.string()),
     recurringFrequency: v.optional(
       v.union(v.literal("weekly"), v.literal("monthly"), v.literal("quarterly"), v.literal("yearly"))
     ),
@@ -221,6 +233,8 @@ export const createInvoice = mutation({
       status: "draft",
       lineItems: c.lineItems,
       note: args.note?.trim() || undefined,
+      paymentDetails: args.paymentDetails?.trim() || undefined,
+      terms: args.terms?.trim() || undefined,
       subtotal: c.subtotal,
       taxTotal: c.taxTotal,
       total: c.total,
@@ -245,6 +259,8 @@ export const updateInvoice = mutation({
       v.array(v.object({ description: v.string(), qty: v.number(), unitPrice: v.number(), taxRate: v.number() }))
     ),
     note: v.optional(v.string()),
+    paymentDetails: v.optional(v.string()),
+    terms: v.optional(v.string()),
     recurringFrequency: v.optional(
       v.union(v.literal("weekly"), v.literal("monthly"), v.literal("quarterly"), v.literal("yearly"))
     ),
@@ -272,6 +288,8 @@ export const updateInvoice = mutation({
       patch.total = c.total;
     }
     if (args.note !== undefined) patch.note = args.note?.trim() || undefined;
+    if (args.paymentDetails !== undefined) patch.paymentDetails = args.paymentDetails?.trim() || undefined;
+    if (args.terms !== undefined) patch.terms = args.terms?.trim() || undefined;
     if (args.recurringFrequency !== undefined) patch.recurringFrequency = args.recurringFrequency;
     if (args.recurringActive !== undefined) patch.recurringActive = args.recurringActive;
     patch.updatedAt = tsNow();
@@ -295,6 +313,36 @@ export const setInvoiceStatus = mutation({
       throw new Error("Cancelled invoices cannot be reactivated");
     }
     await ctx.db.patch(args.id, { status: args.status, updatedAt: tsNow() });
+
+    // Auto-post to the general ledger: revenue once issued/paid, reverse on cancel.
+    if (args.status === "sent" || args.status === "paid" || args.status === "overdue") {
+      await tryPostJournalForSource(ctx, {
+        orgId: args.orgId,
+        source: "invoice",
+        sourceId: doc._id,
+        date: doc.issueDate,
+        description: `Invoice ${doc.number} issued`,
+        lines: [
+          { accountCode: "1100", debit: doc.total, credit: 0, memo: doc.number },
+          { accountCode: "4000", debit: 0, credit: doc.subtotal, memo: doc.number },
+          { accountCode: "2150", debit: 0, credit: doc.taxTotal, memo: "VAT output" },
+        ],
+        postedByName: "Auto (invoice issued)",
+      });
+    } else if (args.status === "cancelled" && doc.status !== "cancelled") {
+      const existing = await ctx.db
+        .query("journals")
+        .withIndex("by_source", (q) => q.eq("orgId", args.orgId).eq("source", "invoice").eq("sourceId", doc._id as never))
+        .first();
+      if (existing) {
+        await reverseJournalInternal(ctx, {
+          orgId: args.orgId,
+          journalId: existing._id,
+          date: new Date().toISOString().slice(0, 10),
+          postedByName: "Auto (invoice cancelled)",
+        });
+      }
+    }
     return true;
   },
 });
@@ -306,6 +354,33 @@ export const deleteInvoice = mutation({
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) throw new Error("Invoice not found");
     await ctx.db.delete(args.id);
+    return true;
+  },
+});
+
+/** Record the outcome of an eTIMS (KRA) submission attempt. */
+export const setEtimsResult = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    id: v.id("invoices"),
+    status: v.union(v.literal("pending"), v.literal("submitted"), v.literal("failed")),
+    controlNumber: v.optional(v.string()),
+    qrData: v.optional(v.string()),
+    error: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const doc = await ctx.db.get(args.id);
+    if (!doc || doc.orgId !== args.orgId) throw new Error("Invoice not found");
+    await ctx.db.patch(args.id, {
+      etimsStatus: args.status,
+      etimsControlNumber: args.status === "submitted" ? args.controlNumber : undefined,
+      etimsQrData: args.status === "submitted" ? args.qrData : undefined,
+      etimsSubmittedAt: args.status === "submitted" ? tsNow() : undefined,
+      etimsError: args.status === "failed" ? args.error?.slice(0, 500) : undefined,
+      updatedAt: tsNow(),
+    });
     return true;
   },
 });

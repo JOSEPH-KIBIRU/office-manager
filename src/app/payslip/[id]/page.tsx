@@ -1,39 +1,55 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Alert, api } from "@/components/ui";
 import { PayslipLines, type PayslipDetail } from "@/components/payslip";
+import { OrgHeader, type OrgBrandingData } from "@/components/OrgBranding";
+import ShareButton from "@/components/ShareButton";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://officemanager.pigiecore.co.ke";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 
-function PayslipView({ payrollId, userId }: { payrollId: string; userId?: string }) {
-  const [data, setData] = useState<PayslipDetail | null>(null);
+interface PayslipViewData extends PayslipDetail {
+  org?: OrgBrandingData | null;
+}
+
+function PayslipView({ payrollId, userId, casualId }: { payrollId: string; userId?: string; casualId?: string }) {
+  const [data, setData] = useState<PayslipViewData | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const printed = useRef(false);
 
   useEffect(() => {
-    api<PayslipDetail>(
-      `/api/payroll/payslip/${payrollId}${userId ? `?userId=${userId}` : ""}`
-    )
-      .then(setData)
+    const qs = casualId ? `?casualId=${casualId}` : userId ? `?userId=${userId}` : "";
+    api<PayslipViewData>(`/api/payroll/payslip/${payrollId}${qs}`)
+      .then((d) => {
+        setData(d);
+        // Print once the payslip has actually rendered (avoids a blank page).
+        if (!printed.current) {
+          printed.current = true;
+          setTimeout(() => window.print(), 400);
+        }
+      })
       .catch((e) => setErr(e.message));
-  }, [payrollId, userId]);
+  }, [payrollId, userId, casualId]);
 
   return (
-    <div className="payslip-print mx-auto max-w-2xl p-6">
-      <div className="mb-4 text-center">
-        <h1 className="text-xl font-bold text-slate-900">Office Manager — Payroll</h1>
-        <p className="text-sm text-slate-600">Payslip for {MONTHS[(data?.month ?? 1) - 1]} {(data?.year) ?? ""}</p>
-      </div>
+    <div className="payslip-print mx-auto flex min-h-[calc(100vh-2rem)] max-w-3xl flex-col p-4 sm:p-6 print:max-w-none print:border-0">
+      <OrgHeader
+        org={data?.org ?? null}
+        showTax
+        periodLabel={`Payslip for ${MONTHS[(data?.month ?? 1) - 1]} ${data?.year ?? ""}`}
+      />
       {err && <Alert kind="error">{err}</Alert>}
       {!data && !err && <p className="text-sm text-slate-500">Loading payslip… (printing will open momentarily)</p>}
       {data && (
         <>
           <div className="mb-4 rounded-lg border border-slate-300 bg-slate-50 p-4">
-            <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
               <div>
                 <p className="text-xs text-slate-500">Employee name</p>
                 <p className="font-semibold">{data.name}</p>
@@ -47,6 +63,16 @@ function PayslipView({ payrollId, userId }: { payrollId: string; userId?: string
                 <p className="capitalize">{data.role}</p>
               </div>
               <div>
+                <p className="text-xs text-slate-500">Employment type</p>
+                <p className="font-semibold">
+                  {data.employmentType === "permanent_pensionable"
+                    ? "Permanent & Pensionable"
+                    : data.employmentType === "casual"
+                      ? "Casual"
+                      : "Permanent"}
+                </p>
+              </div>
+              <div>
                 <p className="text-xs text-slate-500">Pay period</p>
                 <p className="font-semibold">{MONTHS[data.month - 1]} {data.year}</p>
               </div>
@@ -55,9 +81,15 @@ function PayslipView({ payrollId, userId }: { payrollId: string; userId?: string
 
           <PayslipLines data={data} />
 
-          <p className="mt-6 text-center text-xs text-slate-400">
-            This is a computer-generated payslip. Generated {new Date().toLocaleDateString("en-KE")}.
-          </p>
+          <footer className="mt-auto border-t border-slate-200 pt-3 text-center text-[11px] leading-relaxed text-slate-500">
+            <p>This is a computer-generated payslip.</p>
+            <p>
+              Powered by{" "}
+              <a href={SITE_URL} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 hover:underline">
+                Office Manager
+              </a>
+            </p>
+          </footer>
         </>
       )}
     </div>
@@ -67,13 +99,8 @@ function PayslipView({ payrollId, userId }: { payrollId: string; userId?: string
 function Inner({ payrollId }: { payrollId: string }) {
   const params = useSearchParams();
   const userId = params.get("userId") ?? undefined;
-  useEffect(() => {
-    // Allow the payslip to mount, then trigger the browser print dialog
-    // ("Save as PDF" destination) for a true PDF download.
-    const t = setTimeout(() => window.print(), 600);
-    return () => clearTimeout(t);
-  }, []);
-  return <PayslipView payrollId={payrollId} userId={userId} />;
+  const casualId = params.get("casualId") ?? undefined;
+  return <PayslipView payrollId={payrollId} userId={userId} casualId={casualId} />;
 }
 
 export default function PayslipPage({ params }: { params: Promise<{ id: string }> }) {
@@ -84,6 +111,10 @@ export default function PayslipPage({ params }: { params: Promise<{ id: string }
   if (!payrollId) return null;
   return (
     <Suspense fallback={null}>
+      <div className="no-print fixed right-4 top-4 z-50 flex gap-2">
+        <button onClick={() => window.print()} className="btn-primary px-3 py-1.5 text-sm">⬇ Download PDF</button>
+        <ShareButton label="Share" className="btn-secondary px-3 py-1.5 text-sm" />
+      </div>
       <Inner payrollId={payrollId} />
     </Suspense>
   );

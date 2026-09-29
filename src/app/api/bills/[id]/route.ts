@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("bills", ["admin", "manager", "secretary"]);
     const { id } = await ctx.params;
     const row = await cx().query(api.bills.getBill, {
       secret: secret(),
@@ -19,13 +20,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("bills", ["admin", "manager", "secretary"]);
     const { id } = await ctx.params;
     const body = await readJson<{
       contactId?: string;
       billDate?: string;
       dueDate?: string;
       amount?: number;
+      vatRate?: number;
       description?: string;
     }>(req);
     try {
@@ -37,6 +39,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         billDate: body.billDate,
         dueDate: body.dueDate,
         amount: body.amount !== undefined ? Number(body.amount) : undefined,
+        vatRate: body.vatRate !== undefined ? Number(body.vatRate) : undefined,
         description: body.description,
       });
       return ok({ ok: true });
@@ -48,7 +51,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "manager", "secretary"]);
+    const session = await requirePermission("bills", ["admin", "manager", "secretary"]);
     const { id } = await ctx.params;
     try {
       await cx().mutation(api.bills.deleteBill, {

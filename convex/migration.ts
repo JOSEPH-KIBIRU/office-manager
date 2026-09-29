@@ -1,20 +1,32 @@
-import { mutation } from "./_generated/server";
+import { mutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { assertSecret, tsNow } from "./lib";
 
 /**
- * One-time migration: creates the default organization (if missing) and
- * stamps orgId onto every existing document that lacks one.
- * Safe to run multiple times — skips docs that already have an orgId.
+ * Admin/ops-driven data migrations.
+ *
+ * Unlike schema changes (which Convex manages declaratively via schema.ts),
+ * these are one-time data backfills. Every migration registers a `name` in the
+ * `migrations` table the first time it succeeds, so reruns are no-ops — each
+ * migration is guaranteed to run at most once.
+ *
+ * Trigger from the Convex dashboard:
+ *   convex.migration.runMigrations({ secret: "<CONVEX_SERVER_SECRET>" })
  */
-export const backfillOrgs = mutation({
-  args: {
-    secret: v.string(),
-    orgName: v.string(),
-  },
-  handler: async (ctx, args) => {
-    assertSecret(args.secret);
 
+type MigrationArgs = {
+  orgName?: string;
+};
+
+const MIGRATIONS: Record<
+  string,
+  (ctx: MutationCtx, args: MigrationArgs) => Promise<unknown>
+> = {
+  /**
+   * Create the default organization (if missing) and stamp orgId onto every
+   * existing document that lacks one. Safe to rerun: skips docs with orgId.
+   */
+  backfillOrgs: async (ctx, args) => {
     let org = await ctx.db
       .query("organizations")
       .withIndex("by_slug", (q) => q.eq("slug", "default"))
@@ -83,5 +95,58 @@ export const backfillOrgs = mutation({
     }
 
     return { orgId, migrated: counts };
+  },
+};
+
+/**
+ * Run every registered migration not yet recorded in the `migrations` table.
+ * Idempotent: already-applied migrations are skipped. Safe to call repeatedly.
+ */
+export const runMigrations = mutation({
+  args: {
+    secret: v.string(),
+    orgName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+
+    const migrationArgs: MigrationArgs = { orgName: args.orgName };
+
+    const results: Record<string, string> = {};
+    let applied = 0;
+
+    for (const name of Object.keys(MIGRATIONS)) {
+      const already = await ctx.db
+        .query("migrations")
+        .withIndex("by_name", (q) => q.eq("name", name))
+        .unique();
+      if (already) {
+        results[name] = "skipped";
+        continue;
+      }
+
+      await MIGRATIONS[name](ctx, migrationArgs);
+      await ctx.db.insert("migrations", { name, runAt: tsNow() });
+      results[name] = "applied";
+      applied += 1;
+    }
+
+    return { applied, results };
+  },
+});
+
+/**
+ * Legacy one-off org-backfill, kept for manual/backward-compatible invocation.
+ * Note: this does NOT record itself in the migrations table; prefer
+ * `runMigrations` so the run is tracked and idempotent across calls.
+ */
+export const backfillOrgs = mutation({
+  args: {
+    secret: v.string(),
+    orgName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    return MIGRATIONS.backfillOrgs(ctx, { orgName: args.orgName });
   },
 });

@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useSession } from "@/components/SessionProvider";
 import { StatusBadge, api } from "@/components/ui";
+import { useToast } from "@/components/toast";
+import OnboardingChecklist from "@/components/OnboardingChecklist";
 import type { LeaveRow } from "@/lib/types";
 
 interface DashData {
@@ -43,12 +45,12 @@ interface DashData {
 }
 
 const ACTIVITY_STYLES: Record<string, { chip: string; icon: string; label: string }> = {
-  leave: { chip: "bg-blue-100 text-blue-700", icon: "🌴", label: "Leave" },
-  car: { chip: "bg-emerald-100 text-emerald-700", icon: "🚗", label: "Car" },
-  petty: { chip: "bg-orange-100 text-orange-700", icon: "💵", label: "Petty cash" },
-  meeting: { chip: "bg-violet-100 text-violet-700", icon: "📅", label: "Meeting" },
-  payroll: { chip: "bg-teal-100 text-teal-700", icon: "💰", label: "Payroll" },
-  minutes: { chip: "bg-slate-200 text-slate-700", icon: "📝", label: "Minutes" },
+  leave: { chip: "bg-blue-50 text-blue-600", icon: "🌴", label: "Leave" },
+  car: { chip: "bg-emerald-50 text-emerald-600", icon: "🚗", label: "Car" },
+  petty: { chip: "bg-amber-50 text-amber-600", icon: "💵", label: "Petty cash" },
+  meeting: { chip: "bg-violet-50 text-violet-600", icon: "📅", label: "Meeting" },
+  payroll: { chip: "bg-teal-50 text-teal-600", icon: "💰", label: "Payroll" },
+  minutes: { chip: "bg-slate-100 text-slate-600", icon: "📝", label: "Minutes" },
 };
 
 function timeAgo(s: string) {
@@ -65,7 +67,7 @@ function timeAgo(s: string) {
 }
 
 const fmtKsh = (n: number) =>
-  "KSh " + n.toLocaleString("en-KE", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  "KES " + Math.round(n).toLocaleString("en-KE", { maximumFractionDigits: 0 });
 
 const TODAY = new Date().toLocaleDateString("en-GB", {
   weekday: "long",
@@ -82,6 +84,13 @@ function fmtDay(s: string) {
   return new Date(s.replace(" ", "T")).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
 /* ---------- Icons (inline SVG, stroke currentColor) ---------- */
 const paths = {
   calendar: "M8 2v3m8-3v3M3 8h18M4 4h16a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z",
@@ -92,6 +101,10 @@ const paths = {
   check: "M5 13l4 4L19 7",
   clipboard: "M9 5h6a1 1 0 0 1 1 1v1h2a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h2V6a1 1 0 0 1 1-1Zm5 4h-4m4 4H8m4 4H8",
   arrow: "M5 12h14m-6-6 6 6-6 6",
+  chartUp: "M3 17l6-6 4 4 8-8m0 0h-5m5 0v5",
+  alert: "M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
+  send: "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7Z",
+  inbox: "M3 13h5l2 3h4l2-3h5M4 8h16M5 3h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z",
 };
 
 function Icon({ d, className = "h-5 w-5" }: { d: string; className?: string }) {
@@ -102,90 +115,171 @@ function Icon({ d, className = "h-5 w-5" }: { d: string; className?: string }) {
   );
 }
 
-/* ---------- Stat card ---------- */
-function StatCard({
-  label,
-  value,
-  caption,
-  icon,
-  accent,
+/* ---------- Page greeting ---------- */
+function Greeting({
+  name,
+  role,
+  isAdmin,
+  pendingApprovals,
 }: {
-  label: string;
-  value: string;
-  caption?: string;
-  icon: string;
-  accent: string; // tailwind chip classes e.g. "bg-blue-100 text-blue-700"
+  name: string;
+  role: string;
+  isAdmin: boolean;
+  pendingApprovals: number;
 }) {
-  return (
-    <div className="card group relative overflow-hidden p-5 transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <div className={`absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full opacity-10 ${accent.split(" ")[0]}`} />
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-500">{label}</p>
-          <p className="mt-1.5 text-3xl font-extrabold tracking-tight text-slate-900">{value}</p>
-          {caption && <p className="mt-1 text-xs text-slate-400">{caption}</p>}
-        </div>
-        <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${accent}`}>
-          <Icon d={icon} className="h-6 w-6" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Dashboard row for day/time ---------- */
-function HeroBanner({ name, role }: { name: string; role: string }) {
   const firstName = name.split(" ")[0];
   return (
-    <div className="relative mb-6 overflow-hidden rounded-2xl bg-gradient-to-r from-blue-700 via-indigo-600 to-violet-600 p-6 text-white shadow-md sm:p-8">
-      <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10" />
-      <div className="pointer-events-none absolute -bottom-20 right-24 h-40 w-40 rounded-full bg-white/10" />
-      <div className="relative flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-blue-100">{TODAY}</p>
-          <h1 className="mt-1 text-3xl font-extrabold tracking-tight sm:text-4xl">Welcome back, {firstName} 👋</h1>
-          <p className="mt-2 max-w-xl text-sm text-blue-100">
-            Here's what's happening around the office today. You're logged in as{" "}
-            <span className="rounded-md bg-white/15 px-1.5 py-0.5 font-semibold capitalize">{role.replace("_", " ")}</span>.
-          </p>
-        </div>
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{TODAY}</p>
+        <h1 className="mt-1.5 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+          {greeting()}, {firstName}
+        </h1>
+        <p className="mt-1.5 text-sm text-slate-500">
+          {isAdmin ? (
+            <>
+              You have <span className="font-semibold text-slate-700">{pendingApprovals} item(s)</span> waiting for your
+              approval across the office.
+            </>
+          ) : (
+            <>
+              Here's what's happening around the office. You're signed in as{" "}
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-semibold capitalize text-slate-700">
+                {role.replace("_", " ")}
+              </span>
+              .
+            </>
+          )}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <a
+          href="/analytics"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          <Icon d={paths.chartUp} className="h-4 w-4 text-blue-600" />
+          Analytics
+        </a>
         <a
           href="/meetings"
-          className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-blue-700 shadow transition hover:bg-blue-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
         >
-          Schedule a meeting
-          <Icon d={paths.arrow} className="h-4 w-4" />
+          <Icon d={paths.calendar} className="h-4 w-4" />
+          Schedule meeting
+          <Icon d={paths.arrow} className="h-3.5 w-3.5" />
         </a>
       </div>
     </div>
   );
 }
 
+/* ---------- Stat card ---------- */
+function StatCard({
+  label,
+  value,
+  caption,
+  icon,
+  tone,
+  index,
+  captionTone,
+}: {
+  label: string;
+  value: string;
+  caption?: string;
+  icon: string;
+  tone: string; // e.g. "text-blue-600 bg-blue-50"
+  captionTone?: string;
+  index: number;
+}) {
+  const [textColor] = tone.split(" ");
+  return (
+    <div
+      className="card relative overflow-hidden p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-slate-200/80"
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
+      <span className={`absolute inset-x-0 top-0 h-0.5 ${textColor ? textColor.replace("text-", "bg-").split(" ")[0] : "bg-blue-600"} opacity-60`} />
+      <div className="animate-[fadeup_.35s_ease-out_both]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-medium text-slate-500">{label}</p>
+            <p className="mt-1.5 truncate text-[26px] font-extrabold tracking-tight text-slate-900">{value}</p>
+            {caption && <p className={`mt-1 truncate text-xs ${captionTone ?? "text-slate-400"}`}>{caption}</p>}
+          </div>
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone}`}>
+            <Icon d={icon} className="h-5 w-5" />
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Section heading ---------- */
+function SectionTitle({
+  title,
+  link,
+  linkLabel = "View all",
+  right,
+}: {
+  title: string;
+  link?: string;
+  linkLabel?: string;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <span className="h-4 w-1 rounded-full bg-blue-600" />
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-700">{title}</h2>
+      </div>
+      {right ?? (link ? <a href={link} className="text-sm font-medium text-blue-700 hover:underline">{linkLabel} →</a> : null)}
+    </div>
+  );
+}
+
+/* ---------- Leave utilisation card ---------- */
 function LeaveUtilisation({ balance, taken, pct }: { balance: number; taken: number; pct: number }) {
   const bar = Math.min(100, pct);
-  const color = bar >= 85 ? "bg-red-500" : bar >= 60 ? "bg-amber-500" : "bg-emerald-500";
+  const status = bar >= 85 ? { label: "Low balance", cls: "bg-red-50 text-red-600" } : bar >= 60 ? { label: "Getting low", cls: "bg-amber-50 text-amber-600" } : { label: "Healthy", cls: "bg-emerald-50 text-emerald-600" };
+  const barColor = bar >= 85 ? "bg-red-500" : bar >= 60 ? "bg-amber-500" : "bg-emerald-500";
   return (
     <div className="card p-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-          <Icon d={paths.calendar} className="h-4 w-4 text-blue-600" />
-          Leave utilisation
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600">
+            <Icon d={paths.calendar} className="h-4 w-4" />
+          </span>
+          Annual leave
         </div>
-        <StatusBadge status={bar >= 85 ? "cancelled" : bar >= 60 ? "pending" : "approved"} />
+        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${status.cls}`}>{status.label}</span>
       </div>
       <div className="mt-4 flex items-end justify-between">
-        <p className="text-3xl font-extrabold text-slate-900">
-          {balance}<span className="text-base font-semibold text-slate-400"> / 21 days left</span>
+        <p className="text-3xl font-extrabold tracking-tight text-slate-900">
+          {balance}
+          <span className="text-sm font-semibold text-slate-400"> / 21 days left</span>
         </p>
         <p className="text-xs text-slate-400">{taken} day(s) taken this year</p>
       </div>
-      <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-        <div className={`h-full rounded-full ${color} transition-all duration-700`} style={{ width: `${bar}%` }} />
+      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${barColor} transition-all duration-700`} style={{ width: `${bar}%` }} />
       </div>
-      <div className="mt-2 flex justify-between text-xs text-slate-400">
+      <div className="mt-2 flex justify-between text-xs font-medium text-slate-400">
         <span>{bar}% used</span>
-        <span>21 days</span>
+        <span>{21 - balance} used · {balance} available</span>
       </div>
+    </div>
+  );
+}
+
+/* ---------- Empty state ---------- */
+function EmptyState({ icon, tone, title, sub }: { icon: string; tone: string; title: string; sub: string }) {
+  return (
+    <div className="flex flex-col items-center py-12 text-center">
+      <span className={`grid h-12 w-12 place-items-center rounded-2xl ${tone}`}>
+        <Icon d={icon} className="h-6 w-6" />
+      </span>
+      <p className="mt-3 text-sm font-semibold text-slate-600">{title}</p>
+      <p className="text-xs text-slate-400">{sub}</p>
     </div>
   );
 }
@@ -195,6 +289,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isAdmin = session?.role === "admin";
+  const toast = useToast();
 
   async function load() {
     try {
@@ -208,147 +303,154 @@ export default function DashboardPage() {
   async function decide(id: string, action: "approve" | "reject") {
     try {
       await api(`/api/leaves/${id}`, { method: "PATCH", json: { action } });
+      toast.success(action === "approve" ? "Leave approved." : "Leave rejected.");
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Action failed");
+      toast.error(e instanceof Error ? e.message : "Action failed");
     }
   }
 
   if (error) return <p className="text-red-600">{error}</p>;
   if (!data) return (
     <div className="space-y-6">
-      <div className="h-40 animate-pulse rounded-2xl bg-slate-200" />
+      <div className="h-28 animate-pulse rounded-2xl bg-slate-200" />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-slate-200" />)}
+        {[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-slate-200" />)}
       </div>
     </div>
   );
 
   const s = data.stats;
 
-  const stats: Array<{ label: string; value: string; caption?: string; icon: string; accent: string }> = [
-    { label: "Days taken this year", value: String(s.days_taken_this_year), caption: `${s.my_pending_leaves} awaiting approval`, icon: paths.calendar, accent: "bg-blue-100 text-blue-700" },
-    { label: "Meetings this week", value: String(s.meetings_this_week), caption: `${s.meetings_total} scheduled in total`, icon: paths.users, accent: "bg-violet-100 text-violet-700" },
-    ...(isAdmin
-      ? [
-          { label: "Pending approvals", value: String(s.pending_approvals), caption: `${s.pending_leaves} leave · ${s.pending_car_logs} car · ${s.pending_petty_cash} petty cash`, icon: paths.check, accent: "bg-amber-100 text-amber-700" },
-          { label: "Active staff", value: String(s.team_size), caption: "team members", icon: paths.users, accent: "bg-emerald-100 text-emerald-700" },
-          { label: "Pending car log value", value: fmtKsh(s.pending_car_logs_amount), caption: `${s.pending_car_logs} requistion(s)`, icon: paths.car, accent: "bg-emerald-100 text-emerald-700" },
-          { label: "Pending petty cash", value: fmtKsh(s.pending_petty_cash_amount), caption: `${s.pending_petty_cash} request(s)`, icon: paths.wallet, accent: "bg-orange-100 text-orange-700" },
-        ]
-      : [
-          { label: "Leave requests this year", value: String(s.leave_requests_total), caption: "sent from the team", icon: paths.clipboard, accent: "bg-teal-100 text-teal-700" },
-          { label: "Active staff", value: String(s.team_size), caption: "team members", icon: paths.users, accent: "bg-emerald-100 text-emerald-700" },
-        ]),
-  ].slice(0, 4);
-
-  const quickActions = [
-    { href: "/leave", label: "Request leave", icon: paths.calendar, accent: "bg-blue-100 text-blue-700" },
-    { href: "/car-logs", label: "Log car expense", icon: paths.car, accent: "bg-emerald-100 text-emerald-700" },
-    { href: "/petty-cash", label: "Petty cash request", icon: paths.wallet, accent: "bg-orange-100 text-orange-700" },
-    { href: "/meetings", label: "Book a meeting", icon: paths.check, accent: "bg-violet-100 text-violet-700" },
+  const adminStats = [
+    { label: "Pending approvals", value: String(s.pending_approvals), caption: `${s.pending_leaves} leave · ${s.pending_car_logs} car · ${s.pending_petty_cash} petty cash`, icon: paths.inbox, tone: "bg-amber-50 text-amber-600", captionTone: "text-slate-400" },
+    { label: "Outstanding petty cash", value: fmtKsh(s.pending_petty_cash_amount), caption: `${s.pending_petty_cash} request(s) awaiting action`, icon: paths.wallet, tone: "bg-orange-50 text-orange-600", captionTone: "text-slate-400" },
+    { label: "Outstanding fleet claims", value: fmtKsh(s.pending_car_logs_amount), caption: `${s.pending_car_logs} log(s) awaiting action`, icon: paths.car, tone: "bg-emerald-50 text-emerald-600", captionTone: "text-slate-400" },
+    { label: "Active staff", value: String(s.team_size), caption: `${s.meetings_this_week} meeting(s) this week`, icon: paths.users, tone: "bg-indigo-50 text-indigo-600", captionTone: "text-slate-400" },
   ];
+
+  const staffStats = [
+    { label: "Leave days taken", value: String(s.days_taken_this_year), caption: "this year", icon: paths.calendar, tone: "bg-blue-50 text-blue-600" },
+    { label: "Leave balance", value: String(s.leave_balance), caption: "of 21 days remaining", icon: paths.clipboard, tone: "bg-emerald-50 text-emerald-600" },
+    { label: "Meetings this week", value: String(s.meetings_this_week), caption: "across the office", icon: paths.users, tone: "bg-violet-50 text-violet-600" },
+    { label: "My pending requests", value: String(s.my_pending_leaves), caption: "leave awaiting approval", icon: paths.clock, tone: "bg-amber-50 text-amber-600" },
+  ];
+
+  const stats = isAdmin ? adminStats : staffStats;
+
+  const quickActions = isAdmin
+    ? [
+        { href: "/leave", label: "Review leave", desc: "Approve or decline requests", icon: paths.check, tone: "bg-blue-50 text-blue-600" },
+        { href: "/petty-cash", label: "Petty cash", desc: "New request or approve", icon: paths.wallet, tone: "bg-amber-50 text-amber-600" },
+        { href: "/cars", label: "Car log", desc: "Log or approve expense", icon: paths.car, tone: "bg-emerald-50 text-emerald-600" },
+        { href: "/meetings", label: "Meetings", desc: "Schedule or manage", icon: paths.calendar, tone: "bg-violet-50 text-violet-600" },
+      ]
+    : [
+        { href: "/leave", label: "Request leave", desc: "Plan time away", icon: paths.calendar, tone: "bg-blue-50 text-blue-600" },
+        { href: "/petty-cash", label: "Petty cash", desc: "Request cash for office", icon: paths.wallet, tone: "bg-amber-50 text-amber-600" },
+        { href: "/my-payslips", label: "Payslips", desc: "View your latest slips", icon: paths.clipboard, tone: "bg-emerald-50 text-emerald-600" },
+        { href: "/meetings", label: "Meetings", desc: "See what's coming up", icon: paths.calendar, tone: "bg-violet-50 text-violet-600" },
+      ];
 
   return (
     <>
-      <HeroBanner name={session?.name ?? ""} role={session?.role ?? ""} />
+      <Greeting
+        name={session?.name ?? ""}
+        role={session?.role ?? ""}
+        isAdmin={isAdmin}
+        pendingApprovals={s.pending_approvals}
+      />
 
-      {/* Leave utilisation (always visible) */}
-      <LeaveUtilisation balance={s.leave_balance} taken={s.days_taken_this_year} pct={s.leave_taken_pct} />
+      {isAdmin && <OnboardingChecklist />}
 
-      {/* Stat cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* KPI cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((card, i) => (
-          <div key={i} style={{ animationDelay: `${i * 60}ms` }} className="animate-[fadeup_.4s_ease-out_both]">
-            <StatCard {...card} />
-          </div>
+          <StatCard key={card.label} {...card} index={i} />
         ))}
       </div>
 
       {/* Quick actions */}
-      <div className="mt-6">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Quick actions</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="mt-7">
+        <SectionTitle title="Quick actions" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {quickActions.map((q) => (
             <a
               key={q.href}
               href={q.href}
-              className="card group flex items-center gap-3 p-4 transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+              className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
             >
-              <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${q.accent} transition group-hover:scale-110`}>
+              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${q.tone} transition group-hover:scale-105`}>
                 <Icon d={q.icon} className="h-5 w-5" />
               </span>
-              <span className="text-sm font-semibold text-slate-700">{q.label}</span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-slate-800">{q.label}</span>
+                <span className="block truncate text-xs text-slate-400">{q.desc}</span>
+              </span>
             </a>
           ))}
         </div>
       </div>
 
-      {/* Panels */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {isAdmin && (
-          <section className="card overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-              <h2 className="font-semibold text-slate-800">Leave requests awaiting approval</h2>
-              <a href="/leave" className="text-sm font-medium text-blue-700 hover:underline">View all →</a>
-            </div>
-            {data.pending_leaves_list.length === 0 ? (
-              <div className="flex flex-col items-center py-12 text-center">
-                <span className="grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-emerald-600">
-                  <Icon d={paths.check} className="h-6 w-6" />
-                </span>
-                <p className="mt-3 text-sm font-medium text-slate-500">All caught up!</p>
-                <p className="text-xs text-slate-400">No pending leave requests.</p>
-              </div>
+      {/* Two-column: approvals / meetings + leave utilisation */}
+      <div className="mt-7 grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Primary panel */}
+        <section className={`card overflow-hidden ${isAdmin ? "lg:col-span-2" : "lg:col-span-2"}`}>
+          <div className="border-b border-slate-100 px-5 py-4">
+            <SectionTitle
+              title={isAdmin ? "Leave requests awaiting approval" : "Upcoming meetings"}
+              link={isAdmin ? "/leave" : "/meetings"}
+              right={
+                isAdmin && (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">
+                    {s.pending_leaves} open
+                  </span>
+                )
+              }
+            />
+          </div>
+          {isAdmin ? (
+            data.pending_leaves_list.length === 0 ? (
+              <EmptyState icon={paths.check} tone="bg-emerald-50 text-emerald-600" title="All caught up!" sub="No leave requests waiting for approval." />
             ) : (
               <ul className="divide-y divide-slate-100">
                 {data.pending_leaves_list.map((l) => (
-                  <li key={l.id} className="flex items-center justify-between gap-3 px-5 py-3.5">
-                    <div>
-                      <p className="font-medium text-slate-800">{l.requester_name}</p>
-                      <p className="text-sm text-slate-500">
-                        <span className="capitalize">{l.leave_type}</span> · {l.days} day(s) · {l.start_date} → {l.end_date}
+                  <li key={l.id} className="flex items-center justify-between gap-3 px-5 py-3.5 transition hover:bg-slate-50/70">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
+                          {(l.requester_name ?? "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?"}
+                        </span>
+                        <p className="truncate font-semibold text-slate-800">{l.requester_name ?? "Unknown"}</p>
+                      </div>
+                      <p className="mt-1.5 text-sm text-slate-500">
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold capitalize text-slate-600">{l.leave_type}</span>{" "}
+                        · {l.days} day(s) · {l.start_date} → {l.end_date}
                       </p>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex shrink-0 gap-2">
                       <button onClick={() => decide(l.id, "approve")} className="btn-success px-3 py-1.5">Approve</button>
-                      <button onClick={() => decide(l.id, "reject")} className="btn-danger px-3 py-1.5">Reject</button>
+                      <button onClick={() => decide(l.id, "reject")} className="btn-danger px-3 py-1.5">Decline</button>
                     </div>
                   </li>
                 ))}
               </ul>
-            )}
-          </section>
-        )}
-
-        <section className={`card overflow-hidden ${isAdmin ? "" : "lg:col-span-2"}`}>
-          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-            <h2 className="font-semibold text-slate-800">Upcoming meetings</h2>
-            <a href="/meetings" className="text-sm font-medium text-blue-700 hover:underline">View all →</a>
-          </div>
-          {data.upcoming_meetings.length === 0 ? (
-            <div className="flex flex-col items-center py-12 text-center">
-              <span className="grid h-12 w-12 place-items-center rounded-full bg-violet-50 text-violet-600">
-                <Icon d={paths.calendar} className="h-6 w-6" />
-              </span>
-              <p className="mt-3 text-sm font-medium text-slate-500">Nothing scheduled</p>
-              <p className="text-xs text-slate-400">No upcoming meetings right now.</p>
-            </div>
+            )
+          ) : data.upcoming_meetings.length === 0 ? (
+            <EmptyState icon={paths.calendar} tone="bg-violet-50 text-violet-600" title="Nothing scheduled" sub="No upcoming meetings right now." />
           ) : (
             <ul className="divide-y divide-slate-100">
               {data.upcoming_meetings.map((m) => (
                 <li key={m.id} className="flex items-center gap-4 px-5 py-3.5">
-                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-600 text-center text-white">
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-blue-600 to-blue-700 text-center text-white shadow-sm">
                     <div>
-                      <p className="text-base font-extrabold leading-none">{fmtDay(m.scheduled_at).split(" ")[0]}</p>
-                      <p className="text-[11px] uppercase leading-tight">{fmtDay(m.scheduled_at).split(" ")[1]}</p>
+                      <p className="text-sm font-extrabold leading-none">{fmtDay(m.scheduled_at).split(" ")[0]}</p>
+                      <p className="text-[10px] uppercase leading-tight opacity-90">{fmtDay(m.scheduled_at).split(" ")[1]}</p>
                     </div>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-slate-800">{m.title}</p>
-                    <p className="text-sm text-slate-500">
-                      {fmtDate(m.scheduled_at)} · {m.location || "Location TBD"}
-                    </p>
+                    <p className="truncate font-semibold text-slate-800">{m.title}</p>
+                    <p className="text-sm text-slate-500">{fmtDate(m.scheduled_at)} · {m.location || "Location TBD"}</p>
                   </div>
                   <StatusBadge status="scheduled" />
                 </li>
@@ -356,13 +458,53 @@ export default function DashboardPage() {
             </ul>
           )}
         </section>
+
+        {/* Right column */}
+        <div className="flex flex-col gap-6">
+          <LeaveUtilisation balance={s.leave_balance} taken={s.days_taken_this_year} pct={s.leave_taken_pct} />
+          {isAdmin && (
+            <div className="card p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <span className="grid h-8 w-8 place-items-center rounded-lg bg-orange-50 text-orange-600">
+                  <Icon d={paths.alert} className="h-4 w-4" />
+                </span>
+                Needs your attention
+              </div>
+              <ul className="mt-3 space-y-2.5 text-sm">
+                {s.pending_petty_cash > 0 && (
+                  <li className="flex items-center justify-between gap-2">
+                    <span className="text-slate-500">Petty cash requests</span>
+                    <span className="font-bold text-slate-800">{s.pending_petty_cash}</span>
+                  </li>
+                )}
+                {s.pending_car_logs > 0 && (
+                  <li className="flex items-center justify-between gap-2">
+                    <span className="text-slate-500">Fleet (car) logs</span>
+                    <span className="font-bold text-slate-800">{s.pending_car_logs}</span>
+                  </li>
+                )}
+                {s.pending_leaves > 0 && (
+                  <li className="flex items-center justify-between gap-2">
+                    <span className="text-slate-500">Leave requests</span>
+                    <span className="font-bold text-slate-800">{s.pending_leaves}</span>
+                  </li>
+                )}
+                {s.pending_petty_cash + s.pending_car_logs + s.pending_leaves === 0 && (
+                  <li className="text-xs text-slate-400">Nothing needs your attention. 🎉</li>
+                )}
+              </ul>
+              <a href="/leave" className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:underline">
+                Open approvals <Icon d={paths.arrow} className="h-3.5 w-3.5" />
+              </a>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Recent activity feed */}
-      <div className="card mt-6 overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-800">Recent activity</h2>
-          <span className="text-xs text-slate-400">Across the whole office</span>
+      <div className="card mt-7 overflow-hidden">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <SectionTitle title="Recent activity" right={<span className="text-xs text-slate-400">{isAdmin ? "Across the whole office" : "Your activity"}</span>} />
         </div>
         {data.activity.length === 0 ? (
           <p className="px-5 py-10 text-center text-sm text-slate-400">No activity yet — things you do will show up here.</p>
@@ -371,8 +513,8 @@ export default function DashboardPage() {
             {data.activity.map((a) => {
               const style = ACTIVITY_STYLES[a.type] || { chip: "bg-slate-100 text-slate-600", icon: "🔔", label: a.type };
               return (
-                <li key={a.id} className="flex items-center gap-4 px-5 py-3.5 transition hover:bg-slate-50">
-                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg text-base ${style.chip}`}>{style.icon}</span>
+                <li key={a.id} className="flex items-center gap-4 px-5 py-3.5 transition hover:bg-slate-50/70">
+                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl text-base ${style.chip}`}>{style.icon}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-slate-800">{a.title}</p>
                     <p className="truncate text-sm text-slate-500">{a.body}</p>

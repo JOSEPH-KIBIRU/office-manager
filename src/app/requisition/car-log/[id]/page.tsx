@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import PrintButton from "@/components/PrintButton";
+import ShareButton from "@/components/ShareButton";
+import { RequisitionBrand } from "@/components/RequisitionBrand";
 import { cx, secret, api } from "@/lib/convex";
 
 function money(n: number) {
@@ -25,11 +27,25 @@ export default async function CarLogRequisition({ params }: { params: Promise<{ 
   }
   if (!row) redirect("/cars");
 
+  let org = null as { name: string; logoUrl: string | null; address?: string; city?: string; phone?: string; email?: string } | null;
+  try {
+    org = (await cx().query(api.organizations.getOrganization, {
+      secret: secret(),
+      orgId: session.orgId as never,
+    })) as typeof org;
+  } catch {
+    org = null;
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 py-6">
       <style>{`@media print { .no-print { display: none } body { background: white } }`}</style>
       <PrintButton />
+      <div className="no-print mx-auto mb-2 flex max-w-3xl justify-end px-6">
+        <ShareButton label="Share" className="btn-secondary px-3 py-1.5 text-sm" />
+      </div>
       <div className="mx-auto max-w-3xl bg-white p-10 shadow-sm">
+        <RequisitionBrand org={org} />
         <header className="mb-8 border-b-2 border-slate-800 pb-4 text-center">
           <h1 className="text-xl font-bold tracking-widest uppercase">Requisition Form</h1>
           <p className="mt-1 text-sm text-slate-600">Vehicle Repair / Insurance / Service</p>
