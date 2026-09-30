@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       adminName: string;
       adminEmail: string;
       workingDays?: number[];
+      customRoles?: string[];
     }>(req);
     requireFields(body, ["name", "adminName", "adminEmail"]);
 
@@ -50,6 +51,9 @@ export async function POST(req: NextRequest) {
         adminPasswordHash: bcrypt.hashSync(tempPassword, 10),
         workingDays: Array.isArray(body.workingDays)
           ? body.workingDays.map(Number).filter((d) => d >= 0 && d <= 6)
+          : undefined,
+        customRoles: Array.isArray(body.customRoles)
+          ? body.customRoles.map((r) => String(r).trim()).filter(Boolean).slice(0, 20)
           : undefined,
       });
       await recordAudit(

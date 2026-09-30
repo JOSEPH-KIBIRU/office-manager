@@ -35,8 +35,8 @@ const EMPLOYMENT_LABELS: Record<string, string> = {
 
 const ROLES: Role[] = ["admin", "secretary", "manager", "employee"];
 const ROLE_LABELS: Record<Role, string> = {
-  admin: "Director / Admin",
-  secretary: "Secretary",
+  admin: "Director",
+  secretary: "Admin / Secretary",
   manager: "Manager",
   employee: "Employee",
   super_admin: "Platform Owner",

@@ -1,8 +1,8 @@
 export type Role = "admin" | "secretary" | "manager" | "employee" | "super_admin";
 
 export const ROLE_LABELS: Record<Role, string> = {
-  admin: "Director / Admin",
-  secretary: "Secretary",
+  admin: "Director",
+  secretary: "Admin / Secretary",
   manager: "Manager",
   employee: "Employee",
   super_admin: "Platform Owner",

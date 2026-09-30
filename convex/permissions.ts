@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { assertSecret } from "./lib";
 import { assertSuperAdmin } from "./superadmin";
+import { slugify } from "./orgs";
 
 /**
  * Two-layer module access:
@@ -13,14 +14,19 @@ import { assertSuperAdmin } from "./superadmin";
  *  2. Per-role grants (`organizations.rolePermissions`) — set by a company
  *     admin, always a subset of the platform cap. Roles with no entry keep
  *     their defaults.
+ *
+ * Besides the built-in roles (admin/secretary/manager/employee) a company may
+ * define its own roles in `organizations.customRoles`; the same two-layer
+ * rules apply to them.
  */
 
-const ROLE_VALIDATOR = v.union(
-  v.literal("admin"),
-  v.literal("secretary"),
-  v.literal("manager"),
-  v.literal("employee")
-);
+const BUILTIN_ROLES = ["admin", "secretary", "manager", "employee"];
+
+/** Turn a role label into a stable, url-ish key. */
+function roleKey(label: string): string {
+  const k = slugify(label).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return k || "role";
+}
 
 /**
  * Resolve the platform cap and the configured grants for a role.
@@ -54,7 +60,10 @@ export const getPermissionsConfig = query({
     if (!org) throw new Error("Organization not found");
     const enabled = Array.isArray(org.enabledModules) ? org.enabledModules : null;
     const configured = (org.rolePermissions ?? {}) as Record<string, string[]>;
-    const roles = ["admin", "secretary", "manager", "employee"] as const;
+    const customRoles = (org.customRoles ?? []).filter(
+      (r) => r && typeof r.key === "string" && typeof r.label === "string"
+    );
+    const roles = [...BUILTIN_ROLES, ...customRoles.map((r) => r.key)];
     const out: Record<string, { granted: string[] | null; overridden: boolean }> = {};
     for (const role of roles) {
       out[role] = {
@@ -62,7 +71,7 @@ export const getPermissionsConfig = query({
         overridden: Array.isArray(configured[role]),
       };
     }
-    return { config: out, enabledModules: enabled };
+    return { config: out, enabledModules: enabled, customRoles };
   },
 });
 
@@ -71,7 +80,7 @@ export const setRolePermissions = mutation({
   args: {
     secret: v.string(),
     orgId: v.id("organizations"),
-    role: ROLE_VALIDATOR,
+    role: v.string(),
     permissions: v.array(v.string()),
   },
   handler: async (ctx, args) => {
@@ -79,6 +88,11 @@ export const setRolePermissions = mutation({
     const org = await ctx.db.get(args.orgId);
     if (!org || !org.active) throw new Error("Organization not found or inactive");
     if (args.role === "admin") throw new Error("The admin role always has full access");
+
+    const customKeys = (org.customRoles ?? []).map((r) => r.key);
+    if (!BUILTIN_ROLES.includes(args.role) && !customKeys.includes(args.role)) {
+      throw new Error("Unknown role");
+    }
 
     // Never allow granting beyond the platform cap.
     const enabled = Array.isArray(org.enabledModules) ? org.enabledModules : null;
@@ -89,6 +103,44 @@ export const setRolePermissions = mutation({
     existing[args.role] = clean;
     await ctx.db.patch(args.orgId, { rolePermissions: existing as never });
     return { role: args.role, granted: clean };
+  },
+});
+
+/** Add a company-defined role. */
+export const addCustomRole = mutation({
+  args: { secret: v.string(), orgId: v.id("organizations"), label: v.string() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const org = await ctx.db.get(args.orgId);
+    if (!org || !org.active) throw new Error("Organization not found or inactive");
+
+    const label = args.label.trim();
+    if (!label) throw new Error("Role name is required");
+    const key = roleKey(label);
+    if (BUILTIN_ROLES.includes(key)) throw new Error("That name matches a built-in role");
+
+    const existing = org.customRoles ?? [];
+    if (existing.some((r) => r.key === key)) throw new Error("That role already exists");
+
+    const next = [...existing, { key, label }];
+    await ctx.db.patch(args.orgId, { customRoles: next });
+    return { key, label, customRoles: next };
+  },
+});
+
+/** Remove a company-defined role and any permissions stored for it. */
+export const removeCustomRole = mutation({
+  args: { secret: v.string(), orgId: v.id("organizations"), key: v.string() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const org = await ctx.db.get(args.orgId);
+    if (!org) throw new Error("Organization not found");
+
+    const next = (org.customRoles ?? []).filter((r) => r.key !== args.key);
+    const configured = { ...(org.rolePermissions ?? {}) } as Record<string, string[]>;
+    delete configured[args.key];
+    await ctx.db.patch(args.orgId, { customRoles: next, rolePermissions: configured as never });
+    return { customRoles: next };
   },
 });
 
@@ -127,7 +179,6 @@ export const setEnabledModules = mutation({
 
     if (args.modules === null) {
       await ctx.db.patch(args.orgId, { enabledModules: undefined });
-      // Also trim any per-role grants that no longer exist? No: null = all.
       return { orgId: args.orgId, enabledModules: null };
     }
 

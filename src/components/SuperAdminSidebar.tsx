@@ -31,7 +31,7 @@ export default function SuperAdminSidebar() {
       </div>
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-slate-900 text-slate-100 transition-transform lg:static lg:translate-x-0 print:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-slate-900 text-slate-100 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 print:hidden ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -43,7 +43,7 @@ export default function SuperAdminSidebar() {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
           {NAV.map((item) => {
             const active = pathname === item.href;
             return (

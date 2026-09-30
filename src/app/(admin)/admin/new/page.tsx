@@ -16,6 +16,21 @@ export default function CreateCompanyPage() {
   const [adminEmail, setAdminEmail] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [customRoles, setCustomRoles] = useState<string[]>([]);
+  const [roleInput, setRoleInput] = useState("");
+
+  function addRole() {
+    const label = roleInput.trim();
+    if (!label) return;
+    setCustomRoles((prev) =>
+      prev.some((r) => r.toLowerCase() === label.toLowerCase()) ? prev : [...prev, label]
+    );
+    setRoleInput("");
+  }
+
+  function removeRole(label: string) {
+    setCustomRoles((prev) => prev.filter((r) => r !== label));
+  }
 
   function toggleDay(d: number) {
     setWorkingDays((prev) =>
@@ -46,7 +61,7 @@ export default function CreateCompanyPage() {
     try {
       const res = await api<{ orgId: string; adminEmail: string; tempPassword: string }>(
         "/api/admin/companies",
-        { method: "POST", json: { name, adminName, adminEmail, workingDays } }
+        { method: "POST", json: { name, adminName, adminEmail, workingDays, customRoles } }
       );
       setNotice(
         `Company created. Admin account: ${res.adminEmail} with temporary password ${res.tempPassword} — save this now (shown only once). They must change it at first login.`
@@ -54,6 +69,8 @@ export default function CreateCompanyPage() {
       setName("");
       setAdminName("");
       setAdminEmail("");
+      setCustomRoles([]);
+      setRoleInput("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create company");
     } finally {
@@ -120,6 +137,52 @@ export default function CreateCompanyPage() {
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <label className="label" htmlFor="co-roles">Extra roles (optional)</label>
+            <p className="mb-2 text-xs text-slate-500">
+              Add any roles this company needs beyond the built-in Director, Admin / Secretary,
+              Manager and Employee. Their permissions are configured by the company on the Roles &amp;
+              permissions page.
+            </p>
+            <div className="flex gap-2">
+              <input
+                id="co-roles"
+                className="input"
+                value={roleInput}
+                placeholder="e.g. Supervisor, Accountant"
+                onChange={(e) => setRoleInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addRole();
+                  }
+                }}
+              />
+              <button type="button" className="btn-secondary whitespace-nowrap" onClick={addRole}>
+                + Add role
+              </button>
+            </div>
+            {customRoles.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {customRoles.map((r) => (
+                  <span
+                    key={r}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-700"
+                  >
+                    {r}
+                    <button
+                      type="button"
+                      onClick={() => removeRole(r)}
+                      aria-label={`Remove ${r}`}
+                      className="text-slate-400 hover:text-red-600"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="flex justify-end">
             <button type="submit" className="btn-primary" disabled={busy}>

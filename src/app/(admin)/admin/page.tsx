@@ -196,22 +196,27 @@ export default function CompaniesPage() {
 
   const toast = useToast();
 
-  async function load() {
-    setLoading(true);
+  async function load(silent = false) {
+    if (!silent) setLoading(true);
     try {
       const data = await api<{ orgs: Company[] }>("/api/admin/companies");
-      setOrgs(data.orgs);
+      // Avoid re-rendering (and disturbing the reading position) when a silent
+      // background refresh returns identical data.
+      setOrgs((prev) =>
+        silent && JSON.stringify(prev) === JSON.stringify(data.orgs) ? prev : data.orgs
+      );
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load companies");
+      if (!silent) setError(e instanceof Error ? e.message : "Failed to load companies");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
   useEffect(() => {
     load();
-    // Keep "last access" fresh in near real time.
-    const id = setInterval(() => { load(); }, 30000);
+    // Keep "last access" fresh in near real time, without replacing the list
+    // (which would reset the scroll position while the user is reading).
+    const id = setInterval(() => { load(true); }, 30000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

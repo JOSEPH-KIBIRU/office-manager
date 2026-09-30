@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { PageHeader, Alert, api } from "@/components/ui";
+import { PageHeader, Alert, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import OrgSectionNav from "@/components/org/OrgSectionNav";
 import {
@@ -19,27 +19,42 @@ const GROUP_ORDER = ["Overview", "People & HR", "Finance", "Reporting", "Operati
 export default function PermissionsPage() {
   const [config, setConfig] = useState<Config | null>(null);
   const [enabledModules, setEnabledModules] = useState<string[] | null>(null);
-  const [role, setRole] = useState<OrgRole>("secretary");
+  const [customRoles, setCustomRoles] = useState<{ key: string; label: string }[]>([]);
+  const [role, setRole] = useState<string>("secretary");
   const [granted, setGranted] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [roleBusy, setRoleBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newRole, setNewRole] = useState("");
+  const [removeFor, setRemoveFor] = useState<string | null>(null);
   const toast = useToast();
 
+  function applyConfig(d: {
+    config: Config;
+    enabledModules: string[] | null;
+    customRoles: { key: string; label: string }[];
+  }) {
+    setConfig(d.config);
+    setEnabledModules(d.enabledModules);
+    setCustomRoles(d.customRoles);
+  }
+
   useEffect(() => {
-    api<{ config: Config; enabledModules: string[] | null }>("/api/permissions")
+    api<{ config: Config; enabledModules: string[] | null; customRoles: { key: string; label: string }[] }>(
+      "/api/permissions"
+    )
       .then((d) => {
-        setConfig(d.config);
-        setEnabledModules(d.enabledModules);
-        setGranted(new Set(d.config.secretary.granted));
+        applyConfig(d);
+        setGranted(new Set(d.config.secretary?.granted ?? []));
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load permissions"))
       .finally(() => setLoading(false));
   }, []);
 
-  // Modules the platform allows this company to use (null = all). Platform-only
-  // modules (e.g. the audit log) are controlled by the platform console only.
+  // Modules the platform allows this company (null = all). Platform-only modules
+  // (e.g. the audit log) are controlled by the platform console only.
   const availableModules = useMemo(
     () => MODULES.filter((m) => !m.platformOnly && (!enabledModules || enabledModules.includes(m.key))),
     [enabledModules]
@@ -50,9 +65,15 @@ export default function PermissionsPage() {
     (m) => !m.platformOnly && (!enabledModules || enabledModules.includes(m.key))
   ).length;
 
-  function selectRole(r: OrgRole) {
+  const allRoles = [...ORG_ROLES, ...customRoles.map((c) => c.key)];
+  const isBuiltin = (r: string) => (ORG_ROLES as string[]).includes(r);
+  const roleLabel = (r: string) =>
+    isBuiltin(r) ? ROLE_LABELS[r as OrgRole] : customRoles.find((c) => c.key === r)?.label ?? r;
+  const selectedIsCustom = customRoles.some((c) => c.key === role);
+
+  function selectRole(r: string) {
     setRole(r);
-    setGranted(new Set(config?.[r].granted ?? []));
+    setGranted(new Set(config?.[r]?.granted ?? []));
     setSaved(false);
   }
 
@@ -74,17 +95,56 @@ export default function PermissionsPage() {
         method: "PATCH",
         json: { role, permissions: Array.from(granted) },
       });
-      setConfig((prev) =>
-        prev
-          ? { ...prev, [role]: { granted: Array.from(granted), overridden: true } }
-          : prev
-      );
+      setConfig((prev) => (prev ? { ...prev, [role]: { granted: Array.from(granted), overridden: true } } : prev));
       setSaved(true);
-      toast.success(`Permissions for ${ROLE_LABELS[role]} saved`);
+      toast.success(`Permissions for ${roleLabel(role)} saved`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save permissions");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function addRole() {
+    const label = newRole.trim();
+    if (!label) return;
+    setRoleBusy(true);
+    setError(null);
+    try {
+      const res = await api<{ key: string; customRoles: { key: string; label: string }[] }>(
+        "/api/permissions",
+        { method: "POST", json: { action: "addRole", label } }
+      );
+      setNewRole("");
+      const d = await api<{ config: Config; enabledModules: string[] | null; customRoles: { key: string; label: string }[] }>(
+        "/api/permissions"
+      );
+      applyConfig(d);
+      selectRole(res.key);
+      toast.success(`Role "${label}" added`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to add role");
+    } finally {
+      setRoleBusy(false);
+    }
+  }
+
+  async function removeRole(key: string) {
+    setRoleBusy(true);
+    setError(null);
+    try {
+      await api("/api/permissions", { method: "POST", json: { action: "removeRole", key } });
+      const d = await api<{ config: Config; enabledModules: string[] | null; customRoles: { key: string; label: string }[] }>(
+        "/api/permissions"
+      );
+      applyConfig(d);
+      selectRole("secretary");
+      toast.success("Role removed");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove role");
+    } finally {
+      setRoleBusy(false);
+      setRemoveFor(null);
     }
   }
 
@@ -104,7 +164,7 @@ export default function PermissionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Roles & permissions"
-        subtitle="Choose which modules each role can open. Admins always keep full access."
+        subtitle="Choose which modules each role can open. Directors always keep full access. Add your own roles if you need more."
       />
 
       <OrgSectionNav />
@@ -122,8 +182,8 @@ export default function PermissionsPage() {
         <p className="text-sm text-slate-500">Loading permissions…</p>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2">
-            {ORG_ROLES.map((r) => (
+          <div className="flex flex-wrap items-center gap-2">
+            {allRoles.map((r) => (
               <button
                 key={r}
                 type="button"
@@ -134,17 +194,45 @@ export default function PermissionsPage() {
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
                 }`}
               >
-                {ROLE_LABELS[r]}
+                {roleLabel(r)}
                 {r === "admin" && <span className="ml-1 text-xs font-normal opacity-70">(full)</span>}
               </button>
             ))}
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              className="input max-w-[14rem]"
+              value={newRole}
+              placeholder="Add a role, e.g. Supervisor"
+              onChange={(e) => setNewRole(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addRole();
+                }
+              }}
+            />
+            <button type="button" className="btn-secondary" disabled={roleBusy || !newRole.trim()} onClick={addRole}>
+              + Add role
+            </button>
+            {selectedIsCustom && (
+              <button
+                type="button"
+                className="btn-secondary text-red-600"
+                disabled={roleBusy}
+                onClick={() => setRemoveFor(role)}
+              >
+                Remove “{roleLabel(role)}”
+              </button>
+            )}
+          </div>
+
           {role === "admin" ? (
             <div className="card max-w-2xl p-6 text-sm text-slate-600">
-              <p className="font-semibold text-slate-900">The Director / Admin role always has full access.</p>
+              <p className="font-semibold text-slate-900">The Director role always has full access.</p>
               <p className="mt-2">
-                Admins can open every module and manage roles, settings, payroll, finance and
+                Directors can open every module and manage roles, settings, payroll, finance and
                 company data. This role cannot be restricted.
               </p>
             </div>
@@ -152,7 +240,7 @@ export default function PermissionsPage() {
             <div className="card max-w-3xl p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">{ROLE_LABELS[role]}</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">{roleLabel(role)}</h3>
                   <p className="text-xs text-slate-500">
                     {currentOverridden
                       ? "Custom permissions are in effect for this role."
@@ -217,6 +305,21 @@ export default function PermissionsPage() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={removeFor !== null}
+        title="Remove role"
+        message={
+          <>
+            Remove the role <strong>{removeFor ? roleLabel(removeFor) : ""}</strong> and its permissions?
+            This cannot be undone.
+          </>
+        }
+        confirmLabel="Remove"
+        busy={roleBusy}
+        onConfirm={() => removeFor && removeRole(removeFor)}
+        onCancel={() => setRemoveFor(null)}
+      />
     </div>
   );
 }

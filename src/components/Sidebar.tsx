@@ -80,6 +80,22 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   },
 ];
 
+const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
+
+/**
+ * The single most-specific nav href matching the current path. This prevents a
+ * parent link (e.g. /leave or /organization) from being highlighted at the same
+ * time as a more specific child link (/leave/calendar, /organization/permissions).
+ */
+function mostSpecificHref(pathname: string): string | null {
+  let best: string | null = null;
+  for (const item of ALL_NAV_ITEMS) {
+    const matches = pathname === item.href || pathname.startsWith(item.href + "/");
+    if (matches && (best === null || item.href.length > best.length)) best = item.href;
+  }
+  return best;
+}
+
 export default function Sidebar({ session }: { session: SessionPayload }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -119,6 +135,8 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
     });
   }
 
+  const activeHref = mostSpecificHref(pathname);
+
   const groups = NAV_GROUPS.map((g) => ({
     title: g.title,
     items: g.items.filter((n) => {
@@ -153,7 +171,7 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
       </div>
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-slate-900 text-slate-100 transition-transform lg:static lg:translate-x-0 print:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col bg-slate-900 text-slate-100 transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 print:hidden ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -172,11 +190,9 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
           </div>
         </div>
 
-        <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-2">
+        <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2">
           {groups.map((g) => {
-            const hasActive = g.items.some(
-              (i) => pathname === i.href || pathname.startsWith(i.href + "/")
-            );
+            const hasActive = g.items.some((i) => i.href === activeHref);
             const isOpen = !collapsed[g.title] || hasActive;
             return (
               <div key={g.title}>
@@ -201,7 +217,7 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
                 {isOpen && (
                   <div className="mt-1 space-y-1">
                     {g.items.map((item) => {
-                      const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                      const active = item.href === activeHref;
                       return (
                         <Link
                           key={item.href}

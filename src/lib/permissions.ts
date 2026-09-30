@@ -102,8 +102,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, ModuleKey[]> = {
 export const ORG_ROLES: OrgRole[] = ["admin", "secretary", "manager", "employee"];
 
 export const ROLE_LABELS: Record<OrgRole, string> = {
-  admin: "Director / Admin",
-  secretary: "Secretary",
+  admin: "Director",
+  secretary: "Admin / Secretary",
   manager: "Manager",
   employee: "Employee",
 };

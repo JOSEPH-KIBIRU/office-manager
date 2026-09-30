@@ -109,6 +109,7 @@ export const createCompany = mutation({
     adminEmail: v.string(),
     adminPasswordHash: v.string(),
     workingDays: v.optional(v.array(v.number())),
+    customRoles: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -138,6 +139,14 @@ export const createCompany = mutation({
         args.workingDays && args.workingDays.length
           ? Array.from(new Set(args.workingDays.filter((d) => d >= 0 && d <= 6))).sort((a, b) => a - b)
           : [1, 2, 3, 4, 5],
+      customRoles: (args.customRoles ?? [])
+        .map((label) => label.trim())
+        .filter(Boolean)
+        .map((label) => ({
+          key: slugify(label).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "role",
+          label,
+        }))
+        .filter((r, i, arr) => arr.findIndex((x) => x.key === r.key) === i),
     });
 
     const adminId = await ctx.db.insert("users", {

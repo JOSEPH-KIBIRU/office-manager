@@ -44,6 +44,10 @@ export default defineSchema(
     // always full access and is never stored here. A role with no entry keeps
     // its defaults.
     rolePermissions: v.optional(v.record(v.string(), v.array(v.string()))),
+    // Company-defined extra roles beyond the built-in admin/secretary/manager/
+    // employee set. Each is { key, label }; their module grants live in
+    // rolePermissions keyed by `key`.
+    customRoles: v.optional(v.array(v.object({ key: v.string(), label: v.string() }))),
     // Platform feature cap set by the super admin. When present, only these
     // modules are available to the company at all — they cannot be granted in
     // the company's Roles & permissions tab and are hidden from every role.
