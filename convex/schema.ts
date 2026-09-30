@@ -275,6 +275,22 @@ export default defineSchema(
     runAt: v.optional(v.number()),
   }),
 
+  subscriptions: defineTable({
+    orgId: v.id("organizations"),
+    plan: v.union(
+      v.literal("starter"),
+      v.literal("professional"),
+      v.literal("enterprise")
+    ),
+    billingCycle: v.union(v.literal("monthly"), v.literal("annual")),
+    status: v.union(v.literal("trial"), v.literal("active"), v.literal("canceled"), v.literal("past_due")),
+    trialEndsAt: v.optional(v.number()),
+    currentPeriodEnd: v.optional(v.number()),
+    cancelAtPeriodEnd: v.boolean(),
+    userCount: v.number(),
+    startedAt: v.number(),
+  }).index("by_org", ["orgId"]),
+
   rateLimitBuckets: defineTable({
     key: v.string(),
     windowStart: v.number(),

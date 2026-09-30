@@ -9,6 +9,7 @@ const NAV = [
   { href: "/admin", label: "Companies", icon: "🏢" },
   { href: "/admin/new", label: "Create company & admin", icon: "➕" },
   { href: "/admin/features", label: "Modules & features", icon: "🧩" },
+  { href: "/admin/subscriptions", label: "Subscriptions", icon: "💰" },
   { href: "/admin/announcements", label: "Announcements & offers", icon: "📢" },
   { href: "/admin/enquiries", label: "Enquiries desk", icon: "📩" },
   { href: "/admin/status", label: "System status", icon: "🩺" },
