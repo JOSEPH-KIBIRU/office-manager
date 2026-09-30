@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { Alert, api } from "@/components/ui";
 import { OrgHeader, OrgFooter, type OrgBrandingData } from "@/components/OrgBranding";
+import { printDocument } from "@/lib/print";
 import ShareButton from "@/components/ShareButton";
 
 interface BillRow {
@@ -36,7 +37,7 @@ function BillPrint({ id }: { id: string }) {
         // Print once the bill has actually rendered (avoids a blank page).
         if (!printed.current) {
           printed.current = true;
-          setTimeout(() => window.print(), 400);
+          setTimeout(() => printDocument("/bills"), 400);
         }
       })
       .catch((e) => setErr(e.message));
@@ -110,7 +111,7 @@ export default function BillPage({ params }: { params: Promise<{ id: string }> }
   return (
     <Suspense fallback={null}>
       <div className="fixed right-4 top-4 z-50 flex gap-2 no-print">
-        <button onClick={() => window.print()} className="btn-primary px-3 py-1.5 text-sm">🖨 Download PDF</button>
+        <button onClick={() => printDocument("/bills")} className="btn-primary px-3 py-1.5 text-sm">🖨 Download PDF</button>
         <ShareButton label="Share" className="btn-secondary px-3 py-1.5 text-sm" />
       </div>
       <Inner id={id} />

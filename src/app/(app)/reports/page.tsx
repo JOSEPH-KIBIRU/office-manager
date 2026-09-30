@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PageHeader, Alert, StatusBadge, api } from "@/components/ui";
 import { OrgHeader, OrgFooter, type OrgBrandingData } from "@/components/OrgBranding";
+import { printDocument } from "@/lib/print";
 import ShareButton from "@/components/ShareButton";
 import { useToast } from "@/components/toast";
 import type { LeaveRow, CarLogRow, PettyCashRow } from "@/lib/types";
@@ -412,7 +413,7 @@ function ReportsPage() {
           <span className="inline-flex gap-2">
             <button onClick={exportCsv} className="btn-secondary px-3 py-1.5 text-sm">Export CSV</button>
             <button onClick={exportExcel} className="btn-secondary px-3 py-1.5 text-sm">Export Excel</button>
-            <button className="btn-primary px-3 py-1.5 text-sm" onClick={() => window.print()}>🖨 Print / Save as PDF</button>
+            <button className="btn-primary px-3 py-1.5 text-sm" onClick={() => printDocument("/reports")}>🖨 Print / Save as PDF</button>
           </span>
         </div>
       </div>

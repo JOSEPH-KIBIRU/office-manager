@@ -40,7 +40,7 @@ export default async function CarLogRequisition({ params }: { params: Promise<{ 
   return (
     <main className="min-h-screen bg-slate-100 py-6">
       <style>{`@media print { .no-print { display: none } body { background: white } }`}</style>
-      <PrintButton />
+      <PrintButton path="/cars" />
       <div className="no-print mx-auto mb-2 flex max-w-3xl justify-end px-6">
         <ShareButton label="Share" className="btn-secondary px-3 py-1.5 text-sm" />
       </div>

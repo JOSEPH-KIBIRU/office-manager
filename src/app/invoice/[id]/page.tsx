@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, Suspense } from "react";
 import { Alert, api } from "@/components/ui";
 import { OrgHeader, OrgFooter, type OrgBrandingData } from "@/components/OrgBranding";
+import { printDocument } from "@/lib/print";
 
 interface LineItem {
   description: string;
@@ -55,7 +56,7 @@ function InvoicePrint({ id }: { id: string }) {
         // Print only once the invoice has actually rendered (avoids a blank page).
         if (!printed.current) {
           printed.current = true;
-          setTimeout(() => window.print(), 400);
+          setTimeout(() => printDocument("/invoices"), 400);
         }
       })
       .catch((e) => setErr(e.message));
@@ -83,7 +84,7 @@ function InvoicePrint({ id }: { id: string }) {
   return (
     <>
       <div className="no-print fixed right-4 top-4 z-50 flex gap-2">
-        <button onClick={() => window.print()} className="btn-primary px-3 py-1.5 text-sm">
+        <button onClick={() => printDocument("/invoices")} className="btn-primary px-3 py-1.5 text-sm">
           🖨 Print / Save as PDF
         </button>
       </div>

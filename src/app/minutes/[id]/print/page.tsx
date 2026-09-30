@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { Alert, api } from "@/components/ui";
 import PrintButton from "@/components/PrintButton";
 import { OrgHeader, OrgFooter, type ApiOrg } from "@/components/OrgBranding";
+import { printDocument } from "@/lib/print";
 import type { MinuteRow } from "@/lib/types";
 
 function MinutesView({ id }: { id: string }) {
@@ -19,7 +20,7 @@ function MinutesView({ id }: { id: string }) {
         // Print once the minutes have actually rendered (avoids a blank page).
         if (!printed.current) {
           printed.current = true;
-          setTimeout(() => window.print(), 400);
+          setTimeout(() => printDocument("/minutes"), 400);
         }
       })
       .catch((e) => setErr(e.message));
@@ -73,7 +74,7 @@ function Inner({ id }: { id: string }) {
   return (
     <>
       <MinutesView id={id} />
-      <PrintButton />
+      <PrintButton path="/minutes" />
     </>
   );
 }

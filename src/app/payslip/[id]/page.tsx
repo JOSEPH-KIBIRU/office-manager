@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Alert, api } from "@/components/ui";
 import { PayslipLines, type PayslipDetail } from "@/components/payslip";
 import { OrgHeader, type OrgBrandingData } from "@/components/OrgBranding";
+import { printDocument } from "@/lib/print";
 import ShareButton from "@/components/ShareButton";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https://officemanager.pigiecore.co.ke";
@@ -31,7 +32,7 @@ function PayslipView({ payrollId, userId, casualId }: { payrollId: string; userI
         // Print once the payslip has actually rendered (avoids a blank page).
         if (!printed.current) {
           printed.current = true;
-          setTimeout(() => window.print(), 400);
+          setTimeout(() => printDocument("/my-payslips"), 400);
         }
       })
       .catch((e) => setErr(e.message));
@@ -112,7 +113,7 @@ export default function PayslipPage({ params }: { params: Promise<{ id: string }
   return (
     <Suspense fallback={null}>
       <div className="no-print fixed right-4 top-4 z-50 flex gap-2">
-        <button onClick={() => window.print()} className="btn-primary px-3 py-1.5 text-sm">⬇ Download PDF</button>
+        <button onClick={() => printDocument("/my-payslips")} className="btn-primary px-3 py-1.5 text-sm">⬇ Download PDF</button>
         <ShareButton label="Share" className="btn-secondary px-3 py-1.5 text-sm" />
       </div>
       <Inner payrollId={payrollId} />

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, Suspense } from "react";
 import { Alert, api } from "@/components/ui";
 import PrintButton from "@/components/PrintButton";
 import { OrgHeader, OrgFooter, type OrgBrandingData } from "@/components/OrgBranding";
+import { printDocument } from "@/lib/print";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -77,7 +78,7 @@ function P9View({ year, userId }: { year: string; userId?: string }) {
         // Print once the P9 has actually rendered (avoids a blank page).
         if (!printed.current) {
           printed.current = true;
-          setTimeout(() => window.print(), 400);
+          setTimeout(() => printDocument("/p9"), 400);
         }
       })
       .catch((e) => setErr(e.message));
@@ -217,13 +218,13 @@ function Inner({ year: initialYear, userId }: { year: string; userId?: string })
         </select>
         <button
           className="btn-primary px-3 py-1.5 text-xs"
-          onClick={() => window.print()}
+          onClick={() => printDocument("/p9")}
         >
           🖨 Print / Save as PDF
         </button>
       </div>
       <P9View year={year} userId={userId} />
-      <PrintButton />
+      <PrintButton path="/p9" />
     </>
   );
 }
