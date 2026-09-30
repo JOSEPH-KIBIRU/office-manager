@@ -16,7 +16,7 @@ interface NavItem {
   icon: string;
   roles: Role[];
   module: string;
-  /** Admin-control pages (roles, audit) that are never masked by the platform cap. */
+  /** Admin-control pages (e.g. roles & permissions) never masked by the platform cap. */
   always?: boolean;
 }
 
@@ -73,7 +73,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { href: "/organization", label: "Branding & Company", icon: "🎨", roles: ["admin", "secretary"], module: "organization" },
       { href: "/organization/permissions", label: "Roles & permissions", icon: "🔐", roles: ["admin"], module: "organization", always: true },
-      { href: "/audit-log", label: "Audit log", icon: "🕵️", roles: ["admin"], module: "audit-log", always: true },
+      { href: "/audit-log", label: "Audit log", icon: "🕵️", roles: ["admin"], module: "audit-log" },
       { href: "/documents", label: "Documents", icon: "📁", roles: ["admin", "secretary", "manager", "employee"], module: "documents" },
       { href: "/profile", label: "My Profile", icon: "🙋", roles: ["admin", "secretary", "manager", "employee"], module: "profile" },
     ],

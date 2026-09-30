@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -9,7 +9,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
  */
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("audit-log", ["admin"]);
     const url = new URL(req.url);
     const action = url.searchParams.get("action") || undefined;
     const module = url.searchParams.get("module") || undefined;

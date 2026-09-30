@@ -36,6 +36,7 @@ export type ModuleKey =
   | "visitors"
   | "assets"
   | "organization"
+  | "audit-log"
   | "documents"
   | "profile";
 
@@ -43,6 +44,8 @@ export interface ModuleDef {
   key: ModuleKey;
   label: string;
   group: string;
+  /** Controlled only from the platform console (not grantable by company admins). */
+  platformOnly?: boolean;
 }
 
 export const MODULES: ModuleDef[] = [
@@ -69,6 +72,7 @@ export const MODULES: ModuleDef[] = [
   { key: "visitors", label: "Visitors", group: "Operations" },
   { key: "assets", label: "Assets", group: "Operations" },
   { key: "organization", label: "Branding & Company", group: "Company" },
+  { key: "audit-log", label: "Audit log", group: "Company", platformOnly: true },
   { key: "documents", label: "Documents", group: "Company" },
   { key: "profile", label: "My Profile", group: "Company" },
 ];

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { cx, secret, api } from "@/lib/convex";
 
 /**
@@ -12,7 +13,7 @@ function csvCell(value: unknown): string {
 
 export async function GET() {
   try {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("audit-log", ["admin"]);
     const data = (await cx().query(api.audit.list, {
       secret: secret(),
       orgId: session.orgId as never,

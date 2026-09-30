@@ -1,4 +1,4 @@
-import { mutation, MutationCtx } from "./_generated/server";
+import { mutation, internalMutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { assertSecret, tsNow } from "./lib";
 
@@ -148,5 +148,62 @@ export const backfillOrgs = mutation({
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     return MIGRATIONS.backfillOrgs(ctx, { orgName: args.orgName });
+  },
+});
+
+/**
+ * One-off: keep the newly-added "audit-log" module enabled for every company
+ * that already had a restricted `enabledModules` list. Without this, making the
+ * audit trail platform-controllable would hide it from existing companies.
+ * Idempotent (recorded in the `migrations` table).
+ */
+export const ensureAuditLogModule = mutation({
+  args: { secret: v.string() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const name = "ensureAuditLogModule";
+    const already = await ctx.db
+      .query("migrations")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .unique();
+    if (already) return { skipped: true, updated: 0 };
+
+    let updated = 0;
+    for (const o of await ctx.db.query("organizations").collect()) {
+      if (Array.isArray(o.enabledModules) && !o.enabledModules.includes("audit-log")) {
+        await ctx.db.patch(o._id, { enabledModules: [...o.enabledModules, "audit-log"] });
+        updated += 1;
+      }
+    }
+    await ctx.db.insert("migrations", { name, runAt: tsNow() });
+    return { skipped: false, updated };
+  },
+});
+
+/** Same as `ensureAuditLogModule` but callable from the Convex CLI/dashboard
+ *  (internal, so no server secret is needed): `npx convex run migration:ensureAuditLogModuleInternal`. */
+export const ensureAuditLogModuleInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const name = "ensureAuditLogModule";
+    const already = await ctx.db
+      .query("migrations")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .unique();
+    if (already) return { skipped: true, updated: 0, restricted: [] as string[] };
+
+    let updated = 0;
+    const restricted: string[] = [];
+    for (const o of await ctx.db.query("organizations").collect()) {
+      if (Array.isArray(o.enabledModules)) {
+        restricted.push(o.name);
+        if (!o.enabledModules.includes("audit-log")) {
+          await ctx.db.patch(o._id, { enabledModules: [...o.enabledModules, "audit-log"] });
+          updated += 1;
+        }
+      }
+    }
+    await ctx.db.insert("migrations", { name, runAt: tsNow() });
+    return { skipped: false, updated, restricted };
   },
 });

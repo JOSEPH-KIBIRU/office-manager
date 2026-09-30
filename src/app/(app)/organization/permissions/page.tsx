@@ -38,11 +38,17 @@ export default function PermissionsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Modules the platform allows this company to use (null = all).
+  // Modules the platform allows this company to use (null = all). Platform-only
+  // modules (e.g. the audit log) are controlled by the platform console only.
   const availableModules = useMemo(
-    () => MODULES.filter((m) => !enabledModules || enabledModules.includes(m.key)),
+    () => MODULES.filter((m) => !m.platformOnly && (!enabledModules || enabledModules.includes(m.key))),
     [enabledModules]
   );
+
+  const planTotal = MODULES.filter((m) => !m.platformOnly).length;
+  const planIncluded = MODULES.filter(
+    (m) => !m.platformOnly && (!enabledModules || enabledModules.includes(m.key))
+  ).length;
 
   function selectRole(r: OrgRole) {
     setRole(r);
@@ -107,7 +113,7 @@ export default function PermissionsPage() {
 
       {enabledModules && (
         <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-          Your plan includes {enabledModules.length} of {MODULES.length} modules. Modules not included
+          Your plan includes {planIncluded} of {planTotal} modules. Modules not included
           in your plan are hidden here and cannot be granted. Contact support to enable more.
         </div>
       )}
