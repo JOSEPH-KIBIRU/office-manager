@@ -438,6 +438,7 @@ export default function CompaniesPage() {
                       <MenuItem onClick={() => viewCompany(o)}>Open dashboard</MenuItem>
                       <MenuItem onClick={() => { setAdminsFor(o); setResetResult(null); }}>Admins &amp; passwords</MenuItem>
                       <MenuItem onClick={() => openBackups(o)}>Backups / snapshots</MenuItem>
+                      <MenuItem href={`/admin/audit?orgId=${o.id}`}>Audit trail</MenuItem>
                       <MenuItem href={`/api/admin/companies/${o.id}/backup`}>Download JSON backup</MenuItem>
                       <div className="my-1 border-t border-slate-100" />
                       <MenuItem onClick={() => setPendingArchive({ ...o, archived: !o.archived })}>

@@ -1,12 +1,19 @@
 import { mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { assertSecret, tsNow } from "./lib";
+import { assertSuperAdmin } from "./superadmin";
 
 /**
  * Immutable audit trail. Every entry records who acted, what they did, and on
  * which record, scoped to an organization. Entries are append-only; callers
  * only ever insert and read.
+ *
+ * Platform (super-admin) actions are recorded against the target company so the
+ * platform console can show a full per-company trail, but they are hidden from
+ * the company's own audit log (see `list`).
  */
+
+const PLATFORM_ROLE = "super_admin";
 
 export interface AuditEntryInput {
   actorId?: string;
@@ -90,6 +97,8 @@ const ACTION_SET = [
   "backup.restore",
   "permissions.update",
   "features.update",
+  "subscriptions.update",
+  "subscriptions.lifecycle",
   "payroll.run",
   "invoice.create",
   "invoice.delete",
@@ -97,6 +106,60 @@ const ACTION_SET = [
   "leave.reject",
 ] as const;
 
+interface ListArgs {
+  orgId: string;
+  action?: string;
+  module?: string;
+  actorId?: string;
+  limit?: number;
+  before?: number;
+}
+
+/**
+ * Shared listing. `includePlatform` controls whether super-admin actions are
+ * returned: the company-facing query never returns them, the platform console
+ * query does.
+ */
+async function collectLogs(ctx: any, args: ListArgs, includePlatform: boolean) {
+  const limit = Math.min(Math.max(args.limit ?? 200, 1), 1000);
+  const rows = await ctx.db
+    .query("auditLogs")
+    .withIndex("by_org", (q: any) => q.eq("orgId", args.orgId))
+    .collect();
+
+  let filtered = includePlatform
+    ? rows
+    : rows.filter((r: any) => r.actorRole !== PLATFORM_ROLE);
+  if (args.action) filtered = filtered.filter((r: any) => r.action === args.action);
+  if (args.module) filtered = filtered.filter((r: any) => r.module === args.module);
+  if (args.actorId) filtered = filtered.filter((r: any) => r.actorId === args.actorId);
+
+  filtered.sort((a: any, b: any) => b.createdAt - a.createdAt);
+  const afterCursor =
+    args.before !== undefined ? filtered.filter((r: any) => r.createdAt < args.before!) : filtered;
+  const page = afterCursor.slice(0, limit);
+
+  return {
+    total: filtered.length,
+    items: page.map((r: any) => ({
+      id: r._id,
+      actorId: r.actorId ?? null,
+      actorName: r.actorName,
+      actorRole: r.actorRole,
+      action: r.action,
+      module: r.module,
+      targetType: r.targetType ?? null,
+      targetId: r.targetId ?? null,
+      summary: r.summary,
+      metadata: r.metadata ?? null,
+      ip: r.ip ?? null,
+      createdAt: r.createdAt,
+    })),
+    nextBefore: page.length === limit ? page[page.length - 1].createdAt : null,
+  };
+}
+
+/** Company-facing audit log. Platform (super-admin) actions are excluded. */
 export const list = query({
   args: {
     secret: v.string(),
@@ -109,39 +172,28 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    const limit = Math.min(Math.max(args.limit ?? 200, 1), 1000);
-    const rows = await ctx.db
-      .query("auditLogs")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .collect();
+    return collectLogs(ctx, args, false);
+  },
+});
 
-    let filtered = rows;
-    if (args.action) filtered = filtered.filter((r) => r.action === args.action);
-    if (args.module) filtered = filtered.filter((r) => r.module === args.module);
-    if (args.actorId) filtered = filtered.filter((r) => r.actorId === args.actorId);
-
-    filtered.sort((a, b) => b.createdAt - a.createdAt);
-    const afterCursor = args.before !== undefined ? filtered.filter((r) => r.createdAt < args.before!) : filtered;
-    const page = afterCursor.slice(0, limit);
-
-    return {
-      total: filtered.length,
-      items: page.map((r) => ({
-        id: r._id,
-        actorId: r.actorId ?? null,
-        actorName: r.actorName,
-        actorRole: r.actorRole,
-        action: r.action,
-        module: r.module,
-        targetType: r.targetType ?? null,
-        targetId: r.targetId ?? null,
-        summary: r.summary,
-        metadata: r.metadata ?? null,
-        ip: r.ip ?? null,
-        createdAt: r.createdAt,
-      })),
-      nextBefore: page.length === limit ? page[page.length - 1].createdAt : null,
-    };
+/**
+ * Platform-console audit trail for one company. Includes platform actions so a
+ * super admin can see everything that happened to the company.
+ */
+export const adminList = query({
+  args: {
+    secret: v.string(),
+    superAdminId: v.id("users"),
+    orgId: v.id("organizations"),
+    action: v.optional(v.string()),
+    module: v.optional(v.string()),
+    limit: v.optional(v.number()),
+    before: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await assertSuperAdmin(ctx, args.superAdminId);
+    return collectLogs(ctx, args, true);
   },
 });
 
@@ -157,6 +209,7 @@ export const facets = query({
     const modules = new Set<string>();
     const actions = new Set<string>();
     for (const r of rows) {
+      if (r.actorRole === PLATFORM_ROLE) continue;
       modules.add(r.module);
       actions.add(r.action);
     }
