@@ -1,241 +1,233 @@
-import { action, mutation } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import { db } from "./_generated/dataModel";
+import { assertSecret } from "./lib";
+import { assertSuperAdmin } from "./superadmin";
 
-export const subscribe = action({
-  title: "Start trial subscription",
-  args: {
-    orgId: v.id("organizations"),
-    plan: v.union(v.literal("starter"), v.literal("professional"), v.literal("enterprise")),
-    billingCycle: v.union(v.literal("monthly"), v.literal("annual")),
-  },
-  handler: async (ctx, { orgId, plan, billingCycle }) => {
-    const trialEndsAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
-    const startedAt = Date.now();
+/**
+ * Subscription billing.
+ *
+ * Plans (set by the platform super admin, per company):
+ *   - starter      : up to 10 users (incl. admin)  — Ksh 3,500 / month, first month free trial
+ *   - professional : 11–20 users                    — Ksh 8,000 / month
+ *   - enterprise   : 20+ staff                      — contact us
+ *   - annual billing gets a 5% discount on the monthly price.
+ *
+ * A subscription lives in its own table keyed by orgId. On the 1st of every
+ * month a Convex cron (`processSubscriptionRenewals`) cancels any subscription
+ * whose paid period has ended without a payment being recorded (markPaid).
+ */
 
-    await ctx.db.insert("subscriptions", {
-      orgId,
-      plan,
-      billingCycle,
-      status: "trial",
-      trialEndsAt,
-      currentPeriodEnd: trialEndsAt,
-      cancelAtPeriodEnd: false,
-      userCount: 0,
-      startedAt,
-    });
+export const PLAN = v.union(
+  v.literal("starter"),
+  v.literal("professional"),
+  v.literal("enterprise")
+);
+export const CYCLE = v.union(v.literal("monthly"), v.literal("annual"));
+export const STATUS = v.union(
+  v.literal("trial"),
+  v.literal("active"),
+  v.literal("canceled"),
+  v.literal("past_due")
+);
 
-    return { trialEndsAt, startedAt };
-  },
-});
+const TRIAL_MS = 30 * 24 * 60 * 60 * 1000;
 
-export const confirmPayment = mutation({
-  title: "Confirm payment / move from trial to active",
-  args: {
-    orgId: v.id("organizations"),
-  },
-  handler: async (ctx) => {
-    await ctx.db.patch("subscriptions", {
-      id: ctx.suppose.id, // will need to find by orgId
-    });
-    // Actually we need to find the subscription by orgId first.
-    // Let's use a different approach - we'll have a helper.
-    return { success: true };
-  },
-});
+function addMonths(from: number, months: number): number {
+  const d = new Date(from);
+  d.setMonth(d.getMonth() + months);
+  return d.getTime();
+}
 
-// Let me restructure - I'll export helper functions and the main actions
+function nextPeriodEnd(cycle: "monthly" | "annual", from = Date.now()): number {
+  return addMonths(from, cycle === "annual" ? 12 : 1);
+}
 
-// We'll define a few key actions/mutations
-
-export const startTrial = action({
-  title: "Start trial for organization",
-  args: {
-    orgId: v.id("organizations"),
-    plan: v.union(v.literal("starter"), v.literal("professional"), v.literal("enterprise")),
-    billingCycle: v.union(v.literal("monthly"), v.literal("annual")),
-  },
-  handler: async (ctx, { orgId, plan, billingCycle }) => {
-    const trialEndsAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
-    const startedAt = Date.now();
-
-    await ctx.db.insert("subscriptions", {
-      orgId,
-      plan,
-      billingCycle,
-      status: "trial",
-      trialEndsAt,
-      currentPeriodEnd: trialEndsAt,
-      cancelAtPeriodEnd: false,
-      userCount: 0,
-      startedAt,
-    });
-
-    return { trialEndsAt, startedAt, plan, billingCycle };
-  },
-});
-
-export const convertTrialToActive = mutation({
-  title: "Convert trial to active after payment",
-  args: {
-    orgId: v.id("organizations"),
-  },
-  handler: async (ctx) => {
-    // Find subscription for this org
-    const subs = await ctx.db
-      .query("subscriptions")
-      .filter("orgId", "=", ctx.args.orgId)
-      .collect();
-
-    if (subs.length === 0) {
-      throw new Error("No subscription found for this organization");
-    }
-
-    const subId = subs[0].$id;
-
-    await ctx.db.patch(subId, {
-      status: "active",
-      trialEndsAt: null,
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).getTime(), // start new period
-      cancelAtPeriodEnd: false,
-    });
-
-    return { success: true, subId };
-  },
-});
-
-export const cancelSubscription = mutation({
-  title: "Cancel subscription",
-  args: {
-    orgId: v.id("organizations"),
-  },
-  handler: async (ctx) => {
-    const subs = await ctx.db
-      .query("subscriptions")
-      .filter("orgId", "=", ctx.args.orgId)
-      .collect();
-
-    if (subs.length === 0) {
-      throw new Error("No subscription found");
-    }
-
-    const subId = subs[0].$id;
-
-    await ctx.db.patch(subId, {
-      cancelAtPeriodEnd: true,
-      status: "canceled",
-    });
-
-    return { success: true, subId };
-  },
-});
-
-export const updateUserCount = action({
-  title: "Update user count for organization",
-  args: {
-    orgId: v.id("organizations"),
-    count: v.number(),
-  },
-  handler: async (ctx, { orgId, count }) => {
-    const subs = await ctx.db
-      .query("subscriptions")
-      .filter("orgId", "=", orgId)
-      .collect();
-
-    if (subs.length === 0) {
-      throw new Error("No subscription found for organization");
-    }
-
-    const subId = subs[0].$id;
-
-    await ctx.db.patch(subId, {
-      userCount: count,
-    });
-
-    return { success: true, userCount: count };
-  },
-});
-
-// Helper: get current organization's subscription
-export const getSubscription = async (ctx, orgId: string) => {
-  const subs = await ctx.db
+async function findForOrg(ctx: any, orgId: string) {
+  return ctx.db
     .query("subscriptions")
-    .filter("orgId", "=", orgId)
-    .collect();
+    .withIndex("by_org", (q: any) => q.eq("orgId", orgId))
+    .unique();
+}
 
-  if (subs.length === 0) {
-    return null;
-  }
+/** The calling company's own subscription (any authenticated member). */
+export const getSubscription = query({
+  args: { secret: v.string(), orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const sub = await findForOrg(ctx, args.orgId);
+    if (!sub) return null;
+    return {
+      plan: sub.plan,
+      billingCycle: sub.billingCycle,
+      status: sub.status,
+      trialEndsAt: sub.trialEndsAt ?? null,
+      currentPeriodEnd: sub.currentPeriodEnd ?? null,
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+    };
+  },
+});
 
-  return {
-    id: subs[0].$id,
-    ...subs[0],
-  };
-};
+/** All companies with subscription + live user counts (super admin). */
+export const listCompanySubscriptions = query({
+  args: { secret: v.string(), superAdminId: v.id("users") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await assertSuperAdmin(ctx, args.superAdminId);
+    const orgs = await ctx.db.query("organizations").collect();
+    const out = [];
+    for (const o of orgs.filter((x) => x.slug !== "__platform").sort((a, b) => a.name.localeCompare(b.name))) {
+      const users = await ctx.db
+        .query("users")
+        .withIndex("by_org", (q) => q.eq("orgId", o._id))
+        .collect();
+      const sub = await findForOrg(ctx, o._id);
+      out.push({
+        id: o._id,
+        name: o.name,
+        slug: o.slug,
+        active: o.active,
+        userCount: users.length,
+        plan: sub?.plan ?? null,
+        billingCycle: sub?.billingCycle ?? null,
+        status: sub?.status ?? null,
+        trialEndsAt: sub?.trialEndsAt ?? null,
+        currentPeriodEnd: sub?.currentPeriodEnd ?? null,
+        cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
+      });
+    }
+    return out;
+  },
+});
 
-/** Set subscription plan for a company (super admin only). */
+/** Start the one-month free trial for a company. */
+export const startTrial = mutation({
+  args: { secret: v.string(), orgId: v.id("organizations"), plan: PLAN, billingCycle: CYCLE },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const org = await ctx.db.get(args.orgId);
+    if (!org) throw new Error("Organization not found");
+    const now = Date.now();
+    const trialEndsAt = now + TRIAL_MS;
+    const existing = await findForOrg(ctx, args.orgId);
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        plan: args.plan,
+        billingCycle: args.billingCycle,
+        status: "trial",
+        trialEndsAt,
+        currentPeriodEnd: trialEndsAt,
+        cancelAtPeriodEnd: false,
+      });
+      return { orgId: args.orgId, trialEndsAt };
+    }
+    await ctx.db.insert("subscriptions", {
+      orgId: args.orgId,
+      plan: args.plan,
+      billingCycle: args.billingCycle,
+      status: "trial",
+      trialEndsAt,
+      currentPeriodEnd: trialEndsAt,
+      cancelAtPeriodEnd: false,
+      userCount: 0,
+      startedAt: now,
+    });
+    return { orgId: args.orgId, trialEndsAt };
+  },
+});
+
+/** Super admin sets a company's plan, billing cycle and status. */
 export const setSubscriptionPlan = mutation({
-  title: "Set subscription plan for organization",
   args: {
     secret: v.string(),
     superAdminId: v.id("users"),
     orgId: v.id("organizations"),
-    plan: v.union(v.literal("starter"), v.literal("professional"), v.literal("enterprise")),
-    billingCycle: v.union(v.literal("monthly"), v.literal("annual")),
-    status: v.optional(
-      v.union(v.literal("trial"), v.literal("active"), v.literal("canceled"), v.literal("past_due"))
-    ),
+    plan: PLAN,
+    billingCycle: CYCLE,
+    status: v.optional(STATUS),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     await assertSuperAdmin(ctx, args.superAdminId);
     const org = await ctx.db.get(args.orgId);
     if (!org) throw new Error("Organization not found");
-
-    const update: never = {
+    const now = Date.now();
+    const existing = await findForOrg(ctx, args.orgId);
+    const status = args.status ?? existing?.status ?? "active";
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        plan: args.plan,
+        billingCycle: args.billingCycle,
+        status,
+        currentPeriodEnd: existing.currentPeriodEnd ?? nextPeriodEnd(args.billingCycle, now),
+      });
+      return { orgId: args.orgId, plan: args.plan, billingCycle: args.billingCycle, status };
+    }
+    await ctx.db.insert("subscriptions", {
+      orgId: args.orgId,
       plan: args.plan,
       billingCycle: args.billingCycle,
-      status: args.status ?? "active",
-    } as never;
-
-    await ctx.db.patch(args.orgId, update);
-
-    return { orgId: args.orgId, plan: args.plan, billingCycle: args.billingCycle, status: args.status ?? "active" };
+      status,
+      currentPeriodEnd: nextPeriodEnd(args.billingCycle, now),
+      cancelAtPeriodEnd: false,
+      userCount: 0,
+      startedAt: now,
+    });
+    return { orgId: args.orgId, plan: args.plan, billingCycle: args.billingCycle, status };
   },
 });
 
-// Daily cron handler - check for trial expiry and cancellations
-// This would be called from /api/cron/subscription-check
-export const checkSubscriptions = async (ctx) => {
-  const now = Date.now();
-
-  // Find trial subscriptions that have expired
-  const trialSubs = await ctx.db
-    .query("subscriptions")
-    .filter("status", "=", "trial")
-    .filter("trialEndsAt", "<=", now)
-    .collect();
-
-  for (const sub of trialSubs) {
-    await ctx.db.patch(sub.$id, {
-      status: "canceled",
+/** Record a payment: activate the plan and advance the paid period. */
+export const markPaid = mutation({
+  args: { secret: v.string(), superAdminId: v.id("users"), orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await assertSuperAdmin(ctx, args.superAdminId);
+    const sub = await findForOrg(ctx, args.orgId);
+    if (!sub) throw new Error("Subscription not found");
+    const now = Date.now();
+    const from = sub.currentPeriodEnd && sub.currentPeriodEnd > now ? sub.currentPeriodEnd : now;
+    await ctx.db.patch(sub._id, {
+      status: "active",
+      trialEndsAt: undefined,
+      currentPeriodEnd: nextPeriodEnd(sub.billingCycle, from),
+      cancelAtPeriodEnd: false,
     });
-  }
+    return { orgId: args.orgId, currentPeriodEnd: nextPeriodEnd(sub.billingCycle, from) };
+  },
+});
 
-  // Find active subscriptions with cancelAtPeriodEnd = true whose period has ended
-  const activeSubs = await ctx.db
-    .query("subscriptions")
-    .filter("status", "=", "active")
-    .filter("cancelAtPeriodEnd", "=", true)
-    .collect();
+/** Cancel a subscription (effective immediately). */
+export const cancelSubscription = mutation({
+  args: { secret: v.string(), superAdminId: v.id("users"), orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await assertSuperAdmin(ctx, args.superAdminId);
+    const sub = await findForOrg(ctx, args.orgId);
+    if (!sub) throw new Error("Subscription not found");
+    await ctx.db.patch(sub._id, { status: "canceled", cancelAtPeriodEnd: true });
+    return { orgId: args.orgId };
+  },
+});
 
-  for (const sub of activeSubs) {
-    if (sub.currentPeriodEnd && sub.currentPeriodEnd <= now) {
-      await ctx.db.patch(sub.$id, {
-        status: "canceled",
-      });
+/**
+ * Cron (1st of every month): cancel any subscription whose paid period has
+ * ended without payment, or whose trial has expired.
+ */
+export const processSubscriptionRenewals = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const subs = await ctx.db.query("subscriptions").collect();
+    let canceled = 0;
+    for (const s of subs) {
+      if (s.status === "canceled") continue;
+      const periodEnded = s.currentPeriodEnd !== undefined && s.currentPeriodEnd <= now;
+      const trialExpired = s.status === "trial" && s.trialEndsAt !== undefined && s.trialEndsAt <= now;
+      if (periodEnded || trialExpired || s.cancelAtPeriodEnd) {
+        await ctx.db.patch(s._id, { status: "canceled", cancelAtPeriodEnd: true });
+        canceled++;
+      }
     }
-  }
-
-  return { checked: trialSubs.length + activeSubs.length };
-};
+    return { checked: subs.length, canceled };
+  },
+});

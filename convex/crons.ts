@@ -71,4 +71,8 @@ const crons = cronJobs();
 // Jan 1st, 00:00 UTC — yearly leave balance reset for every organization.
 crons.cron("annual-leave-reset", "0 0 1 1 *", internal.crons.annualLeaveReset, {});
 
+// 1st of every month, 00:00 UTC — cancel subscriptions whose paid period has
+// ended (i.e. not yet paid) and expired trials.
+crons.cron("monthly-subscription-check", "0 0 1 * *", internal.subscriptions.processSubscriptionRenewals, {});
+
 export default crons;

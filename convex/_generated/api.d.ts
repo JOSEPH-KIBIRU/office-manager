@@ -49,6 +49,7 @@ import type * as reminders from "../reminders.js";
 import type * as restore from "../restore.js";
 import type * as seed from "../seed.js";
 import type * as storage from "../storage.js";
+import type * as subscriptions from "../subscriptions.js";
 import type * as superadmin from "../superadmin.js";
 import type * as tasks from "../tasks.js";
 import type * as twofa from "../twofa.js";
@@ -103,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   restore: typeof restore;
   seed: typeof seed;
   storage: typeof storage;
+  subscriptions: typeof subscriptions;
   superadmin: typeof superadmin;
   tasks: typeof tasks;
   twofa: typeof twofa;

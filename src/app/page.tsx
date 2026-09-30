@@ -83,7 +83,13 @@ const jsonLd = {
       url: `${BASE_URL}/`,
       description:
         "KRA-compliant payroll, employee leave management, attendance, document and asset registers, visitor management, petty cash, car logs, meetings, invoicing with KRA eTIMS e-invoicing, double-entry accounting and task tracking software for Kenyan businesses.",
-      offers: { "@type": "Offer", price: "0", priceCurrency: "KES" },
+      offers: {
+        "@type": "AggregateOffer",
+        lowPrice: "3500",
+        highPrice: "8000",
+        priceCurrency: "KES",
+        offerCount: "2",
+      },
       countriesSupported: "KE",
       featureList: ALL_MODULE_NAMES,
     },

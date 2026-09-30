@@ -1,51 +1,31 @@
 import { NextRequest } from "next/server";
 import { requireUser, HttpError } from "@/lib/auth";
 import { handle, ok } from "@/lib/api";
-import { cx, secret, api } from "@/lib/convex";
+import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { recordAudit } from "@/lib/audit";
+import { PLANS, ANNUAL_DISCOUNT } from "@/lib/plans";
+
+type PlanKey = "starter" | "professional" | "enterprise";
+type Cycle = "monthly" | "annual";
+type Status = "trial" | "active" | "canceled" | "past_due";
 
 /**
- * Subscriptions management.
- * GET   /api/admin/subscriptions  - list companies with their subscription status.
- * PATCH /api/admin/subscriptions  - set the subscription plan for one company.
- *   body: { orgId: string, plan: "starter" | "professional" | "enterprise",
- *         billingCycle: "monthly" | "annual", status?: "trial" | "active" | "canceled" }
+ * Platform subscriptions (super admin only).
+ * GET   /api/admin/subscriptions           - companies + plan metadata.
+ * PATCH /api/admin/subscriptions           - set a company's plan/cycle/status.
+ *   body: { orgId, plan, billingCycle, status? }
+ * POST  /api/admin/subscriptions           - lifecycle actions.
+ *   body: { orgId, action: "markPaid" | "cancel" | "startTrial", plan?, billingCycle? }
  */
-
 export async function GET() {
   return handle(async () => {
     const session = await requireUser(["super_admin"]);
     try {
-      // Fetch all organizations except the platform placeholder
-      const orgs = await cx().query(api.permissions.listCompaniesModules, {
+      const companies = await cx().query(api.subscriptions.listCompanySubscriptions, {
         secret: secret(),
         superAdminId: session.id as never,
       });
-
-      // For each org, fetch subscription details
-      const companies = await Promise.all(
-        orgs.map(async (org) => {
-          const subs = await cx().query(
-            api.subscriptions.getSubscription,
-            { orgId: org.id }
-          );
-
-          return {
-            id: org.id,
-            name: org.name,
-            slug: org.slug,
-            active: org.active,
-            plan: subs?.plan ?? null,
-            billingCycle: subs?.billingCycle ?? null,
-            status: subs?.status ?? null,
-            userCount: subs?.userCount ?? 0,
-            trialEndsAt: subs?.trialEndsAt ?? null,
-            currentPeriodEnd: subs?.currentPeriodEnd ?? null,
-          };
-        })
-      );
-
-      return ok({ companies });
+      return ok({ companies, plans: PLANS, annualDiscount: ANNUAL_DISCOUNT });
     } catch (e) {
       return mapConvexError(e);
     }
@@ -57,15 +37,13 @@ export async function PATCH(req: NextRequest) {
     const session = await requireUser(["super_admin"]);
     const body = (await req.json().catch(() => ({}))) as {
       orgId?: string;
-      plan?: "starter" | "professional" | "enterprise";
-      billingCycle?: "monthly" | "annual";
-      status?:
-        | "trial"
-        | "active"
-        | "canceled"
-        | "past_due";
+      plan?: PlanKey;
+      billingCycle?: Cycle;
+      status?: Status;
     };
     if (!body.orgId) throw new HttpError(400, "orgId is required");
+    if (!body.plan) throw new HttpError(400, "plan is required");
+    if (!body.billingCycle) throw new HttpError(400, "billingCycle is required");
 
     try {
       const result = await cx().mutation(api.subscriptions.setSubscriptionPlan, {
@@ -76,21 +54,71 @@ export async function PATCH(req: NextRequest) {
         billingCycle: body.billingCycle,
         status: body.status,
       });
-
       await recordAudit(
         session,
         {
           action: "subscriptions.update",
           module: "platform",
-          summary:
-            body.plan !== undefined
-              ? `Set plan to ${body.plan} (${body.billingCycle ?? "monthly"}) for company`
-              : `Set status to ${body.status ?? "active"} for company`,
+          summary: `Set ${body.plan} plan (${body.billingCycle})${body.status ? ` · ${body.status}` : ""} for company`,
         },
         null,
         body.orgId
       );
+      return ok(result);
+    } catch (e) {
+      return mapConvexError(e);
+    }
+  });
+}
 
+export async function POST(req: NextRequest) {
+  return handle(async () => {
+    const session = await requireUser(["super_admin"]);
+    const body = (await req.json().catch(() => ({}))) as {
+      orgId?: string;
+      action?: "markPaid" | "cancel" | "startTrial";
+      plan?: PlanKey;
+      billingCycle?: Cycle;
+    };
+    if (!body.orgId) throw new HttpError(400, "orgId is required");
+    if (!body.action) throw new HttpError(400, "action is required");
+
+    try {
+      let result: unknown;
+      let summary: string;
+      if (body.action === "markPaid") {
+        result = await cx().mutation(api.subscriptions.markPaid, {
+          secret: secret(),
+          superAdminId: session.id as never,
+          orgId: body.orgId as never,
+        });
+        summary = "Recorded subscription payment";
+      } else if (body.action === "cancel") {
+        result = await cx().mutation(api.subscriptions.cancelSubscription, {
+          secret: secret(),
+          superAdminId: session.id as never,
+          orgId: body.orgId as never,
+        });
+        summary = "Cancelled subscription";
+      } else {
+        if (!body.plan || !body.billingCycle) {
+          throw new HttpError(400, "plan and billingCycle are required to start a trial");
+        }
+        result = await cx().mutation(api.subscriptions.startTrial, {
+          secret: secret(),
+          orgId: body.orgId as never,
+          plan: body.plan,
+          billingCycle: body.billingCycle,
+        });
+        summary = `Started ${body.plan} trial`;
+      }
+
+      await recordAudit(
+        session,
+        { action: "subscriptions.lifecycle", module: "platform", summary },
+        null,
+        body.orgId
+      );
       return ok(result);
     } catch (e) {
       return mapConvexError(e);
