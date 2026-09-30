@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 /** Attendance records (+ today's status, + monthly summary for payroll). */
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("attendance", ["admin", "secretary", "manager", "employee"]);
     const url = new URL(req.url);
     const month = url.searchParams.get("month");
     const year = url.searchParams.get("year");
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
 /** Clock in or out. */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("attendance", ["admin", "secretary", "manager", "employee"]);
     const body = await readJson<{ action?: "in" | "out"; note?: string }>(req);
     if (body.action !== "in" && body.action !== "out") throw new HttpError(400, "action must be 'in' or 'out'");
 

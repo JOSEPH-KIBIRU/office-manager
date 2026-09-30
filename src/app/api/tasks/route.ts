@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields, maxLen } from "@/lib/api";
 import { notifyTaskAssigned } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
@@ -10,7 +11,7 @@ type Priority = (typeof PRIORITIES)[number];
 /** List tasks (assigned to me / created by me / all for admins). */
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("tasks", ["admin", "secretary", "manager", "employee"]);
     const scopeParam = new URL(req.url).searchParams.get("scope") || "assigned";
     const scope = (["assigned", "created", "all"] as const).includes(scopeParam as never)
       ? (scopeParam as "assigned" | "created" | "all")
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
 /** Create a task (admin only). */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("tasks", ["admin"]);
     const body = await readJson<{
       title: string;
       description?: string;

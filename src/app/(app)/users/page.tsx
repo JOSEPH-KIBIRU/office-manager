@@ -61,6 +61,7 @@ export default function UsersPage() {
   const [employmentType, setEmploymentType] = useState<string>("permanent");
   const [changeRequests, setChangeRequests] = useState<ProfileChangeRequestRow[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [customRoles, setCustomRoles] = useState<{ key: string; label: string }[]>([]);
   const [errors, setErrors] = useState<Errors>({});
   const [payrollFor, setPayrollFor] = useState<UserRow | null>(null);
   const [payStatutory, setPayStatutory] = useState("");
@@ -84,6 +85,12 @@ export default function UsersPage() {
         "/api/departments"
       );
       setDepartments(depts.departments);
+      try {
+        const perms = await api<{ customRoles: { key: string; label: string }[] }>("/api/permissions");
+        setCustomRoles(perms.customRoles ?? []);
+      } catch {
+        setCustomRoles([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load users");
     } finally {
@@ -183,6 +190,9 @@ export default function UsersPage() {
     }
   }
 
+  const roleOptions = [...ROLES, ...customRoles.map((c) => c.key)];
+  const labelFor = (r: string) => ROLE_LABELS[r] ?? customRoles.find((c) => c.key === r)?.label ?? r;
+
   return (
     <>
       <PageHeader
@@ -266,7 +276,7 @@ export default function UsersPage() {
                     disabled={u.id === session.id}
                     onChange={(e) => patch(u.id, { role: e.target.value })}
                   >
-                    {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                    {roleOptions.map((r) => <option key={r} value={r}>{labelFor(r)}</option>)}
                   </select>
                 </td>
                 <td>
@@ -385,7 +395,7 @@ export default function UsersPage() {
             <div>
               <label className="label" htmlFor="nu-role">Role</label>
               <select id="nu-role" className="input" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                {roleOptions.map((r) => <option key={r} value={r}>{labelFor(r)}</option>)}
               </select>
             </div>
             <div>

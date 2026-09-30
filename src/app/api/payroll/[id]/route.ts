@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 /** Admin only: full payslip breakdown for a payroll run, plus all rows. */
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("payroll", ["admin"]);
     const { id } = await ctx.params;
     let data;
     try {
@@ -25,7 +26,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 /** Admin only: edit a payroll run (recalculates payslips). */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("payroll", ["admin"]);
     const { id } = await ctx.params;
     const body = await readJson<{
       basicSalaries?: Array<{ userId: string; amount: number }>;
@@ -84,7 +85,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 /** Admin only: delete a payroll run. */
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("payroll", ["admin"]);
     const { id } = await ctx.params;
     try {
       const result = await cx().mutation(api.payroll.deletePayroll, {

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields, fail, maxLen, validDate } from "@/lib/api";
 import { notifyAdminsOfLeaveRequest, notifyLeaveDecision } from "@/lib/notify";
 import { LEAVE_TYPES, type LeaveType } from "@/lib/types";
@@ -23,7 +23,7 @@ function workingLeaveDays(start: string, end: string, workingDays: number[], hol
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("leave", ["admin", "secretary", "manager", "employee"]);
     const mineOnly = session.role !== "admin" || req.nextUrl.searchParams.get("scope") === "mine";
 
     try {
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("leave", ["admin", "secretary", "manager", "employee"]);
     const body = await readJson<{ start_date: string; end_date: string; reason: string; leave_type?: LeaveType }>(req);
     requireFields(body, ["start_date", "end_date", "reason"]);
 

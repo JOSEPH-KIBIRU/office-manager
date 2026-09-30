@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 /** Export a payroll run for payment: ?format=csv|bank|mpesa */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("payroll", ["admin"]);
     const { id } = await ctx.params;
     const url = new URL(req.url);
     const format = (url.searchParams.get("format") || "csv").toLowerCase();

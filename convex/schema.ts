@@ -71,13 +71,11 @@ export default defineSchema(
     email: v.string(),
     phone: v.optional(v.string()),
     passwordHash: v.string(),
-    role: v.union(
-      v.literal("admin"),
-      v.literal("secretary"),
-      v.literal("manager"),
-      v.literal("employee"),
-      v.literal("super_admin")
-    ),
+    // Built-in roles: "admin" (Director), "secretary" (Admin / Secretary),
+    // "manager", "employee", "super_admin". Companies may also define their own
+    // roles (see organizations.customRoles), so this is a free-form string that
+    // is validated against the company's role list at the API layer.
+    role: v.string(),
     platformRole: v.optional(
       v.union(v.literal("superadmin"), v.literal("platform_owner"))
     ),

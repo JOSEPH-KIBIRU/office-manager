@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import path from "path";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -10,7 +10,7 @@ const ALLOWED = [".png", ".jpg", ".jpeg", ".svg", ".webp"];
 /** Upload a company logo to Convex storage. Returns { storageId } to persist via PATCH /api/organization. */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary"]);
+    const session = await requirePermission("organization", ["admin", "secretary"]);
 
     const cl = Number(req.headers.get("content-length") || 0);
     if (cl && cl > MAX_SIZE + 1024 * 1024) return fail(413, "Request body too large");

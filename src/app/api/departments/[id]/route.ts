@@ -1,11 +1,11 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("departments", ["admin"]);
     const { id } = await ctx.params;
     const body = await readJson<{ name: string }>(req);
 
@@ -25,7 +25,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("departments", ["admin"]);
     const { id } = await ctx.params;
 
     try {

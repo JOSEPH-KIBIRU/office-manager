@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 /** Unpaid leave-encashment days for a year (admin). */
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("leave", ["admin"]);
     const url = new URL(req.url);
     const year = Number(url.searchParams.get("year") || new Date().getFullYear());
     try {

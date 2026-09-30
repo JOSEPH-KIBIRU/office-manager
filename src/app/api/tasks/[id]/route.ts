@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 /** Task detail + report/comment thread. */
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("tasks", ["admin", "secretary", "manager", "employee"]);
     const { id } = await ctx.params;
     try {
       const data = await cx().query(api.tasks.getTask, {

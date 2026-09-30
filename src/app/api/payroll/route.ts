@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { recordAudit } from "@/lib/audit";
 
 export async function GET() {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("payroll", ["admin"]);
     let payrolls;
     try {
       payrolls = await cx().query(api.payroll.listPayrolls, {
@@ -22,7 +23,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("payroll", ["admin"]);
     const body = await readJson<{
       month: number;
       year: number;

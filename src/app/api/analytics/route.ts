@@ -1,10 +1,10 @@
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET() {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("analytics", ["admin", "secretary", "manager", "employee"]);
     try {
       const data = await cx().query(api.analytics.series, {
         secret: secret(),

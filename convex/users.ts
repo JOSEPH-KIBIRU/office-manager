@@ -3,12 +3,17 @@ import { v, ConvexError } from "convex/values";
 import { assertSecret, tsNow } from "./lib";
 import { seedDefaultsForUser } from "./checklists";
 
-const roleValidator = v.union(
-  v.literal("admin"),
-  v.literal("secretary"),
-  v.literal("manager"),
-  v.literal("employee")
-);
+const roleValidator = v.string();
+
+const BUILTIN_ROLES = ["admin", "secretary", "manager", "employee", "super_admin"];
+
+/** A role must be a built-in or one the company has defined in customRoles. */
+async function assertValidRole(ctx: any, orgId: string, role: string) {
+  if (BUILTIN_ROLES.includes(role)) return;
+  const org = await ctx.db.get(orgId);
+  const custom = ((org?.customRoles ?? []) as Array<{ key: string }>).map((r) => r.key);
+  if (!custom.includes(role)) throw new ConvexError("Unknown role");
+}
 
 export const listUsers = query({
   args: {
@@ -70,6 +75,7 @@ export const createUser = mutation({
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    await assertValidRole(ctx, args.orgId, args.role);
     // Email is the global login key — must be unique platform-wide.
     const existing = await ctx.db
       .query("users")
@@ -129,6 +135,7 @@ export const patchUser = mutation({
     assertSecret(args.secret);
     const user = await ctx.db.get(args.id);
     if (!user || user.orgId !== args.orgId) throw new ConvexError("User not found");
+    if (args.role !== undefined) await assertValidRole(ctx, args.orgId, args.role);
 
     const patch: Record<string, unknown> = {};
     if (args.role !== undefined) patch.role = args.role;

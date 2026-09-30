@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         name: String(body.name).trim(),
         email,
         phone: body.phone?.trim() || undefined,
-        role: body.role as "admin" | "secretary" | "manager" | "employee",
+        role: String(body.role),
         employmentType,
         bankName: body.bank_name?.trim() || undefined,
         bankAccount: body.bank_account?.trim() || undefined,

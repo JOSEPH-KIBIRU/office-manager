@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields, maxLen } from "@/lib/api";
 import { notifyTaskReportSubmitted } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
@@ -7,7 +8,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
 /** Task actions: start, cancel, report, comment, acknowledge, reopen. */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("tasks", ["admin", "secretary", "manager", "employee"]);
     const { id } = await ctx.params;
     const body = await readJson<{
       action: string;

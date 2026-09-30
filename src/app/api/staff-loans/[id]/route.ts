@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 /** Update a staff loan / advance. Admin only. */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("payroll", ["admin"]);
     const { id } = await ctx.params;
     const body = await readJson<{
       monthlyDeduction?: number;
@@ -42,7 +43,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 /** Delete a staff loan / advance. Admin only. */
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("payroll", ["admin"]);
     const { id } = await ctx.params;
     try {
       const res = await cx().mutation(api.payroll.deleteStaffLoan, {

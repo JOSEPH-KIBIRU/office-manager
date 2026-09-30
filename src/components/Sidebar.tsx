@@ -140,12 +140,13 @@ export default function Sidebar({ session }: { session: SessionPayload }) {
   const groups = NAV_GROUPS.map((g) => ({
     title: g.title,
     items: g.items.filter((n) => {
-      if (!n.roles.includes(session.role)) return false;
-      // Admin-control pages are always available to their roles.
-      if (n.always) return true;
-      // While the effective module list is loading, don't hide anything yet.
-      if (granted === null) return true;
-      // `granted` already reflects both the platform cap and role grants.
+      // Admin-control pages (roles & permissions) stay visible only to the
+      // built-in roles that list them.
+      if (n.always) return n.roles.includes(session.role);
+      // While the effective module list is loading, fall back to the role map.
+      if (granted === null) return n.roles.includes(session.role);
+      // Once loaded, visibility is driven by the effective grants — this also
+      // covers company-defined (custom) roles, which never appear in the map.
       return granted.includes(n.module);
     }),
   })).filter((g) => g.items.length > 0);

@@ -2,9 +2,11 @@ import "server-only";
 import { getSession, HttpError } from "./auth";
 import type { SessionPayload } from "./types";
 import { cx, secret, api } from "./convex";
-import { resolveRolePermissions, ALL_MODULE_KEYS, type OrgRole } from "./permissions";
+import { resolveRolePermissions, ALL_MODULE_KEYS, ORG_ROLES, type OrgRole } from "./permissions";
 
 type Access = { enabled: string[] | null; granted: string[] | null };
+
+const BUILTIN_ROLES = new Set<string>([...ORG_ROLES, "super_admin"]);
 
 /** Resolve the platform cap + configured grants for a role in one round-trip. */
 async function resolveAccess(orgId: string, role: string): Promise<Access> {
@@ -38,11 +40,13 @@ export async function getEffectivePermissions(orgId: string, role: string): Prom
 /**
  * Module-level access guard.
  *
- * `fallbackRoles` preserves the existing coarse role gate. On top of that:
+ * `fallbackRoles` preserves the existing coarse role gate for the built-in
+ * roles. On top of that:
  *   - the module must be within the platform cap (applies to every role,
- *     including admin — a disabled module is fully masked), and
- *   - when a role has saved permissions, the module must be granted.
- * Unconfigured roles keep legacy access.
+ *     including admin — a disabled module is fully masked);
+ *   - when a built-in role has saved permissions, the module must be granted;
+ *   - a company-defined (custom) role is never covered by `fallbackRoles`, so it
+ *     is allowed only when the module is explicitly granted to it.
  */
 export async function requirePermission(
   module: string,
@@ -51,11 +55,14 @@ export async function requirePermission(
   const session = await getSession();
   if (!session || !session.orgId) throw new HttpError(401, "Not authenticated");
   if (session.role === "super_admin") return session;
-  if (!fallbackRoles.includes(session.role)) {
-    throw new HttpError(403, "You do not have permission to perform this action");
-  }
 
   const { enabled, granted } = await resolveAccess(session.orgId, session.role);
+  const isCustom = !BUILTIN_ROLES.has(session.role);
+
+  // Built-in roles keep their coarse role gate; custom roles are grant-driven.
+  if (!isCustom && !fallbackRoles.includes(session.role)) {
+    throw new HttpError(403, "You do not have permission to perform this action");
+  }
 
   // Platform cap — the hard ceiling for every role, admin included.
   if (enabled && !enabled.includes(module)) {
@@ -63,7 +70,15 @@ export async function requirePermission(
   }
   if (session.role === "admin") return session;
 
-  // Per-role grant (only enforced once the role has been configured).
+  // Custom roles: allowed only when the module is explicitly granted.
+  if (isCustom) {
+    if (!Array.isArray(granted) || !granted.includes(module)) {
+      throw new HttpError(403, "You do not have permission to access this module");
+    }
+    return session;
+  }
+
+  // Built-in, non-admin: enforce saved grants when present.
   if (Array.isArray(granted) && !granted.includes(module)) {
     throw new HttpError(403, "You do not have permission to access this module");
   }

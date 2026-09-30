@@ -1,6 +1,13 @@
-export type Role = "admin" | "secretary" | "manager" | "employee" | "super_admin";
+/**
+ * Built-in roles are admin/secretary/manager/employee/super_admin, but a
+ * company may define its own roles (organizations.customRoles), so role is a
+ * free-form key validated against the company's role list.
+ */
+export type Role = string;
 
-export const ROLE_LABELS: Record<Role, string> = {
+export const BUILTIN_ROLE_KEYS = ["admin", "secretary", "manager", "employee", "super_admin"];
+
+export const ROLE_LABELS: Record<string, string> = {
   admin: "Director",
   secretary: "Admin / Secretary",
   manager: "Manager",

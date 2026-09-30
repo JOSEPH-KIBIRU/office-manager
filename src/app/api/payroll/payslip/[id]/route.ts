@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -10,7 +10,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
  */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary", "manager", "employee"]);
+    const session = await requirePermission("my-payslips", ["admin", "secretary", "manager", "employee"]);
     const { id } = await ctx.params;
     const url = new URL(req.url);
     const requestedUserId = url.searchParams.get("userId");

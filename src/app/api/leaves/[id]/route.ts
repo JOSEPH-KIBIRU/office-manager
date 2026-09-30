@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { notifyLeaveDecision } from "@/lib/notify";
 import { LEAVE_TYPES } from "@/lib/types";
@@ -9,7 +10,7 @@ import { queueCalendarSync } from "@/lib/calendar/enqueue";
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     // Only the admin may modify leave requests — employees cannot edit once submitted.
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("leave", ["admin"]);
     const { id } = await ctx.params;
 
     const leave = await cx().query(api.leaves.getLeave, {
@@ -86,7 +87,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("leave", ["admin", "secretary", "manager", "employee"]);
     const { id } = await ctx.params;
 
     const existing = await cx().query(api.leaves.getLeave, {

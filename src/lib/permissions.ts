@@ -101,6 +101,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, ModuleKey[]> = {
 
 export const ORG_ROLES: OrgRole[] = ["admin", "secretary", "manager", "employee"];
 
+/** Company roles that are not built-in (i.e. defined in organizations.customRoles). */
+export function isBuiltinOrgRole(role: string): role is OrgRole {
+  return (ORG_ROLES as string[]).includes(role);
+}
+
 export const ROLE_LABELS: Record<OrgRole, string> = {
   admin: "Director",
   secretary: "Admin / Secretary",
@@ -119,8 +124,10 @@ export function resolveRolePermissions(
 ): ModuleKey[] {
   if (role === "admin") return [...ALL_MODULE_KEYS];
   const configured = overrides?.[role];
-  if (!Array.isArray(configured)) return [...DEFAULT_ROLE_PERMISSIONS[role]];
-  return ALL_MODULE_KEYS.filter((k) => configured.includes(k));
+  if (Array.isArray(configured)) return ALL_MODULE_KEYS.filter((k) => configured.includes(k));
+  // Custom roles with no stored grants get nothing by default.
+  const defaults = DEFAULT_ROLE_PERMISSIONS[role];
+  return defaults ? [...defaults] : [];
 }
 
 export function hasPermission(granted: string[] | undefined, module: string): boolean {

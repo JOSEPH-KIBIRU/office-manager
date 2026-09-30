@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -10,7 +10,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
  */
 export async function GET() {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary", "manager", "employee"]);
+    const session = await requirePermission("organization", ["admin", "secretary", "manager", "employee"]);
     try {
       const org = await cx().query(api.organizations.getOrganization, {
         secret: secret(),
@@ -25,7 +25,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary"]);
+    const session = await requirePermission("organization", ["admin", "secretary"]);
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
     const input: Record<string, unknown> = { secret: secret(), orgId: session.orgId as never };

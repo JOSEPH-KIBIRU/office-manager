@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -10,7 +11,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
  */
 export async function GET(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin", "secretary", "manager", "employee"]);
+    const session = await requirePermission("my-payslips", ["admin", "secretary", "manager", "employee"]);
     const url = new URL(req.url);
     const year = Number(url.searchParams.get("year"));
     if (!Number.isInteger(year) || year < 2000 || year > 2100) {
