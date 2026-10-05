@@ -779,18 +779,130 @@ export default defineSchema(
 
   bankLines: defineTable({
     orgId: v.id("organizations"),
+    // Linked ledger account (the cash/bank account this movement belongs to).
     accountCode: v.string(),
+    // Optional link to the bank/M-Pesa account entity.
+    bankAccountId: v.optional(v.id("bankAccounts")),
     date: v.string(),
     description: v.string(),
+    // Signed: positive = money in, negative = money out.
     amount: v.number(),
     reference: v.optional(v.string()),
-    status: v.union(v.literal("unmatched"), v.literal("matched"), v.literal("ignored")),
+    // unmatched | partially_matched | matched | ignored | reconciled
+    status: v.union(
+      v.literal("unmatched"),
+      v.literal("partially_matched"),
+      v.literal("matched"),
+      v.literal("ignored"),
+      v.literal("reconciled")
+    ),
+    // How the line entered the system: import | manual | transfer | receipt | payment
+    source: v.optional(v.string()),
+    // Original 1:1 journal link (legacy + quick matches).
     journalId: v.optional(v.id("journals")),
+    ruleId: v.optional(v.id("bankRules")),
+    notes: v.optional(v.string()),
+    importRef: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_org", ["orgId"])
     .index("by_org_account", ["orgId", "accountCode"])
-    .index("by_org_status", ["orgId", "status"]),
+    .index("by_org_status", ["orgId", "status"])
+    .index("by_org_account_date", ["orgId", "accountCode", "date"]),
+
+  // Bank and M-Pesa accounts (M-Pesa is modelled as a cash/bank account).
+  bankAccounts: defineTable({
+    orgId: v.id("organizations"),
+    kind: v.union(v.literal("bank"), v.literal("mpesa")),
+    name: v.string(),
+    bankName: v.optional(v.string()),
+    accountNumber: v.optional(v.string()),
+    currency: v.string(),
+    openingBalance: v.number(),
+    // The ledger account (asset, isCash) this bank account posts to.
+    accountCode: v.string(),
+    // M-Pesa specifics.
+    paybill: v.optional(v.string()),
+    till: v.optional(v.string()),
+    businessNumber: v.optional(v.string()),
+    active: v.boolean(),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_active", ["orgId", "active"]),
+
+  // Allocations linking a bank statement line to book entries (1:1 and 1:many).
+  bankLineMatches: defineTable({
+    orgId: v.id("organizations"),
+    bankLineId: v.id("bankLines"),
+    amount: v.number(),
+    journalId: v.optional(v.id("journals")),
+    // Optional link to the sub-ledger document that created the journal.
+    paymentId: v.optional(v.id("payments")),
+    creditNoteId: v.optional(v.id("creditNotes")),
+    note: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
+    createdByName: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_line", ["bankLineId"]),
+
+  // Money moved between two of the company's own accounts.
+  bankTransfers: defineTable({
+    orgId: v.id("organizations"),
+    date: v.string(),
+    fromAccountCode: v.string(),
+    toAccountCode: v.string(),
+    amount: v.number(),
+    reference: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    journalId: v.optional(v.id("journals")),
+    createdBy: v.optional(v.id("users")),
+    createdByName: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"]),
+
+  // Rules that suggest (or, if enabled, auto-post) a classification.
+  bankRules: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    matchField: v.union(v.literal("description"), v.literal("reference")),
+    matchType: v.union(v.literal("contains"), v.literal("equals"), v.literal("starts_with")),
+    matchValue: v.string(),
+    suggestAccountCode: v.string(),
+    // Suggest a receipt/payment/expense/transfer classification.
+    suggestType: v.optional(v.string()),
+    autoPost: v.boolean(),
+    active: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  }).index("by_org", ["orgId"]),
+
+  // Reconciliation statements (auditable; never deleted).
+  reconciliations: defineTable({
+    orgId: v.id("organizations"),
+    accountCode: v.string(),
+    bankAccountId: v.optional(v.id("bankAccounts")),
+    periodStart: v.optional(v.string()),
+    periodEnd: v.string(),
+    statementClosingBalance: v.number(),
+    bookBalance: v.number(),
+    outstandingDeposits: v.number(),
+    outstandingPayments: v.number(),
+    adjustedBalance: v.number(),
+    difference: v.number(),
+    status: v.union(v.literal("in_progress"), v.literal("completed")),
+    adjustmentJournalId: v.optional(v.id("journals")),
+    completedBy: v.optional(v.id("users")),
+    completedByName: v.optional(v.string()),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  }).index("by_org", ["orgId"]),
+
 
   calendarConnections: defineTable({
     orgId: v.id("organizations"),

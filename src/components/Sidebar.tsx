@@ -65,6 +65,15 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Banking",
+    items: [
+      { href: "/banking", label: "Banking", icon: "🏦", roles: ["admin", "secretary", "manager"], module: "accounting" },
+      { href: "/banking/accounts", label: "Bank & M-Pesa accounts", icon: "💳", roles: ["admin", "secretary", "manager"], module: "accounting" },
+      { href: "/banking/transactions", label: "Transactions & reconciliation", icon: "🔄", roles: ["admin", "secretary", "manager"], module: "accounting" },
+      { href: "/banking/rules", label: "Bank rules", icon: "⚙️", roles: ["admin", "secretary"], module: "accounting" },
+    ],
+  },
+  {
     title: "Reporting",
     items: [
       { href: "/reports", label: "Reports", icon: "📈", roles: ["admin", "secretary"], module: "reports" },

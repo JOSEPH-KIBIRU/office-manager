@@ -16,6 +16,7 @@ import type * as audit from "../audit.js";
 import type * as auth from "../auth.js";
 import type * as backup from "../backup.js";
 import type * as backupInternals from "../backupInternals.js";
+import type * as banking from "../banking.js";
 import type * as bills from "../bills.js";
 import type * as calendar from "../calendar.js";
 import type * as carLogs from "../carLogs.js";
@@ -72,6 +73,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   backup: typeof backup;
   backupInternals: typeof backupInternals;
+  banking: typeof banking;
   bills: typeof bills;
   calendar: typeof calendar;
   carLogs: typeof carLogs;

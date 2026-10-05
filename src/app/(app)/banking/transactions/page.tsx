@@ -1,0 +1,406 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { PageHeader, Alert, Modal, StatusBadge, api, inputCls } from "@/components/ui";
+import { useToast } from "@/components/toast";
+
+interface BankAccount { id: string; name: string; kind: string; accountCode: string; active: boolean; }
+interface Txn {
+  id: string; accountCode: string; date: string; description: string; amount: number;
+  reference: string | null; status: string; source: string; matched: number; remaining: number;
+}
+interface Candidate { journalId: string; ref: string; date: string; description: string; amount: number; confidence: string; }
+interface Suggestions { rule: { id: string; name: string; accountCode: string; autoPost: boolean; suggestType: string | null } | null; candidates: Candidate[]; }
+interface Account { code: string; name: string; type: string; isCash: boolean; active: boolean; }
+interface RecSummary { bookBalance: number; outstandingDeposits: number; outstandingPayments: number; adjustedBalance: number; difference: number; unreconciledCount: number; }
+
+const fmtKsh = (n: number) => "KSh " + n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const today = () => new Date().toISOString().slice(0, 10);
+
+export default function BankingTransactionsPage() {
+  const [accounts, setAccounts] = useState<BankAccount[]>([]);
+  const [accountCode, setAccountCode] = useState("");
+  const [txns, setTxns] = useState<Txn[]>([]);
+  const [chart, setChart] = useState<Account[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [active, setActive] = useState<Txn | null>(null);
+  const [suggest, setSuggest] = useState<Suggestions | null>(null);
+  const [amount, setAmount] = useState("");
+  const [counter, setCounter] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const [importFor, setImportFor] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [manualFor, setManualFor] = useState(false);
+  const [transferFor, setTransferFor] = useState(false);
+  const [recFor, setRecFor] = useState(false);
+
+  const [mDate, setMDate] = useState(today());
+  const [mDesc, setMDesc] = useState("");
+  const [mAmount, setMAmount] = useState("");
+  const [mCounter, setMCounter] = useState("");
+
+  const [tFrom, setTFrom] = useState(""), [tTo, setTTo] = useState(""), [tAmount, setTAmount] = useState(""), [tRef, setTRef] = useState("");
+  const [recClosing, setRecClosing] = useState("");
+  const [recSummary, setRecSummary] = useState<RecSummary | null>(null);
+  const toast = useToast();
+
+  useEffect(() => {
+    api<{ accounts: BankAccount[] }>("/api/banking/accounts")
+      .then((d) => {
+        const list = d.accounts.filter((a) => a.active);
+        setAccounts(list);
+        if (list[0]) setAccountCode(list[0].accountCode);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load accounts"));
+    api<{ accounts: Account[] }>("/api/accounting/chart")
+      .then((d) => setChart(d.accounts.filter((a) => a.active && !a.isCash)))
+      .catch(() => setChart([]));
+  }, []);
+
+  const load = useCallback(async () => {
+    if (!accountCode) return;
+    setLoading(true);
+    try {
+      const d = await api<{ transactions: Txn[] }>(`/api/banking/transactions?accountCode=${accountCode}`);
+      setTxns(d.transactions);
+      setError(null);
+    } catch (e) { setError(e instanceof Error ? e.message : "Failed to load transactions"); }
+    finally { setLoading(false); }
+  }, [accountCode]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function openActions(t: Txn) {
+    setActive(t);
+    setAmount(String(t.remaining));
+    setCounter("");
+    setSuggest(null);
+    try {
+      const d = await api<Suggestions>(`/api/banking/transactions/${t.id}/suggest`);
+      setSuggest(d);
+    } catch { /* ignore */ }
+  }
+
+  async function act(action: string, extra: Record<string, unknown> = {}) {
+    if (!active) return;
+    setBusy(true);
+    try {
+      await api(`/api/banking/transactions/${active.id}/action`, {
+        method: "POST",
+        json: { action, amount: Number(amount) || undefined, counterAccountCode: counter || undefined, ...extra },
+      });
+      toast.success("Done.");
+      setActive(null);
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Action failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function doImport() {
+    setBusy(true);
+    try {
+      const res = await api<{ imported: number; skipped: number }>("/api/banking/transactions/import", {
+        method: "POST",
+        json: { accountCode, text: importText },
+      });
+      toast.success(`Imported ${res.imported}, skipped ${res.skipped} duplicate(s).`);
+      setImportFor(false);
+      setImportText("");
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Import failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function doManual() {
+    setBusy(true);
+    try {
+      await api("/api/banking/transactions", {
+        method: "POST",
+        json: { accountCode, date: mDate, description: mDesc, amount: Number(mAmount), counterAccountCode: mCounter || undefined },
+      });
+      toast.success("Recorded.");
+      setManualFor(false);
+      setMDesc(""); setMAmount(""); setMCounter("");
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function doTransfer() {
+    setBusy(true);
+    try {
+      await api("/api/banking/transfers", {
+        method: "POST",
+        json: { date: today(), fromAccountCode: tFrom, toAccountCode: tTo, amount: Number(tAmount), reference: tRef },
+      });
+      toast.success("Transfer posted.");
+      setTransferFor(false);
+      setTFrom(""); setTTo(""); setTAmount(""); setTRef("");
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Transfer failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function loadSummary() {
+    try {
+      const d = await api<{ summary: RecSummary }>(
+        `/api/banking/reconcile?accountCode=${accountCode}&statementClosingBalance=${Number(recClosing) || 0}`
+      );
+      setRecSummary(d.summary);
+    } catch (e) { setError(e instanceof Error ? e.message : "Failed"); }
+  }
+
+  async function completeRec(force: boolean) {
+    setBusy(true);
+    try {
+      await api("/api/banking/reconcile", {
+        method: "POST",
+        json: { accountCode, periodEnd: today(), statementClosingBalance: Number(recClosing) || 0, force },
+      });
+      toast.success("Reconciliation completed.");
+      setRecFor(false);
+      setRecSummary(null);
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Failed to complete"); }
+    finally { setBusy(false); }
+  }
+
+  const cashAccounts = useMemo(() => accounts.map((a) => ({ code: a.accountCode, name: a.name })), [accounts]);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Bank transactions & reconciliation"
+        subtitle="Import a statement, then match each line to the books. Nothing is deleted — lines move through unmatched → matched → reconciled."
+      />
+      {error && <Alert kind="error">{error}</Alert>}
+
+      <div className="flex flex-wrap items-center gap-3">
+        <select className="input max-w-xs" value={accountCode} onChange={(e) => setAccountCode(e.target.value)}>
+          {accounts.length === 0 && <option value="">No accounts</option>}
+          {accounts.map((a) => <option key={a.id} value={a.accountCode}>{a.name}</option>)}
+        </select>
+        <button className="btn-secondary" onClick={() => setImportFor(true)} disabled={!accountCode}>Import statement</button>
+        <button className="btn-secondary" onClick={() => setManualFor(true)} disabled={!accountCode}>Manual transaction</button>
+        <button className="btn-secondary" onClick={() => { setTFrom(accountCode); setTransferFor(true); }} disabled={accounts.length < 2}>Transfer</button>
+        <button className="btn-primary ml-auto" onClick={() => { setRecFor(true); setRecSummary(null); }} disabled={!accountCode}>Reconcile</button>
+      </div>
+
+      {loading ? <p className="text-sm text-slate-500">Loading…</p> : txns.length === 0 ? (
+        <p className="card p-6 text-sm text-slate-400">No transactions for this account.</p>
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Description</th>
+                <th className="px-4 py-3">Reference</th>
+                <th className="px-4 py-3 text-right">Amount</th>
+                <th className="px-4 py-3 text-right">Remaining</th>
+                <th className="px-4 py-3">Status</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {txns.map((t) => (
+                <tr key={t.id} className={t.status === "reconciled" ? "opacity-60" : ""}>
+                  <td className="px-4 py-3 whitespace-nowrap text-slate-500">{t.date}</td>
+                  <td className="px-4 py-3 text-slate-700">{t.description}</td>
+                  <td className="px-4 py-3 text-slate-500">{t.reference ?? "—"}</td>
+                  <td className={`px-4 py-3 text-right tabular-nums ${t.amount < 0 ? "text-red-700" : "text-emerald-700"}`}>{fmtKsh(t.amount)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-slate-500">{fmtKsh(t.remaining)}</td>
+                  <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
+                  <td className="px-4 py-3 text-right">
+                    <button className="btn-secondary btn-xs" onClick={() => openActions(t)} disabled={t.status === "reconciled"}>Reconcile</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Action modal */}
+      {active && (
+        <Modal title={`Reconcile — ${active.description}`} onClose={() => setActive(null)}>
+          <div className="space-y-3 text-sm">
+            <p className="text-slate-600">
+              Statement amount <strong>{fmtKsh(active.amount)}</strong> · remaining <strong>{fmtKsh(active.remaining)}</strong>
+            </p>
+            {suggest?.rule && (
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+                Rule “{suggest.rule.name}” suggests account <strong>{suggest.rule.accountCode}</strong>
+                {suggest.rule.autoPost ? " (auto-post enabled)" : ""}.
+              </div>
+            )}
+            <div>
+              <label className="label">Amount to match</label>
+              <input type="number" className={inputCls()} value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button className="btn-secondary" onClick={() => act("receipt")} disabled={busy || active.amount <= 0}>Create receipt</button>
+              <button className="btn-secondary" onClick={() => act("payment")} disabled={busy || active.amount >= 0}>Create payment</button>
+            </div>
+
+            <div>
+              <label className="label">Classify to account (expense / income)</label>
+              <div className="flex gap-2">
+                <select className={inputCls()} value={counter} onChange={(e) => setCounter(e.target.value)}>
+                  <option value="">Select account…</option>
+                  {suggest?.rule && <option value={suggest.rule.accountCode}>{suggest.rule.accountCode} (rule)</option>}
+                  {chart.map((a) => <option key={a.code} value={a.code}>{a.code} · {a.name}</option>)}
+                </select>
+                <button className="btn-primary whitespace-nowrap" onClick={() => act("expense")} disabled={busy || !counter}>Post</button>
+              </div>
+            </div>
+
+            {suggest && suggest.candidates.length > 0 && (
+              <div className="rounded-lg border border-slate-200">
+                <p className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Suggested book entries
+                </p>
+                <div className="max-h-48 divide-y divide-slate-100 overflow-auto">
+                  {suggest.candidates.map((c) => (
+                    <div key={c.journalId} className="flex items-center justify-between gap-2 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-slate-700">{c.description}</p>
+                        <p className="text-xs text-slate-400">{c.ref} · {c.date} · {c.confidence} confidence</p>
+                      </div>
+                      <button className="btn-secondary btn-xs" onClick={() => act("match", { journalId: c.journalId })} disabled={busy}>Match</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between gap-2 border-t border-slate-100 pt-3">
+              <button className="btn-secondary text-red-600" onClick={() => act("ignore")} disabled={busy}>Ignore</button>
+              <button className="btn-secondary" onClick={() => act("unmatch")} disabled={busy || active.matched === 0}>Unmatch</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Import modal */}
+      {importFor && (
+        <Modal title="Import bank / M-Pesa statement" onClose={() => setImportFor(false)}>
+          <div className="space-y-3">
+            <p className="text-xs text-slate-500">
+              Paste CSV/TSV statement text. Columns are auto-detected (date, description/narration, amount or
+              debit/credit or money in/out). M-Pesa statements work too.
+            </p>
+            <textarea className={inputCls()} rows={8} value={importText} onChange={(e) => setImportText(e.target.value)}
+              placeholder={"Date,Description,Amount\n2026-09-05,M-Pesa deposit 522522,45000\n2026-09-06,Bank charges,-250"} />
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setImportFor(false)} disabled={busy}>Cancel</button>
+              <button className="btn-primary" onClick={doImport} disabled={busy || !importText.trim()}>{busy ? "Importing…" : "Import"}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Manual modal */}
+      {manualFor && (
+        <Modal title="Manual bank transaction" onClose={() => setManualFor(false)}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="label">Date</label><input type="date" className={inputCls()} value={mDate} onChange={(e) => setMDate(e.target.value)} /></div>
+              <div><label className="label">Amount (signed)</label><input type="number" className={inputCls()} value={mAmount} onChange={(e) => setMAmount(e.target.value)} /></div>
+            </div>
+            <div><label className="label">Description</label><input className={inputCls()} value={mDesc} onChange={(e) => setMDesc(e.target.value)} /></div>
+            <div>
+              <label className="label">Counter account (optional)</label>
+              <select className={inputCls()} value={mCounter} onChange={(e) => setMCounter(e.target.value)}>
+                <option value="">— leave to match later —</option>
+                {chart.map((a) => <option key={a.code} value={a.code}>{a.code} · {a.name}</option>)}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setManualFor(false)} disabled={busy}>Cancel</button>
+              <button className="btn-primary" onClick={doManual} disabled={busy || !mDesc.trim() || !mAmount}>{busy ? "Saving…" : "Record"}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Transfer modal */}
+      {transferFor && (
+        <Modal title="Transfer money" onClose={() => setTransferFor(false)}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">From</label>
+                <select className={inputCls()} value={tFrom} onChange={(e) => setTFrom(e.target.value)}>
+                  {cashAccounts.map((a) => <option key={a.code} value={a.code}>{a.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">To</label>
+                <select className={inputCls()} value={tTo} onChange={(e) => setTTo(e.target.value)}>
+                  <option value="">Select…</option>
+                  {cashAccounts.map((a) => <option key={a.code} value={a.code}>{a.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="label">Amount</label><input type="number" className={inputCls()} value={tAmount} onChange={(e) => setTAmount(e.target.value)} /></div>
+              <div><label className="label">Reference</label><input className={inputCls()} value={tRef} onChange={(e) => setTRef(e.target.value)} /></div>
+            </div>
+            <p className="text-xs text-slate-400">Transfers post Dr destination / Cr source — never income or expense.</p>
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setTransferFor(false)} disabled={busy}>Cancel</button>
+              <button className="btn-primary" onClick={doTransfer} disabled={busy || !tFrom || !tTo || !tAmount}>{busy ? "Posting…" : "Post transfer"}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Reconcile modal */}
+      {recFor && (
+        <Modal title="Reconcile account" onClose={() => setRecFor(false)}>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="label">Statement closing balance</label>
+                <input type="number" className={inputCls()} value={recClosing} onChange={(e) => setRecClosing(e.target.value)} />
+              </div>
+              <button className="btn-secondary" onClick={loadSummary}>Calculate</button>
+            </div>
+            {recSummary && (
+              <div className="rounded-lg border border-slate-200 p-3">
+                <Row label="Book balance" value={recSummary.bookBalance} />
+                <Row label="Outstanding deposits" value={recSummary.outstandingDeposits} />
+                <Row label="Outstanding payments" value={-recSummary.outstandingPayments} />
+                <Row label="Adjusted balance" value={recSummary.adjustedBalance} bold />
+                <Row label="Difference" value={recSummary.difference} bold danger={Math.abs(recSummary.difference) > 0.5} />
+                <p className="mt-1 text-xs text-slate-500">{recSummary.unreconciledCount} unreconciled line(s).</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setRecFor(false)} disabled={busy}>Cancel</button>
+              <button className="btn-primary" onClick={() => completeRec(false)} disabled={busy || !recSummary || Math.abs(recSummary.difference) > 0.5}>
+                Complete
+              </button>
+              <button className="btn-secondary text-amber-700" onClick={() => completeRec(true)} disabled={busy || !recSummary || Math.abs(recSummary.difference) <= 0.5}>
+                Force with adjustment
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value, bold, danger }: { label: string; value: number; bold?: boolean; danger?: boolean }) {
+  return (
+    <div className={`flex justify-between py-1 ${bold ? "font-semibold" : ""}`}>
+      <span className="text-slate-600">{label}</span>
+      <span className={`tabular-nums ${danger ? "text-red-600" : "text-slate-800"}`}>{fmtKsh(value)}</span>
+    </div>
+  );
+}
