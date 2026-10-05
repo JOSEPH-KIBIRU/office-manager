@@ -9,11 +9,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const { id } = await ctx.params;
     const body = await readJson<{
       name?: string;
+      legalName?: string;
+      contactPerson?: string;
       email?: string;
       phone?: string;
       company?: string;
       address?: string;
       tin?: string;
+      paymentTerms?: number;
+      creditLimit?: number;
+      notes?: string;
+      active?: boolean;
     }>(req);
     try {
       await cx().mutation(api.invoicing.updateContact, {
@@ -21,11 +27,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         orgId: session.orgId as never,
         id: id as never,
         name: body.name,
+        legalName: body.legalName,
+        contactPerson: body.contactPerson,
         email: body.email,
         phone: body.phone,
         company: body.company,
         address: body.address,
         tin: body.tin,
+        paymentTerms: body.paymentTerms !== undefined ? Number(body.paymentTerms) : undefined,
+        creditLimit: body.creditLimit !== undefined ? Number(body.creditLimit) : undefined,
+        notes: body.notes,
+        active: body.active,
       });
       return ok({ ok: true });
     } catch (e) {

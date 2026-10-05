@@ -3,7 +3,7 @@ import { v, ConvexError } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
 import { assertSecret, tsNow, fmtCreated } from "./lib";
-import { tryPostJournalForSource, reverseJournalInternal } from "./accounting";
+import { tryPostJournalForSource } from "./accounting";
 
 type BillDoc = Doc<"bills">;
 
@@ -26,6 +26,8 @@ async function enrichBill(ctx: QueryCtx, b: BillDoc) {
     vat_rate: rate,
     net_amount: net,
     vat_amount: vat,
+    amount_paid: b.amountPaid ?? 0,
+    balance_due: Math.round((b.amount - (b.amountPaid ?? 0)) * 100) / 100,
     description: b.description ?? null,
     status: b.status,
     paid_at: b.paidAt ?? null,
@@ -90,6 +92,7 @@ export const createBill = mutation({
       vatRate: rate,
       description: args.description?.trim() || undefined,
       status: "pending",
+      amountPaid: 0,
       createdBy: args.createdBy,
       createdAt: tsNow(),
       updatedAt: tsNow(),
@@ -140,7 +143,10 @@ export const updateBill = mutation({
     assertSecret(args.secret);
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) throw new Error("Bill not found");
-    if (doc.status === "paid") throw new Error("Paid bills cannot be edited");
+    if ((doc.amountPaid ?? 0) > 0) {
+      throw new Error("This bill has payments applied — void the payment(s) before editing.");
+    }
+    if (doc.status === "void") throw new Error("Voided bills cannot be edited.");
 
     const patch: Record<string, unknown> = {};
     if (args.contactId !== undefined) {
@@ -168,47 +174,28 @@ export const setBillStatus = mutation({
     secret: v.string(),
     orgId: v.id("organizations"),
     id: v.id("bills"),
-    status: v.union(v.literal("pending"), v.literal("paid"), v.literal("overdue")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("received"),
+      v.literal("pending"),
+      v.literal("partially_paid"),
+      v.literal("paid"),
+      v.literal("overdue"),
+      v.literal("void")
+    ),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) throw new ConvexError("Bill not found");
-    if (args.status === "paid") {
-      await ctx.db.patch(args.id, { status: "paid", paidAt: fmtCreated(Date.now()), updatedAt: tsNow() });
-      // Settle the payable: Dr Accounts payable, Cr Bank.
-      await tryPostJournalForSource(ctx, {
-        orgId: args.orgId,
-        source: "bill",
-        sourceId: `${doc._id}:payment`,
-        date: new Date().toISOString().slice(0, 10),
-        description: `Payment of bill ${doc.number}`,
-        lines: [
-          { accountCode: "2000", debit: doc.amount, credit: 0, memo: doc.number },
-          { accountCode: "1020", debit: 0, credit: doc.amount, memo: doc.number },
-        ],
-        postedByName: "Auto (bill paid)",
-      });
-    } else {
-      await ctx.db.patch(args.id, { status: args.status, paidAt: undefined, updatedAt: tsNow() });
-      // Reopening a paid bill reverses its settlement.
-      if (doc.status === "paid") {
-        const pay = await ctx.db
-          .query("journals")
-          .withIndex("by_source", (q) =>
-            q.eq("orgId", args.orgId).eq("source", "bill").eq("sourceId", `${doc._id}:payment` as never)
-          )
-          .first();
-        if (pay && !pay.reversedBy) {
-          await reverseJournalInternal(ctx, {
-            orgId: args.orgId,
-            journalId: pay._id,
-            date: new Date().toISOString().slice(0, 10),
-            postedByName: "Auto (bill reopened)",
-          });
-        }
-      }
+    // Settlement happens through a supplier payment — never mark paid directly.
+    if (args.status === "paid" || args.status === "partially_paid") {
+      throw new ConvexError(
+        "Record a supplier payment to settle this bill. Bills cannot be marked paid directly."
+      );
     }
+    if (doc.status === "void") throw new ConvexError("Voided bills cannot be changed.");
+    await ctx.db.patch(args.id, { status: args.status, updatedAt: tsNow() });
     return true;
   },
 });

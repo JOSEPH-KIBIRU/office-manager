@@ -54,6 +54,8 @@ async function enrichInvoice(ctx: QueryCtx, inv: InvoiceDoc) {
     subtotal: inv.subtotal,
     tax_total: inv.taxTotal,
     total: inv.total,
+    amount_paid: inv.amountPaid ?? 0,
+    balance_due: Math.round((inv.total - (inv.amountPaid ?? 0)) * 100) / 100,
     recurring_frequency: inv.recurringFrequency ?? null,
     recurring_active: inv.recurringActive ?? false,
     etims_status: inv.etimsStatus ?? "not_sent",
@@ -71,13 +73,21 @@ async function enrichContact(ctx: QueryCtx, c: ContactDoc) {
   return {
     id: c._id,
     type: c.type,
+    number: c.number ?? null,
     name: c.name,
+    legalName: c.legalName ?? null,
+    contactPerson: c.contactPerson ?? null,
     email: c.email ?? null,
     phone: c.phone ?? null,
     company: c.company ?? null,
     address: c.address ?? null,
     tin: c.tin ?? null,
+    paymentTerms: c.paymentTerms ?? null,
+    creditLimit: c.creditLimit ?? null,
+    notes: c.notes ?? null,
+    active: c.active ?? true,
     created_at: fmtCreated(c.createdAt),
+    updated_at: c.updatedAt ? fmtCreated(c.updatedAt) : null,
   };
 }
 
@@ -114,25 +124,43 @@ export const createContact = mutation({
     orgId: v.id("organizations"),
     type: v.union(v.literal("customer"), v.literal("supplier")),
     name: v.string(),
+    legalName: v.optional(v.string()),
+    contactPerson: v.optional(v.string()),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
     company: v.optional(v.string()),
     address: v.optional(v.string()),
     tin: v.optional(v.string()),
+    paymentTerms: v.optional(v.number()),
+    creditLimit: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     if (!args.name.trim()) throw new Error("Contact name is required");
+    const all = await ctx.db.query("contacts").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const prefix = args.type === "customer" ? "CUS" : "SUP";
+    const number = `${prefix}-${String(all.filter((c) => c.type === args.type).length + 1).padStart(4, "0")}`;
     return ctx.db.insert("contacts", {
       orgId: args.orgId,
       type: args.type,
+      number,
       name: args.name.trim(),
+      legalName: args.legalName?.trim() || undefined,
+      contactPerson: args.contactPerson?.trim() || undefined,
       email: args.email?.trim() || undefined,
       phone: args.phone?.trim() || undefined,
       company: args.company?.trim() || undefined,
       address: args.address?.trim() || undefined,
       tin: args.tin?.trim() || undefined,
+      paymentTerms: args.paymentTerms,
+      creditLimit: args.creditLimit,
+      notes: args.notes?.trim() || undefined,
+      active: true,
+      createdBy: args.createdBy,
       createdAt: tsNow(),
+      updatedAt: tsNow(),
     });
   },
 });
@@ -143,23 +171,35 @@ export const updateContact = mutation({
     orgId: v.id("organizations"),
     id: v.id("contacts"),
     name: v.optional(v.string()),
+    legalName: v.optional(v.string()),
+    contactPerson: v.optional(v.string()),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
     company: v.optional(v.string()),
     address: v.optional(v.string()),
     tin: v.optional(v.string()),
+    paymentTerms: v.optional(v.number()),
+    creditLimit: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    active: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) throw new Error("Contact not found");
-    const patch: Record<string, unknown> = {};
+    const patch: Record<string, unknown> = { updatedAt: tsNow() };
     if (args.name !== undefined) patch.name = args.name.trim();
+    if (args.legalName !== undefined) patch.legalName = args.legalName?.trim() || undefined;
+    if (args.contactPerson !== undefined) patch.contactPerson = args.contactPerson?.trim() || undefined;
     if (args.email !== undefined) patch.email = args.email?.trim() || undefined;
     if (args.phone !== undefined) patch.phone = args.phone?.trim() || undefined;
     if (args.company !== undefined) patch.company = args.company?.trim() || undefined;
     if (args.address !== undefined) patch.address = args.address?.trim() || undefined;
     if (args.tin !== undefined) patch.tin = args.tin?.trim() || undefined;
+    if (args.paymentTerms !== undefined) patch.paymentTerms = args.paymentTerms;
+    if (args.creditLimit !== undefined) patch.creditLimit = args.creditLimit;
+    if (args.notes !== undefined) patch.notes = args.notes?.trim() || undefined;
+    if (args.active !== undefined) patch.active = args.active;
     await ctx.db.patch(args.id, patch);
     return true;
   },
@@ -238,6 +278,7 @@ export const createInvoice = mutation({
       subtotal: c.subtotal,
       taxTotal: c.taxTotal,
       total: c.total,
+      amountPaid: 0,
       recurringFrequency: args.recurringFrequency,
       recurringActive: args.recurringActive ?? false,
       createdBy: args.createdBy,
@@ -303,19 +344,34 @@ export const setInvoiceStatus = mutation({
     secret: v.string(),
     orgId: v.id("organizations"),
     id: v.id("invoices"),
-    status: v.union(v.literal("draft"), v.literal("sent"), v.literal("paid"), v.literal("overdue"), v.literal("cancelled")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("partially_paid"),
+      v.literal("paid"),
+      v.literal("overdue"),
+      v.literal("cancelled"),
+      v.literal("void")
+    ),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) throw new Error("Invoice not found");
+    // Payments are the source of truth for settlement — never mark paid directly.
+    if (args.status === "paid" || args.status === "partially_paid") {
+      throw new Error(
+        "Record a customer receipt to settle this invoice. Invoices cannot be marked paid directly."
+      );
+    }
+    if (doc.status === "void") throw new Error("Voided invoices cannot be changed.");
     if (doc.status === "cancelled" && args.status !== "cancelled") {
       throw new Error("Cancelled invoices cannot be reactivated");
     }
     await ctx.db.patch(args.id, { status: args.status, updatedAt: tsNow() });
 
-    // Auto-post to the general ledger: revenue once issued/paid, reverse on cancel.
-    if (args.status === "sent" || args.status === "paid" || args.status === "overdue") {
+    // Auto-post to the general ledger: revenue once issued, reverse on cancel/void.
+    if (args.status === "sent" || args.status === "overdue") {
       await tryPostJournalForSource(ctx, {
         orgId: args.orgId,
         source: "invoice",
@@ -329,12 +385,12 @@ export const setInvoiceStatus = mutation({
         ],
         postedByName: "Auto (invoice issued)",
       });
-    } else if (args.status === "cancelled" && doc.status !== "cancelled") {
+    } else if ((args.status === "cancelled" || args.status === "void") && doc.status !== "cancelled") {
       const existing = await ctx.db
         .query("journals")
         .withIndex("by_source", (q) => q.eq("orgId", args.orgId).eq("source", "invoice").eq("sourceId", doc._id as never))
         .first();
-      if (existing) {
+      if (existing && !existing.reversedBy) {
         await reverseJournalInternal(ctx, {
           orgId: args.orgId,
           journalId: existing._id,

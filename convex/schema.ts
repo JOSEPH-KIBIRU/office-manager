@@ -451,14 +451,28 @@ export default defineSchema(
   contacts: defineTable({
     orgId: v.id("organizations"),
     type: v.union(v.literal("customer"), v.literal("supplier")),
+    // Auto-assigned reference, e.g. CUS-0001 / SUP-0001.
+    number: v.optional(v.string()),
     name: v.string(),
+    // Legal / business name (falls back to `name` when absent).
+    legalName: v.optional(v.string()),
+    contactPerson: v.optional(v.string()),
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
     company: v.optional(v.string()),
     address: v.optional(v.string()),
     tin: v.optional(v.string()),
+    // Payment terms in days (e.g. 30).
+    paymentTerms: v.optional(v.number()),
+    creditLimit: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    active: v.optional(v.boolean()),
+    createdBy: v.optional(v.id("users")),
     createdAt: v.number(),
-  }).index("by_org", ["orgId"]),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_type", ["orgId", "type"]),
 
   invoices: defineTable({
     orgId: v.id("organizations"),
@@ -469,10 +483,14 @@ export default defineSchema(
     status: v.union(
       v.literal("draft"),
       v.literal("sent"),
+      v.literal("partially_paid"),
       v.literal("paid"),
       v.literal("overdue"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
+      v.literal("void")
     ),
+    // Amount settled by receipts/credit notes (sub-ledger). Balance = total − amountPaid.
+    amountPaid: v.optional(v.number()),
     lineItems: v.array(
       v.object({
         description: v.string(),
@@ -505,7 +523,9 @@ export default defineSchema(
     // Payment-reminder (dunning) bookkeeping.
     remLastAt: v.optional(v.number()),
     remCount: v.optional(v.number()),
-  }).index("by_org", ["orgId"]),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_contact", ["orgId", "contactId"]),
 
   bills: defineTable({
     orgId: v.id("organizations"),
@@ -516,12 +536,85 @@ export default defineSchema(
     amount: v.number(),
     vatRate: v.optional(v.number()),
     description: v.optional(v.string()),
-    status: v.union(v.literal("pending"), v.literal("paid"), v.literal("overdue")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("received"),
+      v.literal("pending"),
+      v.literal("partially_paid"),
+      v.literal("paid"),
+      v.literal("overdue"),
+      v.literal("void")
+    ),
+    // Amount settled by payments/debit notes (sub-ledger). Balance = amount − amountPaid.
+    amountPaid: v.optional(v.number()),
     paidAt: v.optional(v.string()),
     createdBy: v.id("users"),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_org", ["orgId"]),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_contact", ["orgId", "contactId"]),
+
+  // Receipts (money in from a customer) and payments (money out to a supplier).
+  payments: defineTable({
+    orgId: v.id("organizations"),
+    contactId: v.id("contacts"),
+    kind: v.union(v.literal("receipt"), v.literal("payment")),
+    date: v.string(),
+    amount: v.number(),
+    method: v.union(v.literal("bank"), v.literal("mpesa"), v.literal("cash")),
+    // Cash/bank/M-Pesa ledger account debited (receipt) or credited (payment).
+    accountCode: v.string(),
+    reference: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    journalId: v.optional(v.id("journals")),
+    createdBy: v.optional(v.id("users")),
+    createdByName: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_contact", ["orgId", "contactId"]),
+
+  // Credit notes (sales) / debit notes (purchases) — adjust what is owed.
+  creditNotes: defineTable({
+    orgId: v.id("organizations"),
+    contactId: v.id("contacts"),
+    kind: v.union(v.literal("sales_credit"), v.literal("purchase_debit")),
+    number: v.string(),
+    issueDate: v.string(),
+    amount: v.number(),
+    taxRate: v.optional(v.number()),
+    subtotal: v.number(),
+    taxTotal: v.number(),
+    total: v.number(),
+    reason: v.optional(v.string()),
+    status: v.union(v.literal("draft"), v.literal("issued"), v.literal("void")),
+    journalId: v.optional(v.id("journals")),
+    createdBy: v.optional(v.id("users")),
+    createdByName: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_contact", ["orgId", "contactId"]),
+
+  // Open-item allocations: how much of a payment/credit note settles an invoice/bill.
+  allocations: defineTable({
+    orgId: v.id("organizations"),
+    // The settled open item (exactly one is set).
+    invoiceId: v.optional(v.id("invoices")),
+    billId: v.optional(v.id("bills")),
+    amount: v.number(),
+    // The settler (exactly one is set).
+    paymentId: v.optional(v.id("payments")),
+    creditNoteId: v.optional(v.id("creditNotes")),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_payment", ["paymentId"])
+    .index("by_credit_note", ["creditNoteId"])
+    .index("by_invoice", ["invoiceId"])
+    .index("by_bill", ["billId"]),
 
   storedFiles: defineTable({
     orgId: v.id("organizations"),
@@ -592,14 +685,38 @@ export default defineSchema(
       v.literal("liability"),
       v.literal("equity"),
       v.literal("income"),
+      v.literal("cost_of_sales"),
       v.literal("expense")
     ),
     group: v.string(),
+    // Hierarchical chart of accounts: the parent account code, if any.
+    parentCode: v.optional(v.string()),
+    // Balance-sheet classification (current vs non-current).
+    category: v.optional(v.union(v.literal("current"), v.literal("non_current"))),
+    // Control accounts are referenced by the posting engine (AR, AP, bank, tax…).
+    control: v.optional(
+      v.union(
+        v.literal("ar"),
+        v.literal("ap"),
+        v.literal("bank"),
+        v.literal("cash"),
+        v.literal("vat_input"),
+        v.literal("vat_output"),
+        v.literal("retained_earnings"),
+        v.literal("suspense")
+      )
+    ),
+    // Tax treatment: "vat_16" | "vat_8" | "zero_rated" | "exempt" | "out_of_scope" | "none".
+    taxTreatment: v.optional(v.string()),
+    description: v.optional(v.string()),
     isCash: v.optional(v.boolean()),
     isVat: v.optional(v.boolean()),
     statutory: v.optional(v.boolean()),
+    // Seeded accounts are flagged so the UI can warn before editing codes.
+    builtIn: v.optional(v.boolean()),
     active: v.boolean(),
     createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
   })
     .index("by_org", ["orgId"])
     .index("by_org_code", ["orgId", "code"]),
@@ -627,6 +744,9 @@ export default defineSchema(
       v.literal("opening"),
       v.literal("invoice"),
       v.literal("bill"),
+      v.literal("receipt"),
+      v.literal("payment"),
+      v.literal("credit_note"),
       v.literal("payroll"),
       v.literal("petty_cash"),
       v.literal("petty_cash_fund"),

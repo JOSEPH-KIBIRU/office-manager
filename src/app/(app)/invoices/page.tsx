@@ -39,7 +39,7 @@ interface InvoiceRow {
   number: string;
   issue_date: string;
   due_date: string;
-  status: "draft" | "sent" | "paid" | "overdue" | "cancelled";
+  status: "draft" | "sent" | "partially_paid" | "paid" | "overdue" | "cancelled" | "void";
   line_items: LineItem[];
   note: string | null;
   payment_details: string | null;
@@ -58,10 +58,12 @@ interface InvoiceRow {
 const FREQUENCIES = ["monthly", "quarterly", "yearly"] as const;
 const STATUS_FLOW: Record<string, string[]> = {
   draft: ["sent", "cancelled"],
-  sent: ["paid", "overdue", "cancelled"],
+  sent: ["overdue", "cancelled"],
+  partially_paid: ["overdue", "cancelled"],
   paid: [],
-  overdue: ["paid"],
+  overdue: ["cancelled"],
   cancelled: [],
+  void: [],
 };
 
 const fmtMoney = (n: number) => n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -427,8 +429,11 @@ export default function InvoicesPage() {
                     {(inv.etims_status === "not_sent" || inv.etims_status === "failed") && inv.status !== "draft" && inv.status !== "cancelled" && (
                       <button onClick={() => submitEtims(inv.id)} className="btn-secondary btn-xs" title="Submit to KRA eTIMS">eTIMS</button>
                     )}
+                    {(inv.status === "sent" || inv.status === "overdue" || inv.status === "partially_paid") && (
+                      <a href="/accounting/receipts" className="btn-primary btn-xs">Receive</a>
+                    )}
                     {STATUS_FLOW[inv.status].map((s) => (
-                      <button key={s} onClick={() => setStatus(inv.id, s)} className={`px-2 py-1 text-xs ${s === "cancelled" ? "btn-danger" : "btn-primary"}`}>{s === "sent" ? "Mark sent" : s.charAt(0).toUpperCase() + s.slice(1)}</button>
+                      <button key={s} onClick={() => setStatus(inv.id, s)} className={`px-2 py-1 text-xs ${s === "cancelled" ? "btn-danger" : "btn-secondary"}`}>{s === "sent" ? "Mark sent" : s.charAt(0).toUpperCase() + s.slice(1)}</button>
                     ))}
                     <button onClick={() => setDeleting(inv)} className="btn-danger btn-xs">Delete</button>
                   </td>

@@ -23,11 +23,16 @@ export async function POST(req: NextRequest) {
     const body = await readJson<{
       type: "customer" | "supplier";
       name: string;
+      legalName?: string;
+      contactPerson?: string;
       email?: string;
       phone?: string;
       company?: string;
       address?: string;
       tin?: string;
+      paymentTerms?: number;
+      creditLimit?: number;
+      notes?: string;
     }>(req);
     if (!body.type || !["customer", "supplier"].includes(body.type)) {
       throw new Error("Contact type must be customer or supplier");
@@ -39,11 +44,17 @@ export async function POST(req: NextRequest) {
         orgId: session.orgId as never,
         type: body.type as never,
         name: body.name,
+        legalName: body.legalName ?? undefined,
+        contactPerson: body.contactPerson ?? undefined,
         email: body.email ?? undefined,
         phone: body.phone ?? undefined,
         company: body.company ?? undefined,
         address: body.address ?? undefined,
         tin: body.tin ?? undefined,
+        paymentTerms: body.paymentTerms !== undefined ? Number(body.paymentTerms) : undefined,
+        creditLimit: body.creditLimit !== undefined ? Number(body.creditLimit) : undefined,
+        notes: body.notes ?? undefined,
+        createdBy: session.id as never,
       });
       return ok({ id });
     } catch (e) {

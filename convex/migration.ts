@@ -207,3 +207,117 @@ export const ensureAuditLogModuleInternal = internalMutation({
     return { skipped: false, updated, restricted };
   },
 });
+
+/** New accounting modules must be added to any company with a restricted cap. */
+const ACCOUNTING_MODULES = [
+  "customers",
+  "suppliers",
+  "receipts",
+  "payments",
+  "chart-of-accounts",
+  "accounting-post",
+  "accounting-reverse",
+];
+
+export const ensureAccountingModulesInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const name = "ensureAccountingModules";
+    const already = await ctx.db
+      .query("migrations")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .unique();
+    if (already) return { skipped: true, updated: 0 };
+
+    let updated = 0;
+    for (const o of await ctx.db.query("organizations").collect()) {
+      if (Array.isArray(o.enabledModules)) {
+        const merged = Array.from(new Set([...o.enabledModules, ...ACCOUNTING_MODULES]));
+        if (merged.length !== o.enabledModules.length) {
+          await ctx.db.patch(o._id, { enabledModules: merged });
+          updated += 1;
+        }
+      }
+    }
+    await ctx.db.insert("migrations", { name, runAt: tsNow() });
+    return { skipped: false, updated };
+  },
+});
+
+/**
+ * Backfill the AR/AP sub-ledger for invoices/bills already marked paid before
+ * the open-item layer existed. This only creates the sub-ledger records
+ * (payment + allocation + amountPaid) — it NEVER posts new journals, so no
+ * historical accounting entry is duplicated. For old "mark paid" bills it links
+ * the existing settlement journal.
+ */
+export const backfillSubledgerInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const name = "backfillSubledger";
+    const already = await ctx.db
+      .query("migrations")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .unique();
+    if (already) return { skipped: true, receipts: 0, payments: 0 };
+
+    let receipts = 0;
+    let payments = 0;
+    for (const org of await ctx.db.query("organizations").collect()) {
+      const invoices = await ctx.db.query("invoices").withIndex("by_org", (q) => q.eq("orgId", org._id)).collect();
+      for (const inv of invoices) {
+        if (inv.status !== "paid" || (inv.amountPaid ?? 0) > 0) continue;
+        const allocs = await ctx.db.query("allocations").withIndex("by_invoice", (q) => q.eq("invoiceId", inv._id)).collect();
+        if (allocs.length) continue;
+        const pid = await ctx.db.insert("payments", {
+          orgId: org._id,
+          contactId: inv.contactId,
+          kind: "receipt",
+          date: inv.issueDate,
+          amount: inv.total,
+          method: "bank",
+          accountCode: "1020",
+          reference: inv.number,
+          notes: "Backfilled (historical paid invoice)",
+          createdByName: "Migration",
+          createdAt: Date.now(),
+        });
+        await ctx.db.insert("allocations", { orgId: org._id, invoiceId: inv._id, amount: inv.total, paymentId: pid, createdAt: Date.now() });
+        await ctx.db.patch(inv._id, { amountPaid: inv.total });
+        receipts += 1;
+      }
+
+      const bills = await ctx.db.query("bills").withIndex("by_org", (q) => q.eq("orgId", org._id)).collect();
+      for (const bill of bills) {
+        if (bill.status !== "paid" || (bill.amountPaid ?? 0) > 0) continue;
+        const allocs = await ctx.db.query("allocations").withIndex("by_bill", (q) => q.eq("billId", bill._id)).collect();
+        if (allocs.length) continue;
+        const settle = await ctx.db
+          .query("journals")
+          .withIndex("by_source", (q) =>
+            q.eq("orgId", org._id).eq("source", "bill").eq("sourceId", `${bill._id}:payment` as never)
+          )
+          .first();
+        const pid = await ctx.db.insert("payments", {
+          orgId: org._id,
+          contactId: bill.contactId,
+          kind: "payment",
+          date: bill.billDate,
+          amount: bill.amount,
+          method: "bank",
+          accountCode: "1020",
+          reference: bill.number,
+          notes: "Backfilled (historical paid bill)",
+          journalId: settle?._id,
+          createdByName: "Migration",
+          createdAt: Date.now(),
+        });
+        await ctx.db.insert("allocations", { orgId: org._id, billId: bill._id, amount: bill.amount, paymentId: pid, createdAt: Date.now() });
+        await ctx.db.patch(bill._id, { amountPaid: bill.amount });
+        payments += 1;
+      }
+    }
+    await ctx.db.insert("migrations", { name, runAt: tsNow() });
+    return { skipped: false, receipts, payments };
+  },
+});

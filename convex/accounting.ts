@@ -7,41 +7,60 @@ import { assertSecret, tsNow } from "./lib";
  * Chart of accounts (Kenya SME, generic). Seeded per organization.
  * ------------------------------------------------------------------ */
 
-type AccountType = "asset" | "liability" | "equity" | "income" | "expense";
+type AccountType = "asset" | "liability" | "equity" | "income" | "cost_of_sales" | "expense";
+
+type AccountControl =
+  | "ar"
+  | "ap"
+  | "bank"
+  | "cash"
+  | "vat_input"
+  | "vat_output"
+  | "retained_earnings"
+  | "suspense";
 
 type SeedAccount = {
   code: string;
   name: string;
   type: AccountType;
   group: string;
+  parentCode?: string;
+  category?: "current" | "non_current";
+  control?: AccountControl;
+  taxTreatment?: string;
   isCash?: boolean;
   isVat?: boolean;
   statutory?: boolean;
 };
 
 export const DEFAULT_CHART: SeedAccount[] = [
-  { code: "1000", name: "Cash on hand", type: "asset", group: "Current assets", isCash: true },
-  { code: "1010", name: "Petty cash", type: "asset", group: "Current assets", isCash: true },
-  { code: "1020", name: "Bank", type: "asset", group: "Current assets", isCash: true },
-  { code: "1030", name: "M-Pesa", type: "asset", group: "Current assets", isCash: true },
-  { code: "1100", name: "Accounts receivable", type: "asset", group: "Current assets" },
-  { code: "1150", name: "VAT input (recoverable)", type: "asset", group: "Current assets", isVat: true },
-  { code: "1200", name: "Motor vehicles", type: "asset", group: "Non-current assets" },
-  { code: "1210", name: "Furniture and fittings", type: "asset", group: "Non-current assets" },
-  { code: "2000", name: "Accounts payable", type: "liability", group: "Current liabilities" },
-  { code: "2100", name: "PAYE payable", type: "liability", group: "Statutory", statutory: true },
-  { code: "2110", name: "NSSF payable", type: "liability", group: "Statutory", statutory: true },
-  { code: "2120", name: "SHIF payable", type: "liability", group: "Statutory", statutory: true },
-  { code: "2130", name: "Housing levy payable", type: "liability", group: "Statutory", statutory: true },
-  { code: "2150", name: "VAT output", type: "liability", group: "Statutory", isVat: true, statutory: true },
-  { code: "2160", name: "HELB payable", type: "liability", group: "Statutory", statutory: true },
-  { code: "2170", name: "Pension payable", type: "liability", group: "Statutory", statutory: true },
-  { code: "2180", name: "Staff loans & advances payable", type: "liability", group: "People" },
-  { code: "2190", name: "Other payroll deductions payable", type: "liability", group: "People" },
+  { code: "1000", name: "Cash on hand", type: "asset", group: "Current assets", category: "current", isCash: true, control: "cash" },
+  { code: "1010", name: "Petty cash", type: "asset", group: "Current assets", category: "current", isCash: true },
+  { code: "1020", name: "Bank", type: "asset", group: "Current assets", category: "current", isCash: true, control: "bank" },
+  { code: "1030", name: "M-Pesa", type: "asset", group: "Current assets", category: "current", isCash: true },
+  { code: "1090", name: "Suspense (clearing)", type: "asset", group: "Current assets", category: "current", control: "suspense" },
+  { code: "1100", name: "Accounts receivable", type: "asset", group: "Current assets", category: "current", control: "ar" },
+  { code: "1150", name: "VAT input (recoverable)", type: "asset", group: "Current assets", category: "current", isVat: true, taxTreatment: "vat_16" },
+  { code: "1200", name: "Motor vehicles", type: "asset", group: "Non-current assets", category: "non_current" },
+  { code: "1210", name: "Furniture and fittings", type: "asset", group: "Non-current assets", category: "non_current" },
+  { code: "2000", name: "Accounts payable", type: "liability", group: "Current liabilities", category: "current", control: "ap" },
+  { code: "2100", name: "PAYE payable", type: "liability", group: "Statutory", category: "current", statutory: true },
+  { code: "2110", name: "NSSF payable", type: "liability", group: "Statutory", category: "current", statutory: true },
+  { code: "2120", name: "SHIF payable", type: "liability", group: "Statutory", category: "current", statutory: true },
+  { code: "2130", name: "Housing levy payable", type: "liability", group: "Statutory", category: "current", statutory: true },
+  { code: "2150", name: "VAT output", type: "liability", group: "Statutory", category: "current", isVat: true, taxTreatment: "vat_16", statutory: true, control: "vat_output" },
+  { code: "2160", name: "HELB payable", type: "liability", group: "Statutory", category: "current", statutory: true },
+  { code: "2170", name: "Pension payable", type: "liability", group: "Statutory", category: "current", statutory: true },
+  { code: "2180", name: "Staff loans & advances payable", type: "liability", group: "People", category: "current" },
+  { code: "2190", name: "Other payroll deductions payable", type: "liability", group: "People", category: "current" },
   { code: "3000", name: "Share capital", type: "equity", group: "Equity" },
-  { code: "3100", name: "Retained earnings", type: "equity", group: "Equity" },
-  { code: "4000", name: "Sales and services", type: "income", group: "Operating income" },
+  { code: "3100", name: "Retained earnings", type: "equity", group: "Equity", control: "retained_earnings" },
+  { code: "4000", name: "Sales and services", type: "income", group: "Revenue", taxTreatment: "vat_16" },
   { code: "4100", name: "Other income", type: "income", group: "Other income" },
+  { code: "4600", name: "Cost of sales", type: "cost_of_sales", group: "Cost of sales", parentCode: undefined },
+  { code: "4610", name: "Direct materials", type: "cost_of_sales", group: "Cost of sales", parentCode: "4600" },
+  { code: "4620", name: "Direct labour", type: "cost_of_sales", group: "Cost of sales", parentCode: "4600" },
+  { code: "4630", name: "Production overheads", type: "cost_of_sales", group: "Cost of sales", parentCode: "4600" },
   { code: "5000", name: "Salaries and wages", type: "expense", group: "People" },
   { code: "5010", name: "Employer NSSF", type: "expense", group: "People" },
   { code: "5020", name: "Employer SHIF", type: "expense", group: "People" },
@@ -49,15 +68,55 @@ export const DEFAULT_CHART: SeedAccount[] = [
   { code: "5100", name: "Fuel and mileage", type: "expense", group: "Fleet" },
   { code: "5110", name: "Vehicle repairs and servicing", type: "expense", group: "Fleet" },
   { code: "5120", name: "Insurance", type: "expense", group: "Fleet" },
-  { code: "5200", name: "Rent", type: "expense", group: "Office" },
-  { code: "5210", name: "Utilities and airtime", type: "expense", group: "Office" },
-  { code: "5220", name: "Stationery", type: "expense", group: "Office" },
-  { code: "5230", name: "Staff welfare", type: "expense", group: "Office" },
+  { code: "5200", name: "Rent", type: "expense", group: "Operating expenses" },
+  { code: "5210", name: "Utilities and airtime", type: "expense", group: "Operating expenses" },
+  { code: "5220", name: "Stationery", type: "expense", group: "Operating expenses" },
+  { code: "5230", name: "Staff welfare", type: "expense", group: "Operating expenses" },
   { code: "5300", name: "Depreciation", type: "expense", group: "Non-cash" },
   { code: "5400", name: "Bank charges", type: "expense", group: "Finance" },
-  { code: "5500", name: "Professional fees", type: "expense", group: "Office" },
-  { code: "5990", name: "General expenses", type: "expense", group: "Office" },
+  { code: "5500", name: "Professional fees", type: "expense", group: "Operating expenses" },
+  { code: "5990", name: "General expenses", type: "expense", group: "Operating expenses" },
 ];
+
+const DEFAULT_CONTROL_CODES: Record<AccountControl, string> = {
+  ar: "1100",
+  ap: "2000",
+  bank: "1020",
+  cash: "1000",
+  vat_input: "1150",
+  vat_output: "2150",
+  retained_earnings: "3100",
+  suspense: "1090",
+};
+
+/**
+ * Resolve the ledger account code for a control role (AR, AP, bank, tax…).
+ * Prefers an account explicitly flagged with `control`, falling back to the
+ * seeded default code so existing postings keep working unchanged.
+ */
+export async function resolveControlCode(
+  ctx: MutationCtx | QueryCtx,
+  orgId: Id<"organizations">,
+  control: AccountControl
+): Promise<string> {
+  const rows = await ctx.db.query("ledgerAccounts").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
+  const flagged = rows.find((a) => a.control === control && a.active);
+  return flagged?.code ?? DEFAULT_CONTROL_CODES[control];
+}
+
+/** Resolve the cash/bank account a receipt/payment settles into. */
+export async function resolveCashAccount(
+  ctx: MutationCtx | QueryCtx,
+  orgId: Id<"organizations">,
+  method: "bank" | "mpesa" | "cash"
+): Promise<string> {
+  if (method === "bank") return resolveControlCode(ctx, orgId, "bank");
+  if (method === "cash") return resolveControlCode(ctx, orgId, "cash");
+  // M-Pesa: prefer an account named/flagged M-Pesa, else fall back to 1030.
+  const rows = await ctx.db.query("ledgerAccounts").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
+  const mpesa = rows.find((a) => a.isCash && /m-?pesa/i.test(a.name) && a.active);
+  return mpesa?.code ?? "1030";
+}
 
 /* ------------------------------------------------------------------ *
  * Pure helpers (no ctx)
@@ -85,7 +144,7 @@ function periodBounds(period: string): { start: string; end: string } {
 }
 
 function isDebitNormal(type: AccountType): boolean {
-  return type === "asset" || type === "expense";
+  return type === "asset" || type === "expense" || type === "cost_of_sales";
 }
 
 export type JournalLine = { accountCode: string; debit: number; credit: number; memo?: string };
@@ -114,21 +173,40 @@ export function assertBalancedLines(lines: JournalLine[]): void {
 
 async function ensureChartInternal(ctx: MutationCtx, orgId: Id<"organizations">): Promise<void> {
   const existing = await ctx.db.query("ledgerAccounts").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
-  const have = new Set(existing.map((a) => a.code));
+  const have = new Map(existing.map((a) => [a.code, a]));
   const now = tsNow();
   // Seed the full chart for a new org; for existing orgs, backfill any newly
   // introduced default accounts so newer postings don't fail.
   for (const a of DEFAULT_CHART) {
-    if (have.has(a.code)) continue;
+    if (have.has(a.code)) {
+      // Backfill control/classification metadata without touching codes, names
+      // or types of existing accounts (backward compatibility).
+      const doc = have.get(a.code)!;
+      if (doc.builtIn === undefined) {
+        await ctx.db.patch(doc._id, {
+          builtIn: true,
+          ...(doc.control === undefined && a.control ? { control: a.control } : {}),
+          ...(doc.category === undefined && a.category ? { category: a.category } : {}),
+          ...(doc.parentCode === undefined && a.parentCode ? { parentCode: a.parentCode } : {}),
+          ...(doc.taxTreatment === undefined && a.taxTreatment ? { taxTreatment: a.taxTreatment } : {}),
+        });
+      }
+      continue;
+    }
     await ctx.db.insert("ledgerAccounts", {
       orgId,
       code: a.code,
       name: a.name,
       type: a.type,
       group: a.group,
+      parentCode: a.parentCode,
+      category: a.category,
+      control: a.control,
+      taxTreatment: a.taxTreatment,
       isCash: a.isCash,
       isVat: a.isVat,
       statutory: a.statutory,
+      builtIn: true,
       active: true,
       createdAt: now,
     });
@@ -167,6 +245,9 @@ export type PostSource =
   | "opening"
   | "invoice"
   | "bill"
+  | "receipt"
+  | "payment"
+  | "credit_note"
   | "payroll"
   | "petty_cash"
   | "petty_cash_fund"
@@ -373,6 +454,198 @@ export const ensure = mutation({
   },
 });
 
+/* ------------------------------------------------------------------ *
+ * Chart of accounts: configurable, hierarchical, backward compatible
+ * ------------------------------------------------------------------ */
+
+const ACCOUNT_TYPES: AccountType[] = ["asset", "liability", "equity", "income", "cost_of_sales", "expense"];
+
+async function journalActivity(ctx: MutationCtx | QueryCtx, orgId: Id<"organizations">) {
+  const journals = await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
+  const map = new Map<string, { debit: number; credit: number }>();
+  for (const j of journals) for (const l of j.lines) {
+    const cur = map.get(l.accountCode) ?? { debit: 0, credit: 0 };
+    cur.debit += l.debit;
+    cur.credit += l.credit;
+    map.set(l.accountCode, cur);
+  }
+  return map;
+}
+
+/** Full chart with balances, hierarchy and usage flags (for the CoA screen). */
+export const listChart = query({
+  args: { secret: v.string(), orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const rows = await ctx.db.query("ledgerAccounts").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const act = await journalActivity(ctx, args.orgId);
+    const hasChildren = new Set(rows.map((a) => a.parentCode).filter(Boolean) as string[]);
+    return rows
+      .map((a) => {
+        const { debit, credit } = act.get(a.code) ?? { debit: 0, credit: 0 };
+        return {
+          code: a.code,
+          name: a.name,
+          type: a.type,
+          group: a.group,
+          parentCode: a.parentCode ?? null,
+          category: a.category ?? null,
+          control: a.control ?? null,
+          taxTreatment: a.taxTreatment ?? null,
+          description: a.description ?? null,
+          isCash: a.isCash ?? false,
+          isVat: a.isVat ?? false,
+          statutory: a.statutory ?? false,
+          builtIn: a.builtIn ?? false,
+          active: a.active,
+          balance: roundKes(signed(a.type as AccountType, debit, credit)),
+          hasTransactions: debit !== 0 || credit !== 0,
+          hasChildren: hasChildren.has(a.code),
+        };
+      })
+      .sort((x, y) => x.code.localeCompare(y.code));
+  },
+});
+
+export const createAccount = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    code: v.string(),
+    name: v.string(),
+    type: v.string(),
+    group: v.string(),
+    parentCode: v.optional(v.string()),
+    category: v.optional(v.string()),
+    control: v.optional(v.string()),
+    taxTreatment: v.optional(v.string()),
+    description: v.optional(v.string()),
+    isCash: v.optional(v.boolean()),
+    isVat: v.optional(v.boolean()),
+    statutory: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const code = args.code.trim();
+    const name = args.name.trim();
+    if (!code) throw new Error("An account code is required");
+    if (!name) throw new Error("An account name is required");
+    if (!ACCOUNT_TYPES.includes(args.type as AccountType)) throw new Error("Invalid account type");
+    const existing = await ctx.db
+      .query("ledgerAccounts")
+      .withIndex("by_org_code", (q) => q.eq("orgId", args.orgId).eq("code", code))
+      .first();
+    if (existing) throw new Error(`Account ${code} already exists`);
+    const now = tsNow();
+    await ctx.db.insert("ledgerAccounts", {
+      orgId: args.orgId,
+      code,
+      name,
+      type: args.type as AccountType,
+      group: args.group.trim() || "Other",
+      parentCode: args.parentCode?.trim() || undefined,
+      category: (args.category as "current" | "non_current") || undefined,
+      control: (args.control as AccountControl) || undefined,
+      taxTreatment: args.taxTreatment?.trim() || undefined,
+      description: args.description?.trim() || undefined,
+      isCash: args.isCash,
+      isVat: args.isVat,
+      statutory: args.statutory,
+      builtIn: false,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { code };
+  },
+});
+
+export const updateAccount = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    code: v.string(),
+    newCode: v.optional(v.string()),
+    name: v.optional(v.string()),
+    type: v.optional(v.string()),
+    group: v.optional(v.string()),
+    parentCode: v.optional(v.string()),
+    category: v.optional(v.string()),
+    control: v.optional(v.string()),
+    taxTreatment: v.optional(v.string()),
+    description: v.optional(v.string()),
+    isCash: v.optional(v.boolean()),
+    isVat: v.optional(v.boolean()),
+    statutory: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const doc = await ctx.db
+      .query("ledgerAccounts")
+      .withIndex("by_org_code", (q) => q.eq("orgId", args.orgId).eq("code", args.code))
+      .first();
+    if (!doc) throw new Error("Account not found");
+
+    const patch: Record<string, unknown> = { updatedAt: tsNow() };
+
+    // Changing the code is only "safe" when the account has no journal activity.
+    if (args.newCode !== undefined && args.newCode.trim() && args.newCode.trim() !== doc.code) {
+      const newCode = args.newCode.trim();
+      const act = await journalActivity(ctx, args.orgId);
+      if (act.has(doc.code)) {
+        throw new Error("This account has posted transactions — its code cannot be changed. Rename it instead.");
+      }
+      const clash = await ctx.db
+        .query("ledgerAccounts")
+        .withIndex("by_org_code", (q) => q.eq("orgId", args.orgId).eq("code", newCode))
+        .first();
+      if (clash) throw new Error(`Account ${newCode} already exists`);
+      patch.code = newCode;
+      // Re-point any subaccounts to the new parent code.
+      const children = await ctx.db.query("ledgerAccounts").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+      for (const c of children) {
+        if (c.parentCode === doc.code) await ctx.db.patch(c._id, { parentCode: newCode });
+      }
+    }
+
+    if (args.name !== undefined) {
+      if (!args.name.trim()) throw new Error("Account name is required");
+      patch.name = args.name.trim();
+    }
+    if (args.type !== undefined) {
+      if (!ACCOUNT_TYPES.includes(args.type as AccountType)) throw new Error("Invalid account type");
+      patch.type = args.type;
+    }
+    if (args.group !== undefined) patch.group = args.group.trim() || "Other";
+    if (args.parentCode !== undefined) patch.parentCode = args.parentCode.trim() || undefined;
+    if (args.category !== undefined) patch.category = (args.category as "current" | "non_current") || undefined;
+    if (args.control !== undefined) patch.control = (args.control as AccountControl) || undefined;
+    if (args.taxTreatment !== undefined) patch.taxTreatment = args.taxTreatment.trim() || undefined;
+    if (args.description !== undefined) patch.description = args.description.trim() || undefined;
+    if (args.isCash !== undefined) patch.isCash = args.isCash;
+    if (args.isVat !== undefined) patch.isVat = args.isVat;
+    if (args.statutory !== undefined) patch.statutory = args.statutory;
+
+    await ctx.db.patch(doc._id, patch);
+    return { code: (patch.code as string) ?? doc.code };
+  },
+});
+
+/** Deactivate/reactivate an account (archive). Accounts are never hard-deleted. */
+export const setAccountActive = mutation({
+  args: { secret: v.string(), orgId: v.id("organizations"), code: v.string(), active: v.boolean() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const doc = await ctx.db
+      .query("ledgerAccounts")
+      .withIndex("by_org_code", (q) => q.eq("orgId", args.orgId).eq("code", args.code))
+      .first();
+    if (!doc) throw new Error("Account not found");
+    await ctx.db.patch(doc._id, { active: args.active, updatedAt: tsNow() });
+    return true;
+  },
+});
+
 export const overview = query({
   args: { secret: v.string(), orgId: v.id("organizations") },
   handler: async (ctx, args) => {
@@ -492,10 +765,24 @@ export const profitAndLoss = query({
     const accounts = await loadAccounts(ctx, args.orgId);
     const journals = await loadJournals(ctx, args.orgId);
     const income = rowsOfType(journals, accounts, "income", { from: args.from, through: args.through });
+    const costOfSales = rowsOfType(journals, accounts, "cost_of_sales", { from: args.from, through: args.through });
     const expense = rowsOfType(journals, accounts, "expense", { from: args.from, through: args.through });
     const incomeTotal = roundKes(income.reduce((s, r) => s + r.amount, 0));
+    const costOfSalesTotal = roundKes(costOfSales.reduce((s, r) => s + r.amount, 0));
     const expenseTotal = roundKes(expense.reduce((s, r) => s + r.amount, 0));
-    return { from: args.from, through: args.through, income, expense, incomeTotal, expenseTotal, profit: roundKes(incomeTotal - expenseTotal) };
+    const grossProfit = roundKes(incomeTotal - costOfSalesTotal);
+    return {
+      from: args.from,
+      through: args.through,
+      income,
+      costOfSales,
+      expense,
+      incomeTotal,
+      costOfSalesTotal,
+      grossProfit,
+      expenseTotal,
+      profit: roundKes(grossProfit - expenseTotal),
+    };
   },
 });
 

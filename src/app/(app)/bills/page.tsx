@@ -26,7 +26,9 @@ interface BillRow {
   net_amount: number;
   vat_amount: number;
   description: string | null;
-  status: "pending" | "paid" | "overdue";
+  status: "draft" | "received" | "pending" | "partially_paid" | "paid" | "overdue" | "void";
+  amount_paid: number;
+  balance_due: number;
   paid_at: string | null;
   created_at: string;
 }
@@ -161,7 +163,7 @@ export default function BillsPage() {
   async function setStatus(id: string, status: string) {
     try {
       await api(`/api/bills/${id}/status`, { method: "PATCH", json: { status } });
-      toast.success(status === "paid" ? "Bill marked as paid." : "Bill status updated.");
+      toast.success("Bill status updated.");
       await load();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Action failed");
@@ -187,7 +189,9 @@ export default function BillsPage() {
   const totals = bills.reduce(
     (acc, b) => {
       acc.total += b.amount;
-      if (b.status === "pending" || b.status === "overdue") acc.pending += b.amount;
+      if (b.status === "pending" || b.status === "overdue" || b.status === "partially_paid" || b.status === "received") {
+        acc.pending += b.balance_due ?? b.amount;
+      }
       return acc;
     },
     { total: 0, pending: 0 }
@@ -259,16 +263,21 @@ export default function BillsPage() {
                 <td className="space-x-1.5 whitespace-nowrap text-right">
                   <a href={`/bill/${b.id}`} target="_blank" className="btn-secondary btn-xs">⬇ Download</a>
                   <ShareButton url={`/bill/${b.id}`} title={`${b.contact_company || b.contact_name} — ${b.number}`} text={`Bill ${b.number} for KES ${fmtMoney(b.amount)}`} />
-                  {b.status === "paid" ? (
-                    <button onClick={() => setStatus(b.id, "pending")} className="btn-secondary btn-xs">Reopen</button>
-                  ) : (
-                    <>
-                      <button onClick={() => setStatus(b.id, "paid")} className="btn-success btn-xs">Mark paid</button>
-                      {b.status !== "overdue" && <button onClick={() => setStatus(b.id, "overdue")} className="btn-secondary btn-xs">Overdue</button>}
-                    </>
+                  {(b.status === "pending" || b.status === "received" || b.status === "overdue" || b.status === "partially_paid") && (
+                    <a href="/accounting/payments" className="btn-primary btn-xs">Pay</a>
                   )}
-                  {b.status !== "paid" && <button onClick={() => openEdit(b)} className="btn-secondary btn-xs">Edit</button>}
-                  {b.status !== "paid" && <button onClick={() => setDeletingId(b.id)} className="btn-danger btn-xs">Delete</button>}
+                  {b.status !== "void" && b.status !== "paid" && (
+                    <button onClick={() => setStatus(b.id, "overdue")} className="btn-secondary btn-xs">Overdue</button>
+                  )}
+                  {(b.status === "pending" || b.status === "overdue") && (
+                    <button onClick={() => setStatus(b.id, "void")} className="btn-danger btn-xs">Void</button>
+                  )}
+                  {b.amount_paid === 0 && (b.status === "pending" || b.status === "received") && (
+                    <button onClick={() => openEdit(b)} className="btn-secondary btn-xs">Edit</button>
+                  )}
+                  {b.amount_paid === 0 && (b.status === "pending" || b.status === "received") && (
+                    <button onClick={() => setDeletingId(b.id)} className="btn-danger btn-xs">Delete</button>
+                  )}
                 </td>
               </tr>
             ))}

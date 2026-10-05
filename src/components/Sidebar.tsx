@@ -45,11 +45,22 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "Finance",
     items: [
-      { href: "/invoices", label: "Invoicing", icon: "🧾", roles: ["admin", "secretary", "manager"], module: "invoices" },
-      { href: "/bills", label: "Bills", icon: "🧾", roles: ["admin", "secretary", "manager"], module: "bills" },
       { href: "/petty-cash", label: "Petty Cash", icon: "💵", roles: ["admin", "secretary", "manager", "employee"], module: "petty-cash" },
-      { href: "/accounting", label: "Accounting", icon: "📒", roles: ["admin", "secretary", "manager"], module: "accounting" },
       { href: "/cars", label: "Car Logs", icon: "🚗", roles: ["admin", "manager"], module: "cars" },
+    ],
+  },
+  {
+    title: "Accounting",
+    items: [
+      { href: "/accounting", label: "Accounting", icon: "📒", roles: ["admin", "secretary", "manager"], module: "accounting" },
+      { href: "/accounting/chart", label: "Chart of accounts", icon: "🧮", roles: ["admin", "secretary", "manager"], module: "chart-of-accounts" },
+      { href: "/accounting/customers", label: "Customers", icon: "👤", roles: ["admin", "secretary", "manager"], module: "customers" },
+      { href: "/invoices", label: "Invoices", icon: "🧾", roles: ["admin", "secretary", "manager"], module: "invoices" },
+      { href: "/accounting/receipts", label: "Receipts", icon: "💳", roles: ["admin", "secretary", "manager"], module: "receipts" },
+      { href: "/accounting/suppliers", label: "Suppliers", icon: "🏭", roles: ["admin", "secretary", "manager"], module: "suppliers" },
+      { href: "/bills", label: "Bills", icon: "🧾", roles: ["admin", "secretary", "manager"], module: "bills" },
+      { href: "/accounting/payments", label: "Payments", icon: "💸", roles: ["admin", "secretary", "manager"], module: "payments" },
+      { href: "/accounting/aging", label: "Aging", icon: "⏳", roles: ["admin", "secretary", "manager"], module: "accounting" },
     ],
   },
   {

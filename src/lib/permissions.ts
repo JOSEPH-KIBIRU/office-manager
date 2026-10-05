@@ -26,6 +26,13 @@ export type ModuleKey =
   | "my-payslips"
   | "invoices"
   | "bills"
+  | "customers"
+  | "suppliers"
+  | "receipts"
+  | "payments"
+  | "chart-of-accounts"
+  | "accounting-post"
+  | "accounting-reverse"
   | "petty-cash"
   | "accounting"
   | "cars"
@@ -61,7 +68,14 @@ export const MODULES: ModuleDef[] = [
   { key: "payroll", label: "Payroll", group: "People & HR" },
   { key: "my-payslips", label: "My Payslips", group: "People & HR" },
   { key: "invoices", label: "Invoicing", group: "Finance" },
+  { key: "customers", label: "Customers", group: "Finance" },
+  { key: "receipts", label: "Receipts", group: "Finance" },
   { key: "bills", label: "Bills", group: "Finance" },
+  { key: "suppliers", label: "Suppliers", group: "Finance" },
+  { key: "payments", label: "Payments", group: "Finance" },
+  { key: "chart-of-accounts", label: "Chart of accounts", group: "Finance" },
+  { key: "accounting-post", label: "Post accounting transactions", group: "Finance" },
+  { key: "accounting-reverse", label: "Reverse / void transactions", group: "Finance" },
   { key: "petty-cash", label: "Petty Cash", group: "Finance" },
   { key: "accounting", label: "Accounting", group: "Finance" },
   { key: "cars", label: "Car Logs", group: "Finance" },
@@ -85,12 +99,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, ModuleKey[]> = {
   secretary: [
     "dashboard", "analytics", "org-chart", "onboarding", "leave",
     "leave-calendar", "attendance", "my-payslips", "invoices", "bills",
+    "customers", "suppliers", "receipts", "payments",
     "petty-cash", "accounting", "reports", "tasks", "meetings", "minutes",
     "visitors", "assets", "organization", "documents", "profile",
   ],
   manager: [
     "dashboard", "analytics", "leave", "leave-calendar", "attendance",
-    "my-payslips", "invoices", "bills", "petty-cash", "accounting", "cars",
+    "my-payslips", "invoices", "bills", "customers", "suppliers", "petty-cash", "accounting", "cars",
     "tasks", "documents", "profile",
   ],
   employee: [
