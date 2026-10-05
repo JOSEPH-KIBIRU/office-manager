@@ -12,7 +12,22 @@ interface Txn {
 interface Candidate { journalId: string; ref: string; date: string; description: string; amount: number; confidence: string; }
 interface Suggestions { rule: { id: string; name: string; accountCode: string; autoPost: boolean; suggestType: string | null } | null; candidates: Candidate[]; }
 interface Account { code: string; name: string; type: string; isCash: boolean; active: boolean; }
-interface RecSummary { bookBalance: number; outstandingDeposits: number; outstandingPayments: number; adjustedBalance: number; difference: number; unreconciledCount: number; }
+interface RecItem { date: string; description: string; remaining: number; ref?: string; reference?: string | null; }
+interface RecLedger {
+  bookBalance: number;
+  statementClosingBalance: number;
+  statementMovement: number;
+  matchedCount: number;
+  unpresentedCheques: RecItem[];
+  uncreditedDeposits: RecItem[];
+  directDebits: RecItem[];
+  directCredits: RecItem[];
+  totals: { unpresentedCheques: number; uncreditedDeposits: number; directDebits: number; directCredits: number };
+  adjustedBank: number;
+  adjustedBook: number;
+  difference: number;
+  unreconciledCount: number;
+}
 
 const fmtKsh = (n: number) => "KSh " + n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const today = () => new Date().toISOString().slice(0, 10);
@@ -43,7 +58,7 @@ export default function BankingTransactionsPage() {
 
   const [tFrom, setTFrom] = useState(""), [tTo, setTTo] = useState(""), [tAmount, setTAmount] = useState(""), [tRef, setTRef] = useState("");
   const [recClosing, setRecClosing] = useState("");
-  const [recSummary, setRecSummary] = useState<RecSummary | null>(null);
+  const [recLedger, setRecLedger] = useState<RecLedger | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -145,11 +160,22 @@ export default function BankingTransactionsPage() {
 
   async function loadSummary() {
     try {
-      const d = await api<{ summary: RecSummary }>(
+      const d = await api<{ ledger: RecLedger }>(
         `/api/banking/reconcile?accountCode=${accountCode}&statementClosingBalance=${Number(recClosing) || 0}`
       );
-      setRecSummary(d.summary);
+      setRecLedger(d.ledger);
     } catch (e) { setError(e instanceof Error ? e.message : "Failed"); }
+  }
+
+  async function runAutoMatch() {
+    setBusy(true);
+    try {
+      const res = await api<{ matched: number }>("/api/banking/auto-match", { method: "POST", json: { accountCode } });
+      toast.success(`Auto-matched ${res.matched} item(s).`);
+      await load();
+      if (recLedger) await loadSummary();
+    } catch (e) { setError(e instanceof Error ? e.message : "Auto-match failed"); }
+    finally { setBusy(false); }
   }
 
   async function completeRec(force: boolean) {
@@ -161,7 +187,7 @@ export default function BankingTransactionsPage() {
       });
       toast.success("Reconciliation completed.");
       setRecFor(false);
-      setRecSummary(null);
+      setRecLedger(null);
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "Failed to complete"); }
     finally { setBusy(false); }
@@ -185,7 +211,8 @@ export default function BankingTransactionsPage() {
         <button className="btn-secondary" onClick={() => setImportFor(true)} disabled={!accountCode}>Import statement</button>
         <button className="btn-secondary" onClick={() => setManualFor(true)} disabled={!accountCode}>Manual transaction</button>
         <button className="btn-secondary" onClick={() => { setTFrom(accountCode); setTransferFor(true); }} disabled={accounts.length < 2}>Transfer</button>
-        <button className="btn-primary ml-auto" onClick={() => { setRecFor(true); setRecSummary(null); }} disabled={!accountCode}>Reconcile</button>
+        <button className="btn-secondary ml-auto" onClick={runAutoMatch} disabled={busy || !accountCode}>Auto-match</button>
+        <button className="btn-primary" onClick={() => { setRecFor(true); setRecLedger(null); }} disabled={!accountCode}>Reconcile</button>
       </div>
 
       {loading ? <p className="text-sm text-slate-500">Loading…</p> : txns.length === 0 ? (
@@ -370,22 +397,42 @@ export default function BankingTransactionsPage() {
               </div>
               <button className="btn-secondary" onClick={loadSummary}>Calculate</button>
             </div>
-            {recSummary && (
-              <div className="rounded-lg border border-slate-200 p-3">
-                <Row label="Book balance" value={recSummary.bookBalance} />
-                <Row label="Outstanding deposits" value={recSummary.outstandingDeposits} />
-                <Row label="Outstanding payments" value={-recSummary.outstandingPayments} />
-                <Row label="Adjusted balance" value={recSummary.adjustedBalance} bold />
-                <Row label="Difference" value={recSummary.difference} bold danger={Math.abs(recSummary.difference) > 0.5} />
-                <p className="mt-1 text-xs text-slate-500">{recSummary.unreconciledCount} unreconciled line(s).</p>
+            {recLedger && (
+              <div className="space-y-3">
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Bank statement</p>
+                    <Row label="Balance per bank statement" value={recLedger.statementClosingBalance} />
+                    <Row label="Add: Uncredited deposits" value={recLedger.totals.uncreditedDeposits} />
+                    <Row label="Less: Unpresented cheques" value={-recLedger.totals.unpresentedCheques} />
+                    <Row label="Adjusted balance per bank" value={recLedger.adjustedBank} bold />
+                  </div>
+                  <div className="rounded-lg border border-slate-200 p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Cash book</p>
+                    <Row label="Balance per cash book" value={recLedger.bookBalance} />
+                    <Row label="Add: Direct credits" value={recLedger.totals.directCredits} />
+                    <Row label="Less: Direct debits" value={-recLedger.totals.directDebits} />
+                    <Row label="Adjusted balance per cash book" value={recLedger.adjustedBook} bold />
+                  </div>
+                </div>
+                <Row label="Difference" value={recLedger.difference} bold danger={Math.abs(recLedger.difference) > 0.5} />
+
+                <RecSection title="Unpresented cheques" hint="Issued & recorded, not yet on the statement" items={recLedger.unpresentedCheques} />
+                <RecSection title="Uncredited deposits" hint="Recorded receipts not yet credited by the bank" items={recLedger.uncreditedDeposits} />
+                <RecSection title="Direct debits" hint="On the statement, not yet in the cash book" items={recLedger.directDebits} />
+                <RecSection title="Direct credits" hint="On the statement, not yet in the cash book" items={recLedger.directCredits} />
+
+                <p className="text-xs text-slate-500">
+                  {recLedger.matchedCount} matched · {recLedger.unreconciledCount} outstanding item(s)
+                </p>
               </div>
             )}
             <div className="flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => setRecFor(false)} disabled={busy}>Cancel</button>
-              <button className="btn-primary" onClick={() => completeRec(false)} disabled={busy || !recSummary || Math.abs(recSummary.difference) > 0.5}>
+              <button className="btn-primary" onClick={() => completeRec(false)} disabled={busy || !recLedger || Math.abs(recLedger.difference) > 0.5}>
                 Complete
               </button>
-              <button className="btn-secondary text-amber-700" onClick={() => completeRec(true)} disabled={busy || !recSummary || Math.abs(recSummary.difference) <= 0.5}>
+              <button className="btn-secondary text-amber-700" onClick={() => completeRec(true)} disabled={busy || !recLedger || Math.abs(recLedger.difference) <= 0.5}>
                 Force with adjustment
               </button>
             </div>
@@ -402,5 +449,27 @@ function Row({ label, value, bold, danger }: { label: string; value: number; bol
       <span className="text-slate-600">{label}</span>
       <span className={`tabular-nums ${danger ? "text-red-600" : "text-slate-800"}`}>{fmtKsh(value)}</span>
     </div>
+  );
+}
+
+function RecSection({ title, hint, items }: { title: string; hint: string; items: RecItem[] }) {
+  const total = items.reduce((s, i) => s + i.remaining, 0);
+  if (items.length === 0) return null;
+  return (
+    <details className="rounded-lg border border-slate-200" open>
+      <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <span>{title} <span className="font-normal normal-case text-slate-400">· {hint}</span></span>
+        <span className="tabular-nums text-slate-700">{fmtKsh(total)}</span>
+      </summary>
+      <div className="max-h-40 divide-y divide-slate-100 overflow-auto border-t border-slate-100">
+        {items.map((i, idx) => (
+          <div key={idx} className="flex items-center justify-between gap-2 px-3 py-1.5 text-sm">
+            <span className="min-w-0 truncate text-slate-600">{i.description}</span>
+            <span className="whitespace-nowrap text-xs text-slate-400">{i.date}</span>
+            <span className="w-24 text-right tabular-nums text-slate-700">{fmtKsh(i.remaining)}</span>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }

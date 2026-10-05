@@ -7,6 +7,7 @@ import { recordAudit } from "@/lib/audit";
 
 /**
  * GET  /api/banking/reconcile?accountCode=&statementClosingBalance=
+ *      Two-sided reconciliation ledger (Cash Book vs Bank Statement).
  * POST /api/banking/reconcile — complete a reconciliation.
  */
 export async function GET(req: NextRequest) {
@@ -15,13 +16,13 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const accountCode = url.searchParams.get("accountCode");
     if (!accountCode) throw new HttpError(400, "accountCode is required");
-    const summary = await cx().query(api.banking.reconciliationSummary, {
+    const ledger = await cx().query(api.banking.reconciliationLedger, {
       secret: secret(),
       orgId: session.orgId as never,
       accountCode,
       statementClosingBalance: Number(url.searchParams.get("statementClosingBalance") || 0),
     });
-    return ok({ summary });
+    return ok({ ledger });
   });
 }
 

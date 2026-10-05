@@ -835,35 +835,237 @@ export const suggestForLine = query({
  * Reconciliation
  * ------------------------------------------------------------------ */
 
-async function computeReconciliation(ctx: QueryCtx | MutationCtx, orgId: Id<"organizations">, accountCode: string, statementClosingBalance: number) {
-  const bookBalance = await ledgerBalance(ctx, orgId, accountCode);
+/**
+ * Build the two-sided reconciliation ledger:
+ *  - Cash Book side  = journals that touch the bank account
+ *  - Bank Statement side = imported `bankLines`
+ * Matched items appear on both; anything left over is isolated into the classic
+ * categories: Unpresented Cheques, Uncredited Deposits, Direct Debits, Direct Credits.
+ */
+async function buildReconciliation(
+  ctx: QueryCtx | MutationCtx,
+  orgId: Id<"organizations">,
+  accountCode: string,
+  statementClosingBalance: number
+) {
+  const matches = await ctx.db.query("bankLineMatches").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
+  const byJournal = new Map<string, number>();
+  const byLine = new Map<string, number>();
+  for (const m of matches) {
+    if (m.journalId) byJournal.set(m.journalId, (byJournal.get(m.journalId) ?? 0) + m.amount);
+    byLine.set(m.bankLineId, (byLine.get(m.bankLineId) ?? 0) + m.amount);
+  }
+
+  // ---- Cash Book side (recorded entries affecting this bank account) ----
+  const journals = await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
+  const unpresentedCheques: Array<Record<string, unknown>> = [];
+  const uncreditedDeposits: Array<Record<string, unknown>> = [];
+  const matchedItems: Array<Record<string, unknown>> = [];
+  for (const j of journals) {
+    if (j.reversedBy) continue;
+    if (j.source === "opening") continue; // starting balance, not an outstanding item
+    let effect = 0;
+    for (const l of j.lines) if (l.accountCode === accountCode) effect += l.debit - l.credit;
+    effect = round2(effect);
+    if (Math.abs(effect) < 0.005) continue;
+    const matched = round2(byJournal.get(j._id) ?? 0);
+    const remaining = round2(Math.abs(effect) - matched);
+    const item = {
+      journalId: j._id,
+      ref: j.ref,
+      date: j.date,
+      description: j.description,
+      amount: round2(Math.abs(effect)),
+      matched,
+      remaining,
+      direction: effect > 0 ? "in" : "out",
+    };
+    if (remaining <= 0.005) matchedItems.push(item);
+    else if (effect > 0) uncreditedDeposits.push(item);
+    else unpresentedCheques.push(item);
+  }
+
+  // ---- Bank Statement side (imported movements) ----
   const lines = await ctx.db
     .query("bankLines")
     .withIndex("by_org_account", (q) => q.eq("orgId", orgId).eq("accountCode", accountCode))
     .collect();
-  let outstandingDeposits = 0;
-  let outstandingPayments = 0;
-  let unreconciledCount = 0;
+  const directDebits: Array<Record<string, unknown>> = [];
+  const directCredits: Array<Record<string, unknown>> = [];
+  let statementMovement = 0;
   for (const l of lines) {
-    if (l.status === "reconciled" || l.status === "ignored") continue;
-    const remaining = Math.abs(l.amount) - (await lineMatched(ctx, l._id));
+    if (l.status === "ignored") continue;
+    statementMovement += l.amount;
+    const matched = round2(byLine.get(l._id) ?? 0);
+    const remaining = round2(Math.abs(l.amount) - matched);
     if (remaining <= 0.005) continue;
-    unreconciledCount += 1;
-    if (l.amount > 0) outstandingDeposits += remaining;
-    else outstandingPayments += remaining;
+    const item = {
+      id: l._id,
+      date: l.date,
+      description: l.description,
+      amount: round2(Math.abs(l.amount)),
+      matched,
+      remaining,
+      reference: l.reference ?? null,
+      direction: l.amount > 0 ? "in" : "out",
+    };
+    if (l.amount > 0) directCredits.push(item);
+    else directDebits.push(item);
   }
-  outstandingDeposits = round2(outstandingDeposits);
-  outstandingPayments = round2(outstandingPayments);
-  const adjustedBalance = round2(bookBalance + outstandingDeposits - outstandingPayments);
-  const difference = round2(statementClosingBalance - adjustedBalance);
-  return { bookBalance, outstandingDeposits, outstandingPayments, adjustedBalance, difference, unreconciledCount };
+
+  const bookBalance = await ledgerBalance(ctx, orgId, accountCode);
+  const totals = {
+    unpresentedCheques: round2(unpresentedCheques.reduce((s, i) => s + Number(i.remaining), 0)),
+    uncreditedDeposits: round2(uncreditedDeposits.reduce((s, i) => s + Number(i.remaining), 0)),
+    directDebits: round2(directDebits.reduce((s, i) => s + Number(i.remaining), 0)),
+    directCredits: round2(directCredits.reduce((s, i) => s + Number(i.remaining), 0)),
+  };
+  const adjustedBank = round2(statementClosingBalance + totals.uncreditedDeposits - totals.unpresentedCheques);
+  const adjustedBook = round2(bookBalance + totals.directCredits - totals.directDebits);
+  const difference = round2(adjustedBank - adjustedBook);
+
+  return {
+    accountCode,
+    bookBalance,
+    statementClosingBalance: round2(statementClosingBalance),
+    statementMovement: round2(statementMovement),
+    matchedCount: matchedItems.length,
+    unpresentedCheques,
+    uncreditedDeposits,
+    directDebits,
+    directCredits,
+    totals,
+    adjustedBank,
+    adjustedBook,
+    difference,
+    unreconciledCount:
+      unpresentedCheques.length + uncreditedDeposits.length + directDebits.length + directCredits.length,
+  };
 }
+
+/** Full two-sided reconciliation ledger (Cash Book vs Bank Statement). */
+export const reconciliationLedger = query({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    accountCode: v.string(),
+    statementClosingBalance: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    return buildReconciliation(ctx, args.orgId, args.accountCode, args.statementClosingBalance ?? 0);
+  },
+});
 
 export const reconciliationSummary = query({
   args: { secret: v.string(), orgId: v.id("organizations"), accountCode: v.string(), statementClosingBalance: v.number() },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    return computeReconciliation(ctx, args.orgId, args.accountCode, args.statementClosingBalance);
+    const r = await buildReconciliation(ctx, args.orgId, args.accountCode, args.statementClosingBalance);
+    return {
+      bookBalance: r.bookBalance,
+      outstandingDeposits: r.totals.uncreditedDeposits,
+      outstandingPayments: r.totals.unpresentedCheques,
+      adjustedBalance: r.adjustedBook,
+      difference: r.difference,
+      unreconciledCount: r.unreconciledCount,
+    };
+  },
+});
+
+/**
+ * Automated matching engine: pairs statement entries with Cash Book entries of
+ * the same direction and amount within a date window, creating the matches.
+ */
+export const autoMatch = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    accountCode: v.string(),
+    windowDays: v.optional(v.number()),
+    createdByName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const window = Math.max(0, Math.min(args.windowDays ?? 7, 45));
+
+    // Statement side remaining.
+    const lines = await ctx.db
+      .query("bankLines")
+      .withIndex("by_org_account", (q) => q.eq("orgId", args.orgId).eq("accountCode", args.accountCode))
+      .collect();
+    const lineState = [];
+    for (const l of lines) {
+      if (l.status === "ignored" || l.status === "reconciled") continue;
+      const remaining = round2(Math.abs(l.amount) - (await lineMatched(ctx, l._id)));
+      if (remaining <= 0.005) continue;
+      lineState.push({ id: l._id, amount: l.amount, remaining, date: l.date, description: l.description, reference: l.reference ?? "" });
+    }
+
+    // Cash book side remaining.
+    const journals = await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const matches = await ctx.db.query("bankLineMatches").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const byJournal = new Map<string, number>();
+    for (const m of matches) if (m.journalId) byJournal.set(m.journalId, (byJournal.get(m.journalId) ?? 0) + m.amount);
+    const bookState = [];
+    for (const j of journals) {
+      if (j.reversedBy || j.source === "opening") continue;
+      let effect = 0;
+      for (const l of j.lines) if (l.accountCode === args.accountCode) effect += l.debit - l.credit;
+      effect = round2(effect);
+      if (Math.abs(effect) < 0.005) continue;
+      const remaining = round2(Math.abs(effect) - (byJournal.get(j._id) ?? 0));
+      if (remaining <= 0.005) continue;
+      bookState.push({ journalId: j._id, effect, remaining, date: j.date, description: j.description, ref: j.ref });
+    }
+
+    // Build candidate pairs.
+    const dayMs = 86_400_000;
+    const pairs: Array<{ lineIdx: number; bookIdx: number; amount: number; score: number }> = [];
+    for (let li = 0; li < lineState.length; li++) {
+      const ls = lineState[li];
+      for (let bi = 0; bi < bookState.length; bi++) {
+        const bs = bookState[bi];
+        if (ls.amount > 0 !== bs.effect > 0) continue; // same direction only
+        const amount = Math.min(ls.remaining, bs.remaining);
+        const diff = Math.abs(ls.remaining - bs.remaining);
+        if (diff > 0.5 && amount < Math.min(ls.remaining, bs.remaining) - 0.005) continue;
+        const dd = Math.abs(Date.parse(ls.date + "T00:00:00Z") - Date.parse(bs.date + "T00:00:00Z")) / dayMs;
+        if (Number.isNaN(dd) || dd > window) continue;
+        let score = 100 - dd;
+        if (ls.remaining === bs.remaining) score += 30;
+        const refHit = ls.reference && bs.ref && ls.reference.toLowerCase().includes(bs.ref.toLowerCase());
+        if (refHit) score += 25;
+        pairs.push({ lineIdx: li, bookIdx: bi, amount: round2(amount), score });
+      }
+    }
+    pairs.sort((a, b) => b.score - a.score);
+
+    let matched = 0;
+    const touched = new Set<string>();
+    for (const p of pairs) {
+      const ls = lineState[p.lineIdx];
+      const bs = bookState[p.bookIdx];
+      if (ls.remaining <= 0.005 || bs.remaining <= 0.005) continue;
+      const amount = round2(Math.min(ls.remaining, bs.remaining));
+      if (amount <= 0.005) continue;
+      await ctx.db.insert("bankLineMatches", {
+        orgId: args.orgId,
+        bankLineId: ls.id,
+        amount,
+        journalId: bs.journalId,
+        note: "Auto-matched",
+        createdByName: args.createdByName ?? "Auto-match",
+        createdAt: tsNow(),
+      });
+      ls.remaining = round2(ls.remaining - amount);
+      bs.remaining = round2(bs.remaining - amount);
+      touched.add(ls.id);
+      matched += 1;
+    }
+    for (const id of touched) await recomputeLine(ctx, id as Id<"bankLines">);
+
+    return { matched, remainingLines: lineState.filter((l) => l.remaining > 0.005).length };
   },
 });
 
@@ -882,18 +1084,18 @@ export const completeReconciliation = mutation({
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    let summary = await computeReconciliation(ctx, args.orgId, args.accountCode, args.statementClosingBalance);
+    let r = await buildReconciliation(ctx, args.orgId, args.accountCode, args.statementClosingBalance);
     let adjustmentJournalId: Id<"journals"> | undefined;
 
-    if (Math.abs(summary.difference) > 0.5) {
+    if (Math.abs(r.difference) > 0.5) {
       if (!args.force) {
         throw new Error(
-          `Reconciliation does not balance — difference of KES ${summary.difference.toLocaleString("en-KE")}. ` +
-            `Match the remaining items or record an approved adjustment.`
+          `Reconciliation does not balance — difference of KES ${r.difference.toLocaleString("en-KE")}. ` +
+            `Match the outstanding items or record an approved adjustment.`
         );
       }
       const offset = args.adjustmentAccountCode || (await resolveControlCode(ctx, args.orgId, "suspense"));
-      const diff = summary.difference;
+      const diff = r.difference;
       adjustmentJournalId = await postJournalForSource(ctx, {
         orgId: args.orgId,
         source: "bank",
@@ -913,10 +1115,10 @@ export const completeReconciliation = mutation({
         postedBy: args.completedBy,
         postedByName: args.completedByName ?? "Reconciliation",
       });
-      summary = await computeReconciliation(ctx, args.orgId, args.accountCode, args.statementClosingBalance);
+      r = await buildReconciliation(ctx, args.orgId, args.accountCode, args.statementClosingBalance);
     }
 
-    // Lock the reconciled lines.
+    // Lock the fully-matched statement lines.
     const lines = await ctx.db
       .query("bankLines")
       .withIndex("by_org_account", (q) => q.eq("orgId", args.orgId).eq("accountCode", args.accountCode))
@@ -933,11 +1135,11 @@ export const completeReconciliation = mutation({
       bankAccountId: args.bankAccountId,
       periodEnd: args.periodEnd,
       statementClosingBalance: round2(args.statementClosingBalance),
-      bookBalance: summary.bookBalance,
-      outstandingDeposits: summary.outstandingDeposits,
-      outstandingPayments: summary.outstandingPayments,
-      adjustedBalance: summary.adjustedBalance,
-      difference: summary.difference,
+      bookBalance: r.bookBalance,
+      outstandingDeposits: r.totals.uncreditedDeposits,
+      outstandingPayments: r.totals.unpresentedCheques,
+      adjustedBalance: r.adjustedBook,
+      difference: r.difference,
       status: "completed",
       adjustmentJournalId,
       completedBy: args.completedBy,
@@ -945,7 +1147,7 @@ export const completeReconciliation = mutation({
       createdAt: tsNow(),
       completedAt: tsNow(),
     });
-    return { id, summary };
+    return { id, summary: r };
   },
 });
 
