@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { PageHeader, Alert, Modal, StatusBadge, api, inputCls } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { parseDelimited, normalizeStatementDetailed, type NormalizedTxn } from "@/lib/bankImport";
 
 interface BankAccount { id: string; name: string; kind: string; accountCode: string; active: boolean; }
 interface Txn {
@@ -47,6 +48,9 @@ export default function BankingTransactionsPage() {
 
   const [importFor, setImportFor] = useState(false);
   const [importText, setImportText] = useState("");
+  const [parsed, setParsed] = useState<{ transactions: NormalizedTxn[]; mode: string } | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [fileBusy, setFileBusy] = useState(false);
   const [manualFor, setManualFor] = useState(false);
   const [transferFor, setTransferFor] = useState(false);
   const [recFor, setRecFor] = useState(false);
@@ -113,16 +117,52 @@ export default function BankingTransactionsPage() {
     finally { setBusy(false); }
   }
 
-  async function doImport() {
+  async function parseFile(file: File) {
+    setFileBusy(true);
+    setError(null);
+    setParsed(null);
+    setFileName(file.name);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/banking/import-file", { method: "POST", body: fd });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Could not parse the file");
+      setParsed({ transactions: d.transactions, mode: d.detected?.mode ?? "auto" });
+      toast.success(`${d.count} transaction(s) detected. Review then import.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to parse file");
+    } finally {
+      setFileBusy(false);
+    }
+  }
+
+  function parseText() {
+    setError(null);
+    try {
+      const { transactions, detected } = normalizeStatementDetailed(parseDelimited(importText));
+      if (transactions.length === 0) throw new Error("No transactions detected in the pasted text.");
+      setParsed({ transactions, mode: detected.mode });
+      setFileName("pasted text");
+      toast.success(`${transactions.length} transaction(s) detected.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to parse");
+    }
+  }
+
+  async function importParsed() {
+    if (!parsed) return;
     setBusy(true);
     try {
       const res = await api<{ imported: number; skipped: number }>("/api/banking/transactions/import", {
         method: "POST",
-        json: { accountCode, text: importText },
+        json: { accountCode, lines: parsed.transactions },
       });
       toast.success(`Imported ${res.imported}, skipped ${res.skipped} duplicate(s).`);
       setImportFor(false);
       setImportText("");
+      setParsed(null);
+      setFileName("");
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "Import failed"); }
     finally { setBusy(false); }
@@ -314,17 +354,76 @@ export default function BankingTransactionsPage() {
 
       {/* Import modal */}
       {importFor && (
-        <Modal title="Import bank / M-Pesa statement" onClose={() => setImportFor(false)}>
+        <Modal title="Import bank / M-Pesa statement" onClose={() => { setImportFor(false); setParsed(null); }}>
           <div className="space-y-3">
-            <p className="text-xs text-slate-500">
-              Paste CSV/TSV statement text. Columns are auto-detected (date, description/narration, amount or
-              debit/credit or money in/out). M-Pesa statements work too.
-            </p>
-            <textarea className={inputCls()} rows={8} value={importText} onChange={(e) => setImportText(e.target.value)}
-              placeholder={"Date,Description,Amount\n2026-09-05,M-Pesa deposit 522522,45000\n2026-09-06,Bank charges,-250"} />
+            <div>
+              <label className="label">Upload a statement file</label>
+              <input
+                type="file"
+                accept=".csv,.tsv,.txt,.xlsx,.xls,.pdf"
+                className="input"
+                disabled={fileBusy}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void parseFile(f); }}
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                CSV, Excel (.xlsx/.xls) or PDF. Debit/Credit (or a single Amount) columns are detected
+                automatically; the running Balance column is ignored.
+              </p>
+            </div>
+
+            <details className="rounded-lg border border-slate-200 p-3">
+              <summary className="cursor-pointer text-xs font-medium text-indigo-600">Or paste text instead</summary>
+              <div className="mt-2 space-y-2">
+                <textarea
+                  className={inputCls()}
+                  rows={6}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={"Date,Description,Debit,Credit\n2026-09-05,M-Pesa deposit 522522,,45000\n2026-09-06,Bank charges,250,"}
+                />
+                <button className="btn-secondary text-xs" onClick={parseText} disabled={!importText.trim()}>Parse pasted text</button>
+              </div>
+            </details>
+
+            {fileBusy && <p className="text-sm text-slate-500">Reading file…</p>}
+
+            {parsed && (
+              <div className="rounded-lg border border-slate-200">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs">
+                  <span className="font-semibold text-slate-600">{parsed.transactions.length} transaction(s) · {fileName}</span>
+                  <span className="text-slate-400">detected: {parsed.mode.replace("_", " ")}</span>
+                </div>
+                <div className="max-h-56 overflow-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="text-slate-400">
+                        <th className="px-3 py-1.5">Date</th>
+                        <th className="px-3 py-1.5">Description</th>
+                        <th className="px-3 py-1.5 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {parsed.transactions.slice(0, 30).map((t, i) => (
+                        <tr key={i}>
+                          <td className="px-3 py-1.5 whitespace-nowrap text-slate-500">{t.date}</td>
+                          <td className="px-3 py-1.5 text-slate-600">{t.description}</td>
+                          <td className={`px-3 py-1.5 text-right tabular-nums ${t.amount < 0 ? "text-red-600" : "text-emerald-700"}`}>{fmtKsh(t.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {parsed.transactions.length > 30 && (
+                    <p className="px-3 py-2 text-xs text-slate-400">Showing first 30 of {parsed.transactions.length}.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end gap-2">
-              <button className="btn-secondary" onClick={() => setImportFor(false)} disabled={busy}>Cancel</button>
-              <button className="btn-primary" onClick={doImport} disabled={busy || !importText.trim()}>{busy ? "Importing…" : "Import"}</button>
+              <button className="btn-secondary" onClick={() => { setImportFor(false); setParsed(null); }} disabled={busy}>Cancel</button>
+              <button className="btn-primary" onClick={importParsed} disabled={busy || !parsed || parsed.transactions.length === 0}>
+                {busy ? "Importing…" : parsed ? `Import ${parsed.transactions.length} transaction(s)` : "Import"}
+              </button>
             </div>
           </div>
         </Modal>

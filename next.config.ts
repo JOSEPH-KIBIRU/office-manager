@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["better-sqlite3", "pdfjs-dist"],
+  serverExternalPackages: ["better-sqlite3", "pdfjs-dist", "xlsx"],
   outputFileTracingIncludes: {
     "/api/accounting/bank/pdf": [
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
