@@ -14,9 +14,10 @@ const MAX_SIZE = 15 * 1024 * 1024; // 15MB
 const MAX_PDF_PAGES = 80;
 
 /** Group PDF text items into visual rows, splitting columns on large x-gaps. */
-async function pdfToRows(buf: Uint8Array): Promise<string[][]> {
+async function pdfToRows(buf: Uint8Array, password?: string | null): Promise<string[][]> {
   const doc = await getDocument({
     data: buf,
+    password: password || undefined,
     useWorkerFetch: false,
     isEvalSupported: false,
     disableFontFace: true,
@@ -96,6 +97,8 @@ export async function POST(req: NextRequest) {
     const name = (file.name || "").toLowerCase();
     const ext = name.split(".").pop() || "";
     const buf = new Uint8Array(await file.arrayBuffer());
+    const password = form.get("password");
+    const passwordStr = typeof password === "string" ? password : "";
 
     let rows: string[][];
     try {
@@ -104,7 +107,16 @@ export async function POST(req: NextRequest) {
       } else if (ext === "xlsx" || ext === "xls" || ext === "xlsm") {
         rows = xlsxToRows(buf);
       } else if (ext === "pdf") {
-        rows = await pdfToRows(buf);
+        try {
+          rows = await pdfToRows(buf, passwordStr);
+        } catch (e) {
+          // pdfjs throws a PasswordException when the PDF is encrypted.
+          const err = e as { name?: string; code?: number };
+          if (err?.name === "PasswordException") {
+            return ok({ needsPassword: true, transactions: [], count: 0, wrongPassword: !!passwordStr });
+          }
+          throw e;
+        }
       } else {
         // Best-effort: try text, then excel.
         const text = new TextDecoder().decode(buf);

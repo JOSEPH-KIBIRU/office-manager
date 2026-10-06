@@ -51,6 +51,9 @@ export default function BankingTransactionsPage() {
   const [parsed, setParsed] = useState<{ transactions: NormalizedTxn[]; mode: string } | null>(null);
   const [fileName, setFileName] = useState("");
   const [fileBusy, setFileBusy] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pdfPassword, setPdfPassword] = useState("");
+  const [needsPassword, setNeedsPassword] = useState(false);
   const [manualFor, setManualFor] = useState(false);
   const [transferFor, setTransferFor] = useState(false);
   const [recFor, setRecFor] = useState(false);
@@ -117,17 +120,25 @@ export default function BankingTransactionsPage() {
     finally { setBusy(false); }
   }
 
-  async function parseFile(file: File) {
+  async function parseFile(file: File, password?: string) {
     setFileBusy(true);
     setError(null);
     setParsed(null);
     setFileName(file.name);
+    setPendingFile(file);
     try {
       const fd = new FormData();
       fd.append("file", file);
+      if (password) fd.append("password", password);
       const res = await fetch("/api/banking/import-file", { method: "POST", body: fd });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || "Could not parse the file");
+      if (d.needsPassword) {
+        setNeedsPassword(true);
+        if (d.wrongPassword) toast.error("Incorrect PDF password. Please try again.");
+        return;
+      }
+      setNeedsPassword(false);
       setParsed({ transactions: d.transactions, mode: d.detected?.mode ?? "auto" });
       toast.success(`${d.count} transaction(s) detected. Review then import.`);
     } catch (e) {
@@ -367,9 +378,35 @@ export default function BankingTransactionsPage() {
               />
               <p className="mt-1 text-xs text-slate-500">
                 CSV, Excel (.xlsx/.xls) or PDF. Debit/Credit (or a single Amount) columns are detected
-                automatically; the running Balance column is ignored.
+                automatically; the running Balance column is ignored. Password-protected PDFs can be
+                unlocked below.
               </p>
             </div>
+
+            {needsPassword && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-medium text-amber-800">
+                  {fileName} is password-protected. Enter the PDF password to unlock it.
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="password"
+                    className={inputCls()}
+                    value={pdfPassword}
+                    placeholder="PDF password"
+                    onChange={(e) => setPdfPassword(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && pendingFile) void parseFile(pendingFile, pdfPassword); }}
+                  />
+                  <button
+                    className="btn-primary whitespace-nowrap"
+                    onClick={() => pendingFile && parseFile(pendingFile, pdfPassword)}
+                    disabled={fileBusy || !pdfPassword}
+                  >
+                    {fileBusy ? "Unlocking…" : "Unlock"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <details className="rounded-lg border border-slate-200 p-3">
               <summary className="cursor-pointer text-xs font-medium text-indigo-600">Or paste text instead</summary>
