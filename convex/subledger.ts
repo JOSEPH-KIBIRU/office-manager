@@ -8,6 +8,7 @@ import {
   resolveControlCode,
   resolveCashAccount,
   roundKes,
+  nextSeq,
 } from "./accounting";
 
 /**
@@ -410,9 +411,9 @@ export const voidPayment = mutation({
  * ------------------------------------------------------------------ */
 
 async function nextCreditNoteNumber(ctx: MutationCtx, orgId: Id<"organizations">, kind: string): Promise<string> {
-  const all = await ctx.db.query("creditNotes").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
   const prefix = kind === "sales_credit" ? "CN" : "DN";
-  return `${prefix}-${String(all.length + 1).padStart(4, "0")}`;
+  const n = await nextSeq(ctx, orgId, prefix);
+  return `${prefix}-${String(n).padStart(4, "0")}`;
 }
 
 export const createCreditNote = mutation({
@@ -425,6 +426,8 @@ export const createCreditNote = mutation({
     amount: v.number(),
     taxRate: v.optional(v.number()),
     reason: v.optional(v.string()),
+    revenueAccountCode: v.optional(v.string()),
+    expenseAccountCode: v.optional(v.string()),
     allocateToInvoiceId: v.optional(v.id("invoices")),
     allocateToBillId: v.optional(v.id("bills")),
     createdBy: v.optional(v.id("users")),
@@ -455,6 +458,8 @@ export const createCreditNote = mutation({
       taxTotal,
       total: roundKes(args.amount),
       reason: args.reason?.trim() || undefined,
+      revenueAccountCode: args.revenueAccountCode || undefined,
+      expenseAccountCode: args.expenseAccountCode || undefined,
       status: "draft",
       createdBy: args.createdBy,
       createdByName: args.createdByName,
@@ -487,16 +492,18 @@ async function issueCreditNoteInternal(
   const vatIn = await resolveControlCode(ctx, orgId, "vat_input");
   const vatOut = await resolveControlCode(ctx, orgId, "vat_output");
 
+  const revenueCode = cn.revenueAccountCode || "4000";
+  const expenseCode = cn.expenseAccountCode || "5990";
   const lines =
     cn.kind === "sales_credit"
       ? [
-          { accountCode: "4000", debit: cn.subtotal, credit: 0, memo: cn.number },
+          { accountCode: revenueCode, debit: cn.subtotal, credit: 0, memo: cn.number },
           ...(cn.taxTotal > 0 ? [{ accountCode: vatOut, debit: cn.taxTotal, credit: 0, memo: "VAT output reversal" }] : []),
           { accountCode: ar, debit: 0, credit: cn.total, memo: cn.number },
         ]
       : [
           { accountCode: ap, debit: cn.total, credit: 0, memo: cn.number },
-          { accountCode: "5990", debit: 0, credit: cn.subtotal, memo: cn.number },
+          { accountCode: expenseCode, debit: 0, credit: cn.subtotal, memo: cn.number },
           ...(cn.taxTotal > 0 ? [{ accountCode: vatIn, debit: 0, credit: cn.taxTotal, memo: "VAT input reversal" }] : []),
         ];
 
@@ -730,6 +737,41 @@ export const contactLedger = query({
       rows,
       closingBalance: balance,
       label: isCustomer ? "Accounts receivable" : "Accounts payable",
+    };
+  },
+});
+
+/** GL control-account balance vs sub-ledger open items (AR/AP integrity check). */
+export const controlReconciliation = query({
+  args: { secret: v.string(), orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const arCode = await resolveControlCode(ctx, args.orgId, "ar");
+    const apCode = await resolveControlCode(ctx, args.orgId, "ap");
+    const journals = await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    let arGL = 0;
+    let apGL = 0;
+    for (const j of journals) {
+      for (const l of j.lines) {
+        if (l.accountCode === arCode) arGL += l.debit - l.credit;
+        if (l.accountCode === apCode) apGL += l.credit - l.debit;
+      }
+    }
+    const invoices = await ctx.db.query("invoices").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    let openAR = 0;
+    for (const inv of invoices) {
+      if (["draft", "cancelled", "void"].includes(inv.status)) continue;
+      openAR += inv.total - (inv.amountPaid ?? 0);
+    }
+    const bills = await ctx.db.query("bills").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    let openAP = 0;
+    for (const b of bills) {
+      if (["draft", "void"].includes(b.status)) continue;
+      openAP += b.amount - (b.amountPaid ?? 0);
+    }
+    return {
+      ar: { controlCode: arCode, gl: roundKes(arGL), subledger: roundKes(openAR), difference: roundKes(arGL - openAR) },
+      ap: { controlCode: apCode, gl: roundKes(apGL), subledger: roundKes(openAP), difference: roundKes(apGL - openAP) },
     };
   },
 });

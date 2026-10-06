@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
 import { assertSecret, tsNow, tsString, fmtCreated, orgBranding } from "./lib";
-import { tryPostJournalForSource, reverseJournalInternal } from "./accounting";
+import { tryPostJournalForSource, reverseJournalInternal, nextSeq } from "./accounting";
 
 type ContactDoc = Doc<"contacts">;
 type InvoiceDoc = Doc<"invoices">;
@@ -94,8 +94,8 @@ async function enrichContact(ctx: QueryCtx, c: ContactDoc) {
 }
 
 async function nextInvoiceNumber(ctx: MutationCtx | QueryCtx, orgId: Id<"organizations">): Promise<string> {
-  const all = await ctx.db.query("invoices").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
-  return `INV-${String(all.length + 1).padStart(4, "0")}`;
+  const n = await nextSeq(ctx as MutationCtx, orgId, "INV");
+  return `INV-${String(n).padStart(4, "0")}`;
 }
 
 /* ---------------- Contacts ---------------- */
@@ -141,9 +141,9 @@ export const createContact = mutation({
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     if (!args.name.trim()) throw new Error("Contact name is required");
-    const all = await ctx.db.query("contacts").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
     const prefix = args.type === "customer" ? "CUS" : "SUP";
-    const number = `${prefix}-${String(all.filter((c) => c.type === args.type).length + 1).padStart(4, "0")}`;
+    const n = await nextSeq(ctx, args.orgId, prefix);
+    const number = `${prefix}-${String(n).padStart(4, "0")}`;
     return ctx.db.insert("contacts", {
       orgId: args.orgId,
       type: args.type,
@@ -341,9 +341,50 @@ export const updateInvoice = mutation({
     if (args.recurringActive !== undefined) patch.recurringActive = args.recurringActive;
     patch.updatedAt = tsNow();
     await ctx.db.patch(args.id, patch);
+    // Re-post the ledger journal so the GL always matches the edited invoice.
+    await repostInvoiceJournal(ctx, args.id);
     return true;
   },
 });
+
+/**
+ * Reverse any active journal for an invoice and re-post it from the current
+ * document values. Used when a posted invoice is edited, and on deletion
+ * (reverse + delete).
+ */
+async function repostInvoiceJournal(ctx: MutationCtx, invoiceId: Id<"invoices">): Promise<void> {
+  const inv = await ctx.db.get(invoiceId);
+  if (!inv) return;
+  const existing = await ctx.db
+    .query("journals")
+    .withIndex("by_source", (q) => q.eq("orgId", inv.orgId).eq("source", "invoice").eq("sourceId", invoiceId as never))
+    .collect();
+  for (const j of existing) {
+    if (!j.reversedBy) {
+      await reverseJournalInternal(ctx, {
+        orgId: inv.orgId,
+        journalId: j._id,
+        date: new Date().toISOString().slice(0, 10),
+        postedByName: "Auto (invoice updated)",
+      });
+    }
+  }
+  if (["sent", "paid", "overdue", "partially_paid"].includes(inv.status)) {
+    await tryPostJournalForSource(ctx, {
+      orgId: inv.orgId,
+      source: "invoice",
+      sourceId: invoiceId,
+      date: inv.issueDate,
+      description: `Invoice ${inv.number} issued`,
+      lines: [
+        { accountCode: "1100", debit: inv.total, credit: 0, memo: inv.number, costCenterCode: inv.costCenterCode, projectId: inv.projectId as never },
+        { accountCode: "4000", debit: 0, credit: inv.subtotal, memo: inv.number, costCenterCode: inv.costCenterCode, projectId: inv.projectId as never },
+        { accountCode: "2150", debit: 0, credit: inv.taxTotal, memo: "VAT output", costCenterCode: inv.costCenterCode, projectId: inv.projectId as never },
+      ],
+      postedByName: "Auto (invoice updated)",
+    });
+  }
+}
 
 export const setInvoiceStatus = mutation({
   args: {
@@ -415,6 +456,26 @@ export const deleteInvoice = mutation({
     assertSecret(args.secret);
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) throw new Error("Invoice not found");
+    if ((doc.amountPaid ?? 0) > 0) {
+      throw new Error("This invoice has receipts applied — void the receipt(s) before deleting.");
+    }
+    // Reverse the ledger journal(s), then remove any allocations, then the invoice.
+    const existing = await ctx.db
+      .query("journals")
+      .withIndex("by_source", (q) => q.eq("orgId", args.orgId).eq("source", "invoice").eq("sourceId", args.id as never))
+      .collect();
+    for (const j of existing) {
+      if (!j.reversedBy) {
+        await reverseJournalInternal(ctx, {
+          orgId: args.orgId,
+          journalId: j._id,
+          date: new Date().toISOString().slice(0, 10),
+          postedByName: "Auto (invoice deleted)",
+        });
+      }
+    }
+    const allocs = await ctx.db.query("allocations").withIndex("by_invoice", (q) => q.eq("invoiceId", args.id)).collect();
+    for (const a of allocs) await ctx.db.delete(a._id);
     await ctx.db.delete(args.id);
     return true;
   },

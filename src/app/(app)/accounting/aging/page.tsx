@@ -24,13 +24,20 @@ const BUCKETS: Array<{ key: keyof AgingRow; label: string }> = [
   { key: "d90plus", label: "90+ days" },
 ];
 
+interface Ctl { controlCode: string; gl: number; subledger: number; difference: number; }
+
 export default function AgingPage() {
   const [type, setType] = useState<"ar" | "ap">("ar");
   const [rows, setRows] = useState<AgingRow[]>([]);
   const [totals, setTotals] = useState<AgingRow | null>(null);
   const [asAt, setAsAt] = useState("");
+  const [control, setControl] = useState<{ ar: Ctl; ap: Ctl } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api<{ ar: Ctl; ap: Ctl }>("/api/accounting/control-reconciliation").then(setControl).catch(() => setControl(null));
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,6 +87,18 @@ export default function AgingPage() {
       />
 
       {error && <Alert kind="error">{error}</Alert>}
+
+      {control && (
+        <div className="card p-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Control-account reconciliation — GL vs sub-ledger
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CtlRow label="Accounts receivable" c={control.ar} />
+            <CtlRow label="Accounts payable" c={control.ap} />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {(["ar", "ap"] as const).map((t) => (
@@ -137,6 +156,20 @@ export default function AgingPage() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function CtlRow({ label, c }: { label: string; c: Ctl }) {
+  const ok = Math.abs(c.difference) < 0.5;
+  return (
+    <div className="rounded-lg border border-slate-200 p-3 text-sm">
+      <p className="font-semibold text-slate-700">{label}</p>
+      <p className="mt-1 flex justify-between"><span className="text-slate-500">GL control ({c.controlCode})</span><span className="tabular-nums">{fmtKsh(c.gl)}</span></p>
+      <p className="flex justify-between"><span className="text-slate-500">Sub-ledger open</span><span className="tabular-nums">{fmtKsh(c.subledger)}</span></p>
+      <p className={`flex justify-between font-semibold ${ok ? "text-emerald-600" : "text-red-600"}`}>
+        <span>Difference</span><span className="tabular-nums">{fmtKsh(c.difference)}</span>
+      </p>
     </div>
   );
 }

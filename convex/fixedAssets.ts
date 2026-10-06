@@ -295,6 +295,8 @@ export const disposeAsset = mutation({
     date: v.string(),
     proceeds: v.number(),
     proceedsAccountCode: v.optional(v.string()),
+    gainAccountCode: v.optional(v.string()),
+    lossAccountCode: v.optional(v.string()),
     createdByName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -313,9 +315,9 @@ export const disposeAsset = mutation({
       ...(proceeds !== 0 ? [{ accountCode: proceedsCode, debit: proceeds, credit: 0, memo: "Disposal proceeds" }] : []),
       { accountCode: asset.assetAccountCode, debit: 0, credit: asset.purchaseCost, memo: asset.tag },
       ...(gain > 0
-        ? [{ accountCode: "4100", debit: 0, credit: gain, memo: "Gain on disposal" }]
+        ? [{ accountCode: args.gainAccountCode || "4100", debit: 0, credit: gain, memo: "Gain on disposal" }]
         : gain < 0
-          ? [{ accountCode: "5990", debit: -gain, credit: 0, memo: "Loss on disposal" }]
+          ? [{ accountCode: args.lossAccountCode || "5990", debit: -gain, credit: 0, memo: "Loss on disposal" }]
           : []),
     ];
 

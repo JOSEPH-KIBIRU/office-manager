@@ -3,7 +3,7 @@ import { v, ConvexError } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
 import { assertSecret, tsNow, fmtCreated } from "./lib";
-import { tryPostJournalForSource } from "./accounting";
+import { tryPostJournalForSource, reverseJournalInternal, nextSeq } from "./accounting";
 
 type BillDoc = Doc<"bills">;
 
@@ -40,8 +40,8 @@ async function enrichBill(ctx: QueryCtx, b: BillDoc) {
 }
 
 async function nextBillNumber(ctx: MutationCtx | QueryCtx, orgId: Id<"organizations">): Promise<string> {
-  const all = await ctx.db.query("bills").withIndex("by_org", (q) => q.eq("orgId", orgId)).collect();
-  return `BL-${String(all.length + 1).padStart(4, "0")}`;
+  const n = await nextSeq(ctx as MutationCtx, orgId, "BL");
+  return `BL-${String(n).padStart(4, "0")}`;
 }
 
 export const listBills = query({
@@ -171,9 +171,53 @@ export const updateBill = mutation({
     if (args.vatRate !== undefined) patch.vatRate = Math.max(0, Math.min(100, args.vatRate));
     patch.updatedAt = tsNow();
     await ctx.db.patch(args.id, patch);
+    await repostBillJournal(ctx, args.id);
     return true;
   },
 });
+
+/** Reverse any active journal for a bill and re-post it from current values. */
+async function repostBillJournal(ctx: MutationCtx, billId: Id<"bills">): Promise<void> {
+  const bill = await ctx.db.get(billId);
+  if (!bill) return;
+  const existing = await ctx.db
+    .query("journals")
+    .withIndex("by_source", (q) => q.eq("orgId", bill.orgId).eq("source", "bill").eq("sourceId", billId as never))
+    .collect();
+  for (const j of existing) {
+    if (!j.reversedBy) {
+      await reverseJournalInternal(ctx, {
+        orgId: bill.orgId,
+        journalId: j._id,
+        date: new Date().toISOString().slice(0, 10),
+        postedByName: "Auto (bill updated)",
+      });
+    }
+  }
+  const rate = bill.vatRate ?? 0;
+  const vat = rate > 0 ? Math.round((bill.amount - bill.amount / (1 + rate / 100)) * 100) / 100 : 0;
+  const net = Math.round((bill.amount - vat) * 100) / 100;
+  const lines =
+    vat > 0
+      ? [
+          { accountCode: "5990", debit: net, credit: 0, memo: bill.number, costCenterCode: bill.costCenterCode, projectId: bill.projectId as never },
+          { accountCode: "1150", debit: vat, credit: 0, memo: "VAT input", costCenterCode: bill.costCenterCode, projectId: bill.projectId as never },
+          { accountCode: "2000", debit: 0, credit: bill.amount, memo: bill.number, costCenterCode: bill.costCenterCode, projectId: bill.projectId as never },
+        ]
+      : [
+          { accountCode: "5990", debit: bill.amount, credit: 0, memo: bill.number, costCenterCode: bill.costCenterCode, projectId: bill.projectId as never },
+          { accountCode: "2000", debit: 0, credit: bill.amount, memo: bill.number, costCenterCode: bill.costCenterCode, projectId: bill.projectId as never },
+        ];
+  await tryPostJournalForSource(ctx, {
+    orgId: bill.orgId,
+    source: "bill",
+    sourceId: billId,
+    date: bill.billDate,
+    description: `Bill ${bill.number}`,
+    lines,
+    postedByName: "Auto (bill updated)",
+  });
+}
 
 export const setBillStatus = mutation({
   args: {
@@ -212,6 +256,25 @@ export const deleteBill = mutation({
     assertSecret(args.secret);
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) throw new Error("Bill not found");
+    if ((doc.amountPaid ?? 0) > 0) {
+      throw new Error("This bill has payments applied — void the payment(s) before deleting.");
+    }
+    const existing = await ctx.db
+      .query("journals")
+      .withIndex("by_source", (q) => q.eq("orgId", args.orgId).eq("source", "bill").eq("sourceId", args.id as never))
+      .collect();
+    for (const j of existing) {
+      if (!j.reversedBy) {
+        await reverseJournalInternal(ctx, {
+          orgId: args.orgId,
+          journalId: j._id,
+          date: new Date().toISOString().slice(0, 10),
+          postedByName: "Auto (bill deleted)",
+        });
+      }
+    }
+    const allocs = await ctx.db.query("allocations").withIndex("by_bill", (q) => q.eq("billId", args.id)).collect();
+    for (const a of allocs) await ctx.db.delete(a._id);
     await ctx.db.delete(args.id);
     return true;
   },

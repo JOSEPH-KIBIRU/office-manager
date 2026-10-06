@@ -594,6 +594,9 @@ export default defineSchema(
     taxTotal: v.number(),
     total: v.number(),
     reason: v.optional(v.string()),
+    // Optional revenue / expense accounts (defaults applied when absent).
+    revenueAccountCode: v.optional(v.string()),
+    expenseAccountCode: v.optional(v.string()),
     status: v.union(v.literal("draft"), v.literal("issued"), v.literal("void")),
     journalId: v.optional(v.id("journals")),
     createdBy: v.optional(v.id("users")),
@@ -1064,6 +1067,13 @@ export default defineSchema(
   })
     .index("by_org", ["orgId"])
     .index("by_org_account", ["orgId", "accountCode"]),
+
+  // Monotonic per-org sequence counters (document numbering).
+  counters: defineTable({
+    orgId: v.id("organizations"),
+    key: v.string(),
+    value: v.number(),
+  }).index("by_org_key", ["orgId", "key"]),
 
 
   calendarConnections: defineTable({

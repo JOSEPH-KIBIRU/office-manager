@@ -348,6 +348,21 @@ export async function tryPostJournalForSource(ctx: MutationCtx, input: PostJourn
   }
 }
 
+/** Monotonic per-org sequence used for document numbering (INV/BL/CN/…). */
+export async function nextSeq(ctx: MutationCtx, orgId: Id<"organizations">, key: string): Promise<number> {
+  const row = await ctx.db
+    .query("counters")
+    .withIndex("by_org_key", (q) => q.eq("orgId", orgId).eq("key", key))
+    .first();
+  if (!row) {
+    await ctx.db.insert("counters", { orgId, key, value: 1 });
+    return 1;
+  }
+  const next = row.value + 1;
+  await ctx.db.patch(row._id, { value: next });
+  return next;
+}
+
 /** Reverse a journal with a reversing entry. Returns null when not applicable. */
 export async function reverseJournalInternal(
   ctx: MutationCtx,
@@ -812,11 +827,15 @@ export const balanceSheet = query({
     assertSecret(args.secret);
     const accounts = await loadAccounts(ctx, args.orgId);
     const journals = await loadJournals(ctx, args.orgId);
-    const yearStart = `${args.through.slice(0, 4)}-01-01`;
-    const income = rowsOfType(journals, accounts, "income", { from: yearStart, through: args.through });
-    const expense = rowsOfType(journals, accounts, "expense", { from: yearStart, through: args.through });
-    const currentYear = roundKes(
-      income.reduce((s, r) => s + r.amount, 0) - expense.reduce((s, r) => s + r.amount, 0)
+    // Accumulated result (all years through the date) so equity carries prior
+    // years forward even before a formal year-end close is posted.
+    const income = rowsOfType(journals, accounts, "income", { through: args.through });
+    const costOfSales = rowsOfType(journals, accounts, "cost_of_sales", { through: args.through });
+    const expense = rowsOfType(journals, accounts, "expense", { through: args.through });
+    const accumulatedResult = roundKes(
+      income.reduce((s, r) => s + r.amount, 0) -
+        costOfSales.reduce((s, r) => s + r.amount, 0) -
+        expense.reduce((s, r) => s + r.amount, 0)
     );
     const assets = rowsOfType(journals, accounts, "asset", { through: args.through });
     const liabilities = rowsOfType(journals, accounts, "liability", { through: args.through });
@@ -824,13 +843,14 @@ export const balanceSheet = query({
     const assetTotal = roundKes(assets.reduce((s, r) => s + r.amount, 0));
     const liabTotal = roundKes(liabilities.reduce((s, r) => s + r.amount, 0));
     const equityPosted = roundKes(equity.reduce((s, r) => s + r.amount, 0));
-    const equityTotal = roundKes(equityPosted + currentYear);
+    const equityTotal = roundKes(equityPosted + accumulatedResult);
     return {
       through: args.through,
       assets,
       liabilities,
       equity,
-      currentYear,
+      currentYear: accumulatedResult,
+      accumulatedResult,
       assetTotal,
       liabTotal,
       equityTotal,
@@ -1280,6 +1300,9 @@ export const vatReturn = query({
   args: { secret: v.string(), orgId: v.id("organizations"), period: v.string() },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
+    const chart = await ctx.db.query("ledgerAccounts").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const vatOutCode = chart.find((a) => a.control === "vat_output")?.code ?? "2150";
+    const vatInCode = chart.find((a) => a.control === "vat_input")?.code ?? "1150";
     const journals = await ctx.db
       .query("journals")
       .withIndex("by_org_period", (q) => q.eq("orgId", args.orgId).eq("period", args.period))
@@ -1291,14 +1314,14 @@ export const vatReturn = query({
     for (const j of journals) {
       if (j.source === "vat") continue;
       for (const l of j.lines) {
-        if (l.accountCode === "2150") {
+        if (l.accountCode === vatOutCode) {
           const net = l.credit - l.debit;
           if (net !== 0) {
             output += net;
             outputLines.push({ ref: j.ref, date: j.date, description: j.description, amount: roundKes(net) });
           }
         }
-        if (l.accountCode === "1150") {
+        if (l.accountCode === vatInCode) {
           const net = l.debit - l.credit;
           if (net !== 0) {
             input += net;

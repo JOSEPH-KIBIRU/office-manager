@@ -694,7 +694,24 @@ export const unmatchLine = mutation({
     if (!line || line.orgId !== args.orgId) throw new Error("Bank transaction not found");
     if (line.status === "reconciled") throw new Error("Reconciled transactions cannot be unmatched.");
     const matches = await ctx.db.query("bankLineMatches").withIndex("by_line", (q) => q.eq("bankLineId", args.lineId)).collect();
-    for (const m of matches) await ctx.db.delete(m._id);
+    for (const m of matches) {
+      // If the match created its own journal (receipt/payment/expense from a
+      // line), reverse it so the GL no longer reflects the removed match.
+      if (m.journalId) {
+        const j = await ctx.db.get(m.journalId);
+        const sid = j?.sourceId ?? "";
+        const created = sid.startsWith("receipt:") || sid.startsWith("payment:") || sid.startsWith("expense:");
+        if (j && !j.reversedBy && j.source === "bank" && created) {
+          await reverseJournalInternal(ctx, {
+            orgId: args.orgId,
+            journalId: j._id,
+            date: new Date().toISOString().slice(0, 10),
+            postedByName: "Auto (unmatched)",
+          });
+        }
+      }
+      await ctx.db.delete(m._id);
+    }
     await ctx.db.patch(args.lineId, { status: "unmatched" });
     return true;
   },
