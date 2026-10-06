@@ -727,7 +727,13 @@ export default defineSchema(
     label: v.string(),
     start: v.string(),
     end: v.string(),
-    status: v.union(v.literal("open"), v.literal("locked"), v.literal("future")),
+    status: v.union(
+      v.literal("open"),
+      v.literal("pending_close"),
+      v.literal("closed"),
+      v.literal("locked"),
+      v.literal("future")
+    ),
     lockedAt: v.optional(v.string()),
     lockedBy: v.optional(v.id("users")),
     createdAt: v.number(),
@@ -747,6 +753,8 @@ export default defineSchema(
       v.literal("receipt"),
       v.literal("payment"),
       v.literal("credit_note"),
+      v.literal("asset"),
+      v.literal("recurring"),
       v.literal("payroll"),
       v.literal("petty_cash"),
       v.literal("petty_cash_fund"),
@@ -902,6 +910,82 @@ export default defineSchema(
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
   }).index("by_org", ["orgId"]),
+
+  // Accounting fixed-asset register (distinct from the operational `assets` register).
+  fixedAssets: defineTable({
+    orgId: v.id("organizations"),
+    tag: v.string(),
+    name: v.string(),
+    category: v.optional(v.string()),
+    purchaseDate: v.string(),
+    purchaseCost: v.number(),
+    supplierId: v.optional(v.id("contacts")),
+    location: v.optional(v.string()),
+    custodian: v.optional(v.string()),
+    usefulLifeYears: v.number(),
+    depreciationMethod: v.union(v.literal("straight_line")),
+    residualValue: v.number(),
+    accumulatedDepreciation: v.number(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("purchased"),
+      v.literal("active"),
+      v.literal("disposed"),
+      v.literal("archived")
+    ),
+    assetAccountCode: v.string(),
+    accumDepAccountCode: v.string(),
+    depExpenseAccountCode: v.string(),
+    purchaseJournalId: v.optional(v.id("journals")),
+    disposedDate: v.optional(v.string()),
+    disposalProceeds: v.optional(v.number()),
+    disposalJournalId: v.optional(v.id("journals")),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_tag", ["orgId", "tag"]),
+
+  // Recurring bills / expenses / journals.
+  recurringTransactions: defineTable({
+    orgId: v.id("organizations"),
+    kind: v.union(v.literal("bill"), v.literal("expense"), v.literal("journal")),
+    name: v.string(),
+    description: v.optional(v.string()),
+    frequency: v.union(v.literal("weekly"), v.literal("monthly"), v.literal("quarterly"), v.literal("yearly")),
+    startDate: v.string(),
+    endDate: v.optional(v.string()),
+    nextRun: v.string(),
+    amount: v.number(),
+    accountCode: v.optional(v.string()),
+    vatRate: v.optional(v.number()),
+    taxTreatment: v.optional(v.string()),
+    supplierId: v.optional(v.id("contacts")),
+    lines: v.optional(
+      v.array(v.object({ accountCode: v.string(), debit: v.number(), credit: v.number(), memo: v.optional(v.string()) }))
+    ),
+    active: v.boolean(),
+    lastRunAt: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  }).index("by_org", ["orgId"]),
+
+  // Month-end close checklist items.
+  closeTasks: defineTable({
+    orgId: v.id("organizations"),
+    period: v.string(),
+    key: v.string(),
+    label: v.string(),
+    status: v.union(v.literal("pending"), v.literal("in_progress"), v.literal("complete"), v.literal("blocked")),
+    note: v.optional(v.string()),
+    updatedBy: v.optional(v.id("users")),
+    updatedByName: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_period", ["orgId", "period"]),
 
 
   calendarConnections: defineTable({

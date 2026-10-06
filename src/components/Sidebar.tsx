@@ -62,6 +62,9 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/accounting/payments", label: "Payments", icon: "💸", roles: ["admin", "secretary", "manager"], module: "payments" },
       { href: "/accounting/credit-notes", label: "Credit notes", icon: "📝", roles: ["admin", "secretary"], module: "accounting" },
       { href: "/accounting/aging", label: "Aging", icon: "⏳", roles: ["admin", "secretary", "manager"], module: "accounting" },
+      { href: "/accounting/fixed-assets", label: "Fixed assets", icon: "🏗️", roles: ["admin", "secretary", "manager"], module: "accounting" },
+      { href: "/accounting/recurring", label: "Recurring", icon: "🔁", roles: ["admin", "secretary"], module: "accounting" },
+      { href: "/accounting/close", label: "Month-end close", icon: "📆", roles: ["admin", "secretary"], module: "accounting" },
     ],
   },
   {

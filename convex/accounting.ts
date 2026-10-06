@@ -43,6 +43,10 @@ export const DEFAULT_CHART: SeedAccount[] = [
   { code: "1150", name: "VAT input (recoverable)", type: "asset", group: "Current assets", category: "current", isVat: true, taxTreatment: "vat_16" },
   { code: "1200", name: "Motor vehicles", type: "asset", group: "Non-current assets", category: "non_current" },
   { code: "1210", name: "Furniture and fittings", type: "asset", group: "Non-current assets", category: "non_current" },
+  { code: "1220", name: "Office equipment", type: "asset", group: "Non-current assets", category: "non_current" },
+  { code: "1230", name: "Computer equipment", type: "asset", group: "Non-current assets", category: "non_current" },
+  { code: "1240", name: "Leasehold improvements", type: "asset", group: "Non-current assets", category: "non_current" },
+  { code: "1250", name: "Accumulated depreciation", type: "asset", group: "Non-current assets", category: "non_current" },
   { code: "2000", name: "Accounts payable", type: "liability", group: "Current liabilities", category: "current", control: "ap" },
   { code: "2100", name: "PAYE payable", type: "liability", group: "Statutory", category: "current", statutory: true },
   { code: "2110", name: "NSSF payable", type: "liability", group: "Statutory", category: "current", statutory: true },
@@ -217,7 +221,7 @@ async function ensurePeriodInternal(
   ctx: MutationCtx,
   orgId: Id<"organizations">,
   date: string
-): Promise<{ period: string; status: "open" | "locked" | "future" }> {
+): Promise<{ period: string; status: "open" | "pending_close" | "closed" | "locked" | "future" }> {
   const period = periodOf(date);
   const existing = await ctx.db
     .query("accountingPeriods")
@@ -248,6 +252,8 @@ export type PostSource =
   | "receipt"
   | "payment"
   | "credit_note"
+  | "asset"
+  | "recurring"
   | "payroll"
   | "petty_cash"
   | "petty_cash_fund"
@@ -266,13 +272,18 @@ export interface PostJournalInput {
   lines: JournalLine[];
   postedBy?: Id<"users">;
   postedByName?: string;
+  /** Adjustment/reversal entries may post into a closed period (but never a locked one). */
+  allowClosed?: boolean;
 }
 
 /** Post a balanced journal for a source document. Idempotent per (source, sourceId). */
 export async function postJournalForSource(ctx: MutationCtx, input: PostJournalInput): Promise<Id<"journals">> {
   await ensureChartInternal(ctx, input.orgId);
   const { period, status } = await ensurePeriodInternal(ctx, input.orgId, input.date);
-  if (status === "locked") throw new Error(`${monthLabel(period)} is locked — cannot post.`);
+  if (status === "locked") throw new Error(`${monthLabel(period)} is locked — no entries can be posted.`);
+  if (status === "closed" && !input.allowClosed) {
+    throw new Error(`${monthLabel(period)} is closed. Post an adjustment journal or a reversal instead.`);
+  }
 
   if (input.sourceId) {
     const existing = await ctx.db
@@ -828,6 +839,8 @@ export const postManual = mutation({
     lines: v.array(v.object({ accountCode: v.string(), debit: v.number(), credit: v.number(), memo: v.optional(v.string()) })),
     postedBy: v.optional(v.id("users")),
     postedByName: v.optional(v.string()),
+    /** Mark as an adjustment journal (may post into a closed period). */
+    adjustment: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -841,6 +854,7 @@ export const postManual = mutation({
       lines: args.lines,
       postedBy: args.postedBy,
       postedByName: args.postedByName,
+      allowClosed: args.adjustment,
     });
   },
 });
