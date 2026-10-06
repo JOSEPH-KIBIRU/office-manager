@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     const body = await readJson<{
       date: string;
       description: string;
+      adjustment?: boolean;
       lines: Array<{ accountCode: string; debit: number; credit: number; memo?: string }>;
     }>(req);
     requireFields(body, ["date", "description"]);
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
         lines,
         postedBy: session.id as never,
         postedByName: session.name,
+        adjustment: !!body.adjustment,
       });
       return ok({ journalId: id });
     } catch (e) {

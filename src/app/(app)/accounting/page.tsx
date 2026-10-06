@@ -1085,7 +1085,7 @@ function ManualTab({ accounts, onPosted }: { accounts: AccountRow[]; onPosted: (
   ]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const [adjustment, setAdjustment] = useState(false);
   const dr = lines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
   const cr = lines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
   const balanced = Math.round(dr) === Math.round(cr) && dr > 0;
@@ -1103,6 +1103,7 @@ function ManualTab({ accounts, onPosted }: { accounts: AccountRow[]; onPosted: (
         json: {
           date,
           description,
+          adjustment,
           lines: lines
             .filter((l) => l.accountCode && (Number(l.debit) > 0 || Number(l.credit) > 0))
             .map((l) => ({ accountCode: l.accountCode, debit: Number(l.debit) || 0, credit: Number(l.credit) || 0 })),
@@ -1157,6 +1158,10 @@ function ManualTab({ accounts, onPosted }: { accounts: AccountRow[]; onPosted: (
         </p>
       </div>
 
+      <label className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+        <input type="checkbox" checked={adjustment} onChange={(e) => setAdjustment(e.target.checked)} />
+        Adjustment journal (may post into a closed period; never into a locked one)
+      </label>
       <button onClick={submit} disabled={busy || !balanced || !description.trim()} className="btn-primary mt-4 w-full">
         {busy ? "Posting…" : "Post journal"}
       </button>
