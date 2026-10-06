@@ -14,7 +14,7 @@ import {
 
 type Config = Record<string, { granted: string[]; overridden: boolean }>;
 
-const GROUP_ORDER = ["Overview", "People & HR", "Finance", "Reporting", "Operations", "Company"];
+const GROUP_ORDER = ["Overview", "People & HR", "Finance", "Management", "Reporting", "Operations", "Company"];
 
 export default function PermissionsPage() {
   const [config, setConfig] = useState<Config | null>(null);

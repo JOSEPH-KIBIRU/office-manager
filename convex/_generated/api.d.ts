@@ -34,6 +34,7 @@ import type * as invoicing from "../invoicing.js";
 import type * as keHolidays from "../keHolidays.js";
 import type * as leaves from "../leaves.js";
 import type * as lib from "../lib.js";
+import type * as management from "../management.js";
 import type * as meetings from "../meetings.js";
 import type * as migration from "../migration.js";
 import type * as minutes from "../minutes.js";
@@ -94,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   keHolidays: typeof keHolidays;
   leaves: typeof leaves;
   lib: typeof lib;
+  management: typeof management;
   meetings: typeof meetings;
   migration: typeof migration;
   minutes: typeof minutes;

@@ -491,6 +491,9 @@ export default defineSchema(
     ),
     // Amount settled by receipts/credit notes (sub-ledger). Balance = total − amountPaid.
     amountPaid: v.optional(v.number()),
+    // Optional management dimensions.
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
     lineItems: v.array(
       v.object({
         description: v.string(),
@@ -547,6 +550,9 @@ export default defineSchema(
     ),
     // Amount settled by payments/debit notes (sub-ledger). Balance = amount − amountPaid.
     amountPaid: v.optional(v.number()),
+    // Optional management dimensions.
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
     paidAt: v.optional(v.string()),
     createdBy: v.id("users"),
     createdAt: v.number(),
@@ -772,6 +778,9 @@ export default defineSchema(
         debit: v.number(),
         credit: v.number(),
         memo: v.optional(v.string()),
+        // Management dimensions (optional) carried on the posting line.
+        costCenterCode: v.optional(v.string()),
+        projectId: v.optional(v.id("projects")),
       })
     ),
     postedBy: v.optional(v.id("users")),
@@ -986,6 +995,75 @@ export default defineSchema(
   })
     .index("by_org", ["orgId"])
     .index("by_org_period", ["orgId", "period"]),
+
+  // Management accounting dimensions.
+  costCentres: defineTable({
+    orgId: v.id("organizations"),
+    code: v.string(),
+    name: v.string(),
+    type: v.union(
+      v.literal("branch"),
+      v.literal("department"),
+      v.literal("location"),
+      v.literal("cost_centre")
+    ),
+    active: v.boolean(),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_code", ["orgId", "code"]),
+
+  projects: defineTable({
+    orgId: v.id("organizations"),
+    code: v.string(),
+    name: v.string(),
+    customerId: v.optional(v.id("contacts")),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    budget: v.number(),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("active"),
+      v.literal("on_hold"),
+      v.literal("completed")
+    ),
+    active: v.boolean(),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_code", ["orgId", "code"]),
+
+  budgets: defineTable({
+    orgId: v.id("organizations"),
+    // "YYYY" (annual) or "YYYY-MM" (monthly).
+    period: v.string(),
+    frequency: v.union(v.literal("annual"), v.literal("monthly")),
+    accountCode: v.string(),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
+    amount: v.number(),
+    note: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_period", ["orgId", "period"]),
+
+  dimensionRequirements: defineTable({
+    orgId: v.id("organizations"),
+    accountCode: v.string(),
+    requireCostCentre: v.boolean(),
+    requireProject: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_account", ["orgId", "accountCode"]),
 
 
   calendarConnections: defineTable({

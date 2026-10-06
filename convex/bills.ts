@@ -28,6 +28,8 @@ async function enrichBill(ctx: QueryCtx, b: BillDoc) {
     vat_amount: vat,
     amount_paid: b.amountPaid ?? 0,
     balance_due: Math.round((b.amount - (b.amountPaid ?? 0)) * 100) / 100,
+    cost_center_code: b.costCenterCode ?? null,
+    project_id: b.projectId ?? null,
     description: b.description ?? null,
     status: b.status,
     paid_at: b.paidAt ?? null,
@@ -72,6 +74,8 @@ export const createBill = mutation({
     amount: v.number(),
     vatRate: v.optional(v.number()),
     description: v.optional(v.string()),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
     createdBy: v.id("users"),
   },
   handler: async (ctx, args) => {
@@ -93,6 +97,8 @@ export const createBill = mutation({
       description: args.description?.trim() || undefined,
       status: "pending",
       amountPaid: 0,
+      costCenterCode: args.costCenterCode || undefined,
+      projectId: args.projectId,
       createdBy: args.createdBy,
       createdAt: tsNow(),
       updatedAt: tsNow(),
@@ -106,13 +112,13 @@ export const createBill = mutation({
     const lines =
       vat > 0
         ? [
-            { accountCode: "5990", debit: net, credit: 0, memo: number },
-            { accountCode: "1150", debit: vat, credit: 0, memo: "VAT input" },
-            { accountCode: "2000", debit: 0, credit: args.amount, memo: number },
+            { accountCode: "5990", debit: net, credit: 0, memo: number, costCenterCode: args.costCenterCode, projectId: args.projectId as never },
+            { accountCode: "1150", debit: vat, credit: 0, memo: "VAT input", costCenterCode: args.costCenterCode, projectId: args.projectId as never },
+            { accountCode: "2000", debit: 0, credit: args.amount, memo: number, costCenterCode: args.costCenterCode, projectId: args.projectId as never },
           ]
         : [
-            { accountCode: "5990", debit: args.amount, credit: 0, memo: number },
-            { accountCode: "2000", debit: 0, credit: args.amount, memo: number },
+            { accountCode: "5990", debit: args.amount, credit: 0, memo: number, costCenterCode: args.costCenterCode, projectId: args.projectId as never },
+            { accountCode: "2000", debit: 0, credit: args.amount, memo: number, costCenterCode: args.costCenterCode, projectId: args.projectId as never },
           ];
     await tryPostJournalForSource(ctx, {
       orgId: args.orgId,

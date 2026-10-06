@@ -12,7 +12,7 @@ interface Company {
   enabledModules: string[] | null;
 }
 
-const GROUP_ORDER = ["Overview", "People & HR", "Finance", "Reporting", "Operations", "Company"];
+const GROUP_ORDER = ["Overview", "People & HR", "Finance", "Management", "Reporting", "Operations", "Company"];
 
 export default function FeaturesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);

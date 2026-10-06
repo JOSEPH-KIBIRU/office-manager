@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
       terms?: string;
       recurringFrequency?: "weekly" | "monthly" | "quarterly" | "yearly";
       recurringActive?: boolean;
+      costCenterCode?: string;
+      projectId?: string;
     }>(req);
     if (!body.contactId || !body.issueDate || !body.dueDate) {
       throw new Error("Contact, issue date and due date are required");
@@ -47,6 +49,8 @@ export async function POST(req: NextRequest) {
         terms: body.terms ?? undefined,
         recurringFrequency: body.recurringFrequency as never,
         recurringActive: body.recurringActive ?? false,
+        costCenterCode: body.costCenterCode || undefined,
+        projectId: body.projectId as never,
         createdBy: session.id as never,
       });
       return ok({ id });

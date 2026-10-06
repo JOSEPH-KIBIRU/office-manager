@@ -244,6 +244,34 @@ export const ensureAccountingModulesInternal = internalMutation({
   },
 });
 
+/** New management modules must be added to any company with a restricted cap. */
+const MANAGEMENT_MODULES = ["cost-centres", "projects", "budgets", "management-reports"];
+
+export const ensureManagementModulesInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const name = "ensureManagementModules";
+    const already = await ctx.db
+      .query("migrations")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .unique();
+    if (already) return { skipped: true, updated: 0 };
+
+    let updated = 0;
+    for (const o of await ctx.db.query("organizations").collect()) {
+      if (Array.isArray(o.enabledModules)) {
+        const merged = Array.from(new Set([...o.enabledModules, ...MANAGEMENT_MODULES]));
+        if (merged.length !== o.enabledModules.length) {
+          await ctx.db.patch(o._id, { enabledModules: merged });
+          updated += 1;
+        }
+      }
+    }
+    await ctx.db.insert("migrations", { name, runAt: tsNow() });
+    return { skipped: false, updated };
+  },
+});
+
 /**
  * Backfill the AR/AP sub-ledger for invoices/bills already marked paid before
  * the open-item layer existed. This only creates the sub-ledger records

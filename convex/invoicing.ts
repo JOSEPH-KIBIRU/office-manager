@@ -56,6 +56,8 @@ async function enrichInvoice(ctx: QueryCtx, inv: InvoiceDoc) {
     total: inv.total,
     amount_paid: inv.amountPaid ?? 0,
     balance_due: Math.round((inv.total - (inv.amountPaid ?? 0)) * 100) / 100,
+    cost_center_code: inv.costCenterCode ?? null,
+    project_id: inv.projectId ?? null,
     recurring_frequency: inv.recurringFrequency ?? null,
     recurring_active: inv.recurringActive ?? false,
     etims_status: inv.etimsStatus ?? "not_sent",
@@ -255,6 +257,8 @@ export const createInvoice = mutation({
       v.union(v.literal("weekly"), v.literal("monthly"), v.literal("quarterly"), v.literal("yearly"))
     ),
     recurringActive: v.optional(v.boolean()),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
     createdBy: v.id("users"),
   },
   handler: async (ctx, args) => {
@@ -279,6 +283,8 @@ export const createInvoice = mutation({
       taxTotal: c.taxTotal,
       total: c.total,
       amountPaid: 0,
+      costCenterCode: args.costCenterCode || undefined,
+      projectId: args.projectId,
       recurringFrequency: args.recurringFrequency,
       recurringActive: args.recurringActive ?? false,
       createdBy: args.createdBy,
@@ -379,9 +385,9 @@ export const setInvoiceStatus = mutation({
         date: doc.issueDate,
         description: `Invoice ${doc.number} issued`,
         lines: [
-          { accountCode: "1100", debit: doc.total, credit: 0, memo: doc.number },
-          { accountCode: "4000", debit: 0, credit: doc.subtotal, memo: doc.number },
-          { accountCode: "2150", debit: 0, credit: doc.taxTotal, memo: "VAT output" },
+          { accountCode: "1100", debit: doc.total, credit: 0, memo: doc.number, costCenterCode: doc.costCenterCode, projectId: doc.projectId as never },
+          { accountCode: "4000", debit: 0, credit: doc.subtotal, memo: doc.number, costCenterCode: doc.costCenterCode, projectId: doc.projectId as never },
+          { accountCode: "2150", debit: 0, credit: doc.taxTotal, memo: "VAT output", costCenterCode: doc.costCenterCode, projectId: doc.projectId as never },
         ],
         postedByName: "Auto (invoice issued)",
       });

@@ -151,7 +151,14 @@ function isDebitNormal(type: AccountType): boolean {
   return type === "asset" || type === "expense" || type === "cost_of_sales";
 }
 
-export type JournalLine = { accountCode: string; debit: number; credit: number; memo?: string };
+export type JournalLine = {
+  accountCode: string;
+  debit: number;
+  credit: number;
+  memo?: string;
+  costCenterCode?: string;
+  projectId?: string;
+};
 
 export function assertBalancedLines(lines: JournalLine[]): void {
   if (lines.length < 2) throw new Error("A journal needs at least two lines.");
@@ -302,6 +309,8 @@ export async function postJournalForSource(ctx: MutationCtx, input: PostJournalI
       debit: roundKes(l.debit),
       credit: roundKes(l.credit),
       memo: l.memo,
+      costCenterCode: l.costCenterCode,
+      projectId: l.projectId as never,
     }))
     .filter((l) => l.debit !== 0 || l.credit !== 0);
   assertBalancedLines(lines);
@@ -836,7 +845,16 @@ export const postManual = mutation({
     orgId: v.id("organizations"),
     date: v.string(),
     description: v.string(),
-    lines: v.array(v.object({ accountCode: v.string(), debit: v.number(), credit: v.number(), memo: v.optional(v.string()) })),
+    lines: v.array(
+      v.object({
+        accountCode: v.string(),
+        debit: v.number(),
+        credit: v.number(),
+        memo: v.optional(v.string()),
+        costCenterCode: v.optional(v.string()),
+        projectId: v.optional(v.id("projects")),
+      })
+    ),
     postedBy: v.optional(v.id("users")),
     postedByName: v.optional(v.string()),
     /** Mark as an adjustment journal (may post into a closed period). */
@@ -846,12 +864,39 @@ export const postManual = mutation({
     assertSecret(args.secret);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) throw new Error("A valid date is required");
     if (!args.description.trim()) throw new Error("A description is required");
+
+    const lines = args.lines.map((l) => ({
+      accountCode: l.accountCode,
+      debit: l.debit,
+      credit: l.credit,
+      memo: l.memo,
+      costCenterCode: l.costCenterCode,
+      projectId: l.projectId,
+    }));
+
+    // Enforce configurable dimension requirements (only where configured).
+    const reqs = await ctx.db.query("dimensionRequirements").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    if (reqs.length > 0) {
+      const byAccount = new Map(reqs.map((r) => [r.accountCode, r]));
+      for (const l of lines) {
+        if (l.debit === 0 && l.credit === 0) continue;
+        const req = byAccount.get(l.accountCode);
+        if (!req) continue;
+        if (req.requireCostCentre && !l.costCenterCode) {
+          throw new Error(`Account ${l.accountCode} requires a cost centre.`);
+        }
+        if (req.requireProject && !l.projectId) {
+          throw new Error(`Account ${l.accountCode} requires a project.`);
+        }
+      }
+    }
+
     return postJournalForSource(ctx, {
       orgId: args.orgId,
       source: "manual",
       date: args.date,
       description: args.description.trim(),
-      lines: args.lines,
+      lines,
       postedBy: args.postedBy,
       postedByName: args.postedByName,
       allowClosed: args.adjustment,

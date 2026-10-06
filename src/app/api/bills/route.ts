@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
       amount: number;
       vatRate?: number;
       description?: string;
+      costCenterCode?: string;
+      projectId?: string;
     }>(req);
     if (!body.contactId || !body.billDate || !body.dueDate) {
       throw new Error("Supplier, bill date and due date are required");
@@ -39,6 +41,8 @@ export async function POST(req: NextRequest) {
         amount: Number(body.amount),
         vatRate: body.vatRate !== undefined ? Number(body.vatRate) : undefined,
         description: body.description ?? undefined,
+        costCenterCode: body.costCenterCode || undefined,
+        projectId: body.projectId as never,
         createdBy: session.id as never,
       });
       return ok({ id });

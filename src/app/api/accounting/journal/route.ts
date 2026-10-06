@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       date: string;
       description: string;
       adjustment?: boolean;
-      lines: Array<{ accountCode: string; debit: number; credit: number; memo?: string }>;
+      lines: Array<{ accountCode: string; debit: number; credit: number; memo?: string; costCenterCode?: string; projectId?: string }>;
     }>(req);
     requireFields(body, ["date", "description"]);
     if (!Array.isArray(body.lines) || body.lines.length < 2) {
@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
       debit: amountInRange(l.debit ?? 0, "Debit", 0),
       credit: amountInRange(l.credit ?? 0, "Credit", 0),
       memo: l.memo ? String(l.memo) : undefined,
+      costCenterCode: l.costCenterCode ? String(l.costCenterCode) : undefined,
+      projectId: (l.projectId ? String(l.projectId) : undefined) as never,
     }));
     try {
       const id = await cx().mutation(api.accounting.postManual, {

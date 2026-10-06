@@ -68,6 +68,15 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Management",
+    items: [
+      { href: "/accounting/cost-centres", label: "Cost centres", icon: "🏢", roles: ["admin", "secretary", "manager"], module: "cost-centres" },
+      { href: "/accounting/projects", label: "Projects", icon: "📐", roles: ["admin", "secretary", "manager"], module: "projects" },
+      { href: "/accounting/budgets", label: "Budgets", icon: "🎯", roles: ["admin", "secretary", "manager"], module: "budgets" },
+      { href: "/accounting/management-reports", label: "Management reports", icon: "📊", roles: ["admin", "secretary", "manager"], module: "management-reports" },
+    ],
+  },
+  {
     title: "Banking",
     items: [
       { href: "/banking", label: "Banking", icon: "🏦", roles: ["admin", "secretary", "manager"], module: "accounting" },

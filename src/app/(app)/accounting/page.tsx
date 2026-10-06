@@ -1086,6 +1086,20 @@ function ManualTab({ accounts, onPosted }: { accounts: AccountRow[]; onPosted: (
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adjustment, setAdjustment] = useState(false);
+  const [costCentres, setCostCentres] = useState<{ code: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [costCentre, setCostCentre] = useState("");
+  const [project, setProject] = useState("");
+
+  useEffect(() => {
+    api<{ costCentres: { code: string; name: string }[] }>("/api/management/cost-centres")
+      .then((d) => setCostCentres(d.costCentres ?? []))
+      .catch(() => setCostCentres([]));
+    api<{ projects: { _id: string; name: string }[] }>("/api/management/projects")
+      .then((d) => setProjects((d.projects ?? []).map((p) => ({ id: p._id, name: p.name }))))
+      .catch(() => setProjects([]));
+  }, []);
+
   const dr = lines.reduce((s, l) => s + (Number(l.debit) || 0), 0);
   const cr = lines.reduce((s, l) => s + (Number(l.credit) || 0), 0);
   const balanced = Math.round(dr) === Math.round(cr) && dr > 0;
@@ -1106,7 +1120,7 @@ function ManualTab({ accounts, onPosted }: { accounts: AccountRow[]; onPosted: (
           adjustment,
           lines: lines
             .filter((l) => l.accountCode && (Number(l.debit) > 0 || Number(l.credit) > 0))
-            .map((l) => ({ accountCode: l.accountCode, debit: Number(l.debit) || 0, credit: Number(l.credit) || 0 })),
+            .map((l) => ({ accountCode: l.accountCode, debit: Number(l.debit) || 0, credit: Number(l.credit) || 0, costCenterCode: costCentre || undefined, projectId: project || undefined })),
         },
       });
       toast.success("Journal posted.");
@@ -1131,6 +1145,23 @@ function ManualTab({ accounts, onPosted }: { accounts: AccountRow[]; onPosted: (
         <div>
           <label className="label">Description</label>
           <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. Opening balance" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="label">Cost centre (optional)</label>
+          <select className="input" value={costCentre} onChange={(e) => setCostCentre(e.target.value)}>
+            <option value="">— none —</option>
+            {costCentres.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="label">Project (optional)</label>
+          <select className="input" value={project} onChange={(e) => setProject(e.target.value)}>
+            <option value="">— none —</option>
+            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
         </div>
       </div>
 

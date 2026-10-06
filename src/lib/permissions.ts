@@ -33,6 +33,10 @@ export type ModuleKey =
   | "chart-of-accounts"
   | "accounting-post"
   | "accounting-reverse"
+  | "cost-centres"
+  | "projects"
+  | "budgets"
+  | "management-reports"
   | "petty-cash"
   | "accounting"
   | "cars"
@@ -76,6 +80,10 @@ export const MODULES: ModuleDef[] = [
   { key: "chart-of-accounts", label: "Chart of accounts", group: "Finance" },
   { key: "accounting-post", label: "Post accounting transactions", group: "Finance" },
   { key: "accounting-reverse", label: "Reverse / void transactions", group: "Finance" },
+  { key: "cost-centres", label: "Cost centres", group: "Management" },
+  { key: "projects", label: "Projects", group: "Management" },
+  { key: "budgets", label: "Budgets", group: "Management" },
+  { key: "management-reports", label: "Management reports", group: "Management" },
   { key: "petty-cash", label: "Petty Cash", group: "Finance" },
   { key: "accounting", label: "Accounting", group: "Finance" },
   { key: "cars", label: "Car Logs", group: "Finance" },
@@ -102,11 +110,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, ModuleKey[]> = {
     "customers", "suppliers", "receipts", "payments",
     "petty-cash", "accounting", "reports", "tasks", "meetings", "minutes",
     "visitors", "assets", "organization", "documents", "profile",
+    "management-reports",
   ],
   manager: [
     "dashboard", "analytics", "leave", "leave-calendar", "attendance",
     "my-payslips", "invoices", "bills", "customers", "suppliers", "petty-cash", "accounting", "cars",
-    "tasks", "documents", "profile",
+    "tasks", "documents", "profile", "projects", "management-reports",
   ],
   employee: [
     "dashboard", "analytics", "leave", "leave-calendar", "attendance",
