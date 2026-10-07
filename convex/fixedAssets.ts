@@ -238,6 +238,7 @@ export const runDepreciation = mutation({
     if (!/^\d{4}-\d{2}$/.test(args.period)) throw new Error("Period must be YYYY-MM");
     const periodEnd = `${args.period}-${new Date(Date.UTC(Number(args.period.slice(0, 4)), Number(args.period.slice(5, 7)), 0)).getUTCDate()}`;
     const assets = await ctx.db.query("fixedAssets").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const allJournals = await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
     let posted = 0;
     let total = 0;
     const skipped: string[] = [];
@@ -256,9 +257,20 @@ export const runDepreciation = mutation({
         skipped.push(asset.tag);
         continue;
       }
+      // Derive accumulated depreciation from the ledger so it never drifts from
+      // the posted journals (including reversals).
+      let fromGL = 0;
+      for (const j of allJournals) {
+        if (j.source !== "depreciation" || !(j.sourceId ?? "").startsWith(`${asset._id}:`)) continue;
+        for (const l of j.lines) if (l.accountCode === asset.accumDepAccountCode) fromGL += l.credit - l.debit;
+      }
+      fromGL = round2(fromGL);
+      if (Math.abs(fromGL - asset.accumulatedDepreciation) > 0.005) {
+        await ctx.db.patch(asset._id, { accumulatedDepreciation: fromGL, updatedAt: tsNow() });
+      }
       const base = round2(asset.purchaseCost - asset.residualValue);
       const target = Math.min(base, round2((base / lifeMonths) * elapsed));
-      const needed = round2(target - asset.accumulatedDepreciation);
+      const needed = round2(target - fromGL);
       if (needed <= 0.005) {
         skipped.push(asset.tag);
         continue;
@@ -276,7 +288,7 @@ export const runDepreciation = mutation({
         postedByName: args.createdByName ?? "Depreciation run",
       });
       await ctx.db.patch(asset._id, {
-        accumulatedDepreciation: round2(asset.accumulatedDepreciation + needed),
+        accumulatedDepreciation: round2(fromGL + needed),
         updatedAt: tsNow(),
       });
       posted += 1;

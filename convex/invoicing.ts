@@ -213,6 +213,15 @@ export const deleteContact = mutation({
     assertSecret(args.secret);
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) throw new Error("Contact not found");
+    const inv = await ctx.db.query("invoices").withIndex("by_org_contact", (q) => q.eq("orgId", args.orgId).eq("contactId", args.id)).first();
+    const bill = await ctx.db.query("bills").withIndex("by_org_contact", (q) => q.eq("orgId", args.orgId).eq("contactId", args.id)).first();
+    const pay = await ctx.db.query("payments").withIndex("by_org_contact", (q) => q.eq("orgId", args.orgId).eq("contactId", args.id)).first();
+    const cn = await ctx.db.query("creditNotes").withIndex("by_org_contact", (q) => q.eq("orgId", args.orgId).eq("contactId", args.id)).first();
+    const projects = await ctx.db.query("projects").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const prj = projects.some((p) => p.customerId === args.id);
+    if (inv || bill || pay || cn || prj) {
+      throw new Error("This contact has transactions (invoices, bills, receipts, notes or projects). Deactivate it instead of deleting.");
+    }
     await ctx.db.delete(args.id);
     return true;
   },
@@ -312,6 +321,8 @@ export const updateInvoice = mutation({
       v.union(v.literal("weekly"), v.literal("monthly"), v.literal("quarterly"), v.literal("yearly"))
     ),
     recurringActive: v.optional(v.boolean()),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -339,6 +350,8 @@ export const updateInvoice = mutation({
     if (args.terms !== undefined) patch.terms = args.terms?.trim() || undefined;
     if (args.recurringFrequency !== undefined) patch.recurringFrequency = args.recurringFrequency;
     if (args.recurringActive !== undefined) patch.recurringActive = args.recurringActive;
+    if (args.costCenterCode !== undefined) patch.costCenterCode = args.costCenterCode || undefined;
+    if (args.projectId !== undefined) patch.projectId = args.projectId ?? undefined;
     patch.updatedAt = tsNow();
     await ctx.db.patch(args.id, patch);
     // Re-post the ledger journal so the GL always matches the edited invoice.

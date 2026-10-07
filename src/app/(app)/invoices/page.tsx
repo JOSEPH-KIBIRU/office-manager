@@ -49,6 +49,8 @@ interface InvoiceRow {
   total: number;
   recurring_frequency: string | null;
   recurring_active: boolean;
+  cost_center_code?: string | null;
+  project_id?: string | null;
   created_at: string;
   updated_at: string;
   etims_status: "not_sent" | "pending" | "submitted" | "failed";
@@ -98,6 +100,10 @@ export default function InvoicesPage() {
   const [frequency, setFrequency] = useState<string>("");
   const [recurringActive, setRecurringActive] = useState(false);
   const [items, setItems] = useState<LineItem[]>([{ description: "", qty: 1, unitPrice: 0, taxRate: 16 }]);
+  const [costCentres, setCostCentres] = useState<{ code: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ _id: string; name: string }[]>([]);
+  const [costCentre, setCostCentre] = useState("");
+  const [project, setProject] = useState("");
   const [errors, setErrors] = useState<Errors>({});
 
   // contact form
@@ -138,6 +144,8 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices();
     loadContacts();
+    api<{ costCentres: { code: string; name: string }[] }>("/api/management/cost-centres").then((d) => setCostCentres(d.costCentres ?? [])).catch(() => setCostCentres([]));
+    api<{ projects: { _id: string; name: string }[] }>("/api/management/projects").then((d) => setProjects(d.projects ?? [])).catch(() => setProjects([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -163,6 +171,8 @@ export default function InvoicesPage() {
     setFrequency("");
     setRecurringActive(false);
     setItems([{ description: "", qty: 1, unitPrice: 0, taxRate: 16 }]);
+    setCostCentre("");
+    setProject("");
     setErrors({});
   }
 
@@ -182,6 +192,8 @@ export default function InvoicesPage() {
     setFrequency(inv.recurring_frequency ?? "");
     setRecurringActive(inv.recurring_active);
     setItems(inv.line_items.map((it) => ({ description: it.description, qty: it.qty, unitPrice: it.unitPrice, taxRate: it.taxRate })));
+    setCostCentre(inv.cost_center_code ?? "");
+    setProject(inv.project_id ?? "");
     setErrors({});
     setShowInvoiceModal(true);
   }
@@ -215,6 +227,8 @@ export default function InvoicesPage() {
       lineItems: items.map((it) => ({ description: it.description.trim(), qty: it.qty, unitPrice: it.unitPrice, taxRate: it.taxRate })),
       recurringFrequency: frequency || undefined,
       recurringActive,
+      costCenterCode: costCentre || undefined,
+      projectId: project || undefined,
     };
     try {
       if (editing) {
@@ -590,6 +604,25 @@ export default function InvoicesPage() {
                 placeholder="Leave blank to use your company default terms"
               />
             </div>
+
+            {(costCentres.length > 0 || projects.length > 0) && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="inv-cc">Cost centre (optional)</label>
+                  <select id="inv-cc" className={inputCls()} value={costCentre} onChange={(e) => setCostCentre(e.target.value)}>
+                    <option value="">— none —</option>
+                    {costCentres.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label" htmlFor="inv-prj">Project (optional)</label>
+                  <select id="inv-prj" className={inputCls()} value={project} onChange={(e) => setProject(e.target.value)}>
+                    <option value="">— none —</option>
+                    {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
 
             <button type="submit" className="btn-primary w-full" disabled={busy}>
               {busy ? "Saving…" : editing ? "Save changes" : "Create invoice"}

@@ -118,7 +118,7 @@ async function buildSummary(ctx: QueryCtx | MutationCtx, orgId: Id<"organization
   }
   const vatPayable = roundKes(vatOutput - vatInput);
 
-  const critical = trialBalanceDifference !== 0;
+  const critical = trialBalanceDifference !== 0 || unreconciledBankTransactions > 0 || unpostedDepreciation > 0;
   return {
     period,
     through,

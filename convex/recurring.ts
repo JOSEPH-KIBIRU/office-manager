@@ -141,34 +141,40 @@ export const runRecurring = mutation({
     const rows = await ctx.db.query("recurringTransactions").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
     let processed = 0;
     let total = 0;
+    const skipped: string[] = [];
 
     for (const rec of rows) {
       if (!rec.active) continue;
       let guard = 0;
-      while (rec.nextRun <= asOf && (!rec.endDate || rec.nextRun <= rec.endDate) && guard < 120) {
-        guard += 1;
-        const runDate = rec.nextRun;
-        const lines = await buildLines(ctx, args.orgId, rec);
-        if (lines.length >= 2) {
-          await postJournalForSource(ctx, {
-            orgId: args.orgId,
-            source: "recurring",
-            sourceId: `${rec._id}:${runDate}`,
-            date: runDate,
-            description: `${rec.name}${rec.description ? ` — ${rec.description}` : ""}`,
-            lines,
-            postedByName: args.createdByName ?? "Recurring",
-          });
-          processed += 1;
-          total = round2(total + rec.amount);
+      try {
+        while (rec.nextRun <= asOf && (!rec.endDate || rec.nextRun <= rec.endDate) && guard < 120) {
+          guard += 1;
+          const runDate = rec.nextRun;
+          const lines = await buildLines(ctx, args.orgId, rec);
+          if (lines.length >= 2) {
+            await postJournalForSource(ctx, {
+              orgId: args.orgId,
+              source: "recurring",
+              sourceId: `${rec._id}:${runDate}`,
+              date: runDate,
+              description: `${rec.name}${rec.description ? ` — ${rec.description}` : ""}`,
+              lines,
+              postedByName: args.createdByName ?? "Recurring",
+            });
+            processed += 1;
+            total = round2(total + rec.amount);
+          }
+          // Advance and persist after each run.
+          const next = advance(runDate, rec.frequency);
+          await ctx.db.patch(rec._id, { nextRun: next, lastRunAt: runDate, updatedAt: tsNow() });
+          rec.nextRun = next;
         }
-        // Advance and persist after each run.
-        const next = advance(runDate, rec.frequency);
-        await ctx.db.patch(rec._id, { nextRun: next, lastRunAt: runDate, updatedAt: tsNow() });
-        rec.nextRun = next;
+      } catch (e) {
+        // One bad template must not abort the rest; report and continue.
+        skipped.push(`${rec.name}: ${e instanceof Error ? e.message : "failed"}`);
       }
     }
-    return { processed, total };
+    return { processed, total, skipped };
   },
 });
 

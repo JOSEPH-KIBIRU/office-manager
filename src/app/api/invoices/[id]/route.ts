@@ -32,6 +32,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       terms?: string;
       recurringFrequency?: "weekly" | "monthly" | "quarterly" | "yearly";
       recurringActive?: boolean;
+      costCenterCode?: string;
+      projectId?: string;
     }>(req);
     try {
       await cx().mutation(api.invoicing.updateInvoice, {
@@ -47,6 +49,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         terms: body.terms,
         recurringFrequency: body.recurringFrequency as never,
         recurringActive: body.recurringActive,
+        costCenterCode: body.costCenterCode,
+        projectId: body.projectId as never,
       });
       return ok({ ok: true });
     } catch (e) {

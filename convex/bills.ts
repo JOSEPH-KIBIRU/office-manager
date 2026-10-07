@@ -144,6 +144,8 @@ export const updateBill = mutation({
     amount: v.optional(v.number()),
     vatRate: v.optional(v.number()),
     description: v.optional(v.string()),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -169,6 +171,8 @@ export const updateBill = mutation({
     }
     if (args.description !== undefined) patch.description = args.description?.trim() || undefined;
     if (args.vatRate !== undefined) patch.vatRate = Math.max(0, Math.min(100, args.vatRate));
+    if (args.costCenterCode !== undefined) patch.costCenterCode = args.costCenterCode || undefined;
+    if (args.projectId !== undefined) patch.projectId = args.projectId ?? undefined;
     patch.updatedAt = tsNow();
     await ctx.db.patch(args.id, patch);
     await repostBillJournal(ctx, args.id);

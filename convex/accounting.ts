@@ -321,13 +321,13 @@ export async function postJournalForSource(ctx: MutationCtx, input: PostJournalI
     if (!known.has(l.accountCode)) throw new Error(`Unknown ledger account ${l.accountCode}.`);
   }
 
-  const count = (await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", input.orgId)).collect()).length;
+  const seq = await nextSeq(ctx, input.orgId, "JNL");
   const now = tsNow();
   return ctx.db.insert("journals", {
     orgId: input.orgId,
     date: input.date,
     period,
-    ref: `JNL-${String(count + 1).padStart(4, "0")}`,
+    ref: `JNL-${String(seq).padStart(4, "0")}`,
     source: input.source,
     sourceId: input.sourceId,
     description: input.description,
@@ -373,13 +373,13 @@ export async function reverseJournalInternal(
   if (original.reversedBy) return null;
   const { status } = await ensurePeriodInternal(ctx, opts.orgId, opts.date);
   if (status === "locked") return null;
-  const count = (await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", opts.orgId)).collect()).length;
+  const seq = await nextSeq(ctx, opts.orgId, "REV");
   const now = tsNow();
   const revId = await ctx.db.insert("journals", {
     orgId: opts.orgId,
     date: opts.date,
     period: periodOf(opts.date),
-    ref: `REV-${String(count + 1).padStart(4, "0")}`,
+    ref: `REV-${String(seq).padStart(4, "0")}`,
     source: "manual",
     sourceId: original.sourceId,
     description: `Reversal of ${original.ref} — ${original.description}`,

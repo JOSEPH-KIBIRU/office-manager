@@ -29,6 +29,8 @@ interface BillRow {
   status: "draft" | "received" | "pending" | "partially_paid" | "paid" | "overdue" | "void";
   amount_paid: number;
   balance_due: number;
+  cost_center_code?: string | null;
+  project_id?: string | null;
   paid_at: string | null;
   created_at: string;
 }
@@ -54,6 +56,10 @@ export default function BillsPage() {
   const [amount, setAmount] = useState("");
   const [vatRate, setVatRate] = useState("0");
   const [description, setDescription] = useState("");
+  const [costCentres, setCostCentres] = useState<{ code: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ _id: string; name: string }[]>([]);
+  const [costCentre, setCostCentre] = useState("");
+  const [project, setProject] = useState("");
   const [errors, setErrors] = useState<Errors>({});
 
   const billGross = Number(amount) || 0;
@@ -89,6 +95,8 @@ export default function BillsPage() {
   useEffect(() => {
     load();
     loadSuppliers();
+    api<{ costCentres: { code: string; name: string }[] }>("/api/management/cost-centres").then((d) => setCostCentres(d.costCentres ?? [])).catch(() => setCostCentres([]));
+    api<{ projects: { _id: string; name: string }[] }>("/api/management/projects").then((d) => setProjects(d.projects ?? [])).catch(() => setProjects([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -100,6 +108,8 @@ export default function BillsPage() {
     setAmount("");
     setVatRate("0");
     setDescription("");
+    setCostCentre("");
+    setProject("");
     setErrors({});
     setShowModal(true);
   }
@@ -112,6 +122,8 @@ export default function BillsPage() {
     setAmount(String(b.amount));
     setVatRate(String(b.vat_rate ?? 0));
     setDescription(b.description ?? "");
+    setCostCentre(b.cost_center_code ?? "");
+    setProject(b.project_id ?? "");
     setErrors({});
     setShowModal(true);
   }
@@ -142,6 +154,8 @@ export default function BillsPage() {
       amount: Number(amount),
       vatRate: Number(vatRate) || 0,
       description: description || undefined,
+      costCenterCode: costCentre || undefined,
+      projectId: project || undefined,
     };
     try {
       if (editing) {
@@ -333,6 +347,24 @@ export default function BillsPage() {
               <label className="label" htmlFor="bl-desc">Description (optional)</label>
               <input id="bl-desc" className={inputCls()} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. October electricity" />
             </div>
+            {(costCentres.length > 0 || projects.length > 0) && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label" htmlFor="bl-cc">Cost centre (optional)</label>
+                  <select id="bl-cc" className="input" value={costCentre} onChange={(e) => setCostCentre(e.target.value)}>
+                    <option value="">— none —</option>
+                    {costCentres.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label" htmlFor="bl-prj">Project (optional)</label>
+                  <select id="bl-prj" className="input" value={project} onChange={(e) => setProject(e.target.value)}>
+                    <option value="">— none —</option>
+                    {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
             <button type="submit" className="btn-primary w-full" disabled={busy}>{busy ? "Saving…" : editing ? "Save changes" : "Add bill"}</button>
           </form>
         </Modal>

@@ -769,9 +769,49 @@ export const controlReconciliation = query({
       if (["draft", "void"].includes(b.status)) continue;
       openAP += b.amount - (b.amountPaid ?? 0);
     }
+
+    // Amounts recorded in the GL but not yet applied to an open item (e.g. a
+    // receipt created straight from a bank line). These explain the difference.
+    const allocations = await ctx.db.query("allocations").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const payments = await ctx.db.query("payments").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    let unappliedReceipts = 0;
+    let unappliedPayments = 0;
+    for (const p of payments) {
+      const applied = allocations.filter((a) => a.paymentId === p._id).reduce((s, a) => s + a.amount, 0);
+      const un = roundKes(p.amount - applied);
+      if (p.kind === "receipt") unappliedReceipts += un;
+      else unappliedPayments += un;
+    }
+    const creditNotes = await ctx.db.query("creditNotes").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    let unappliedCN_AR = 0;
+    let unappliedCN_AP = 0;
+    for (const cn of creditNotes) {
+      if (cn.status !== "issued") continue;
+      const applied = allocations.filter((a) => a.creditNoteId === cn._id).reduce((s, a) => s + a.amount, 0);
+      const un = roundKes(cn.total - applied);
+      if (cn.kind === "sales_credit") unappliedCN_AR += un;
+      else unappliedCN_AP += un;
+    }
+
+    const arSub = roundKes(openAR - unappliedReceipts - unappliedCN_AR);
+    const apSub = roundKes(openAP - unappliedPayments - unappliedCN_AP);
     return {
-      ar: { controlCode: arCode, gl: roundKes(arGL), subledger: roundKes(openAR), difference: roundKes(arGL - openAR) },
-      ap: { controlCode: apCode, gl: roundKes(apGL), subledger: roundKes(openAP), difference: roundKes(apGL - openAP) },
+      ar: {
+        controlCode: arCode,
+        gl: roundKes(arGL),
+        subledger: arSub,
+        openItems: roundKes(openAR),
+        unapplied: roundKes(unappliedReceipts + unappliedCN_AR),
+        difference: roundKes(arGL - arSub),
+      },
+      ap: {
+        controlCode: apCode,
+        gl: roundKes(apGL),
+        subledger: apSub,
+        openItems: roundKes(openAP),
+        unapplied: roundKes(unappliedPayments + unappliedCN_AP),
+        difference: roundKes(apGL - apSub),
+      },
     };
   },
 });

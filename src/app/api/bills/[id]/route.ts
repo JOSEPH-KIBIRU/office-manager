@@ -29,6 +29,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       amount?: number;
       vatRate?: number;
       description?: string;
+      costCenterCode?: string;
+      projectId?: string;
     }>(req);
     try {
       await cx().mutation(api.bills.updateBill, {
@@ -41,6 +43,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         amount: body.amount !== undefined ? Number(body.amount) : undefined,
         vatRate: body.vatRate !== undefined ? Number(body.vatRate) : undefined,
         description: body.description,
+        costCenterCode: body.costCenterCode,
+        projectId: body.projectId as never,
       });
       return ok({ ok: true });
     } catch (e) {
