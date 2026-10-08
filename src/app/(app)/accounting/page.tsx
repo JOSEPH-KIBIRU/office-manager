@@ -655,15 +655,23 @@ function PnlView({ d }: { d: Pnl }) {
 }
 
 function BsView({ d }: { d: Bs }) {
+  const statTotal = d.liabilities.filter((r) => r.group === "Statutory").reduce((s, r) => s + r.amount, 0);
+  const liabRows: StatementRow[] =
+    statTotal !== 0
+      ? [
+          ...d.liabilities.filter((r) => r.group !== "Statutory"),
+          { code: "", name: "Statutory deductions (PAYE, NSSF, SHIF, Housing, HELB…)", amount: statTotal, group: "Statutory" },
+        ]
+      : d.liabilities;
   return (
     <div className="card p-5">
       <p className="mb-4 text-sm text-slate-500">As at {d.through}</p>
       <StatementSection title="Assets" rows={d.assets} />
       <div className="mb-4 flex justify-between text-sm font-semibold"><span>Total assets</span><span className="tabular-nums">{fmtKsh(d.assetTotal)}</span></div>
-      <StatementSection title="Liabilities" rows={d.liabilities} />
+      <StatementSection title="Liabilities" rows={liabRows} />
       <div className="mb-1 flex justify-between text-sm font-semibold"><span>Total liabilities</span><span className="tabular-nums">{fmtKsh(d.liabTotal)}</span></div>
       <StatementSection title="Equity" rows={d.equity} />
-      <div className="mb-1 flex justify-between text-sm"><span className="text-slate-600">Current year result</span><span className="tabular-nums">{fmtKsh(d.currentYear)}</span></div>
+      <div className="mb-1 flex justify-between text-sm"><span className="text-slate-600">Accumulated result</span><span className="tabular-nums">{fmtKsh(d.currentYear)}</span></div>
       <div className="flex justify-between border-t-2 border-slate-900 pt-3 text-base font-bold">
         <span>Liabilities + equity</span>
         <span className="tabular-nums">{fmtKsh(d.equityTotal + d.liabTotal)}</span>

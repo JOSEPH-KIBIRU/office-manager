@@ -154,7 +154,7 @@ function csvCell(v: string | number) {
 }
 const money = (n: number) => n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-interface AccountRow { code: string; name: string; amount: number; }
+interface AccountRow { code: string; name: string; amount: number; group?: string; }
 
 async function buildReport(type: ReportId, from: string, through: string, dim: string): Promise<Report> {
   if (type === "trial") {
@@ -180,7 +180,20 @@ async function buildReport(type: ReportId, from: string, through: string, dim: s
     const rows: (string | number)[][] = [];
     for (const r of d.data.assets) rows.push(["Asset", r.name, money(r.amount)]);
     rows.push(["", "Total assets", money(d.data.assetTotal)]);
-    for (const r of d.data.liabilities) rows.push(["Liability", r.name, money(r.amount)]);
+    // Statutory deductions (PAYE, NSSF, SHIF, Housing, HELB…) are collapsed into
+    // one presentation line; the underlying accounts remain separate on the GL.
+    let statutory = 0;
+    for (const r of d.data.liabilities) {
+      if ((r.group ?? "") === "Statutory") {
+        statutory += r.amount;
+        continue;
+      }
+      rows.push(["Liability", r.name, money(r.amount)]);
+    }
+    if (statutory !== 0) {
+      rows.push(["Liability", "Statutory deductions (PAYE, NSSF, SHIF, Housing, HELB…)", money(statutory)]);
+    }
+    rows.push(["", "Total liabilities", money(d.data.liabTotal)]);
     for (const r of d.data.equity) rows.push(["Equity", r.name, money(r.amount)]);
     rows.push(["", "Accumulated result", money(d.data.currentYear)]);
     rows.push(["", "Liabilities + equity", money(d.data.liabTotal + d.data.equityTotal)]);
