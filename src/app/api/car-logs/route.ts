@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
       vendor?: string;
       amount: number;
       log_date: string;
+      costCenterCode?: string;
+      projectId?: string;
     }>(req);
     requireFields(body, ["vehicle_reg", "category", "description", "log_date"]);
 
@@ -47,6 +49,8 @@ export async function POST(req: NextRequest) {
         vendor: body.vendor?.trim() || undefined,
         amount: Number(body.amount) || 0,
         logDate: body.log_date,
+        costCenterCode: body.costCenterCode,
+        projectId: body.projectId as never,
       });
     } catch (e) {
       return mapConvexError(e);

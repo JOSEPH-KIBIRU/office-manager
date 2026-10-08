@@ -14,11 +14,13 @@ interface Account { code: string; name: string; isCash: boolean; active: boolean
 const fmtKsh = (n: number) => "KSh " + n.toLocaleString("en-KE", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const today = () => new Date().toISOString().slice(0, 10);
 
-const empty = { kind: "expense" as "bill" | "expense" | "journal", name: "", description: "", frequency: "monthly" as "weekly" | "monthly" | "quarterly" | "yearly", startDate: today(), endDate: "", amount: "", accountCode: "", vatRate: "0" };
+const empty = { kind: "expense" as "bill" | "expense" | "journal", name: "", description: "", frequency: "monthly" as "weekly" | "monthly" | "quarterly" | "yearly", startDate: today(), endDate: "", amount: "", accountCode: "", vatRate: "0", costCentre: "", project: "" };
 
 export default function RecurringPage() {
   const [rows, setRows] = useState<Recurring[]>([]);
   const [chart, setChart] = useState<Account[]>([]);
+  const [costCentres, setCostCentres] = useState<{ code: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ _id: string; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<typeof empty | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,6 +35,8 @@ export default function RecurringPage() {
   useEffect(() => {
     void load();
     api<{ accounts: Account[] }>("/api/accounting/chart").then((d) => setChart(d.accounts.filter((a) => a.active && !a.isCash))).catch(() => setChart([]));
+    api<{ costCentres: { code: string; name: string }[] }>("/api/management/cost-centres").then((d) => setCostCentres(d.costCentres ?? [])).catch(() => setCostCentres([]));
+    api<{ projects: { _id: string; name: string }[] }>("/api/management/projects").then((d) => setProjects(d.projects ?? [])).catch(() => setProjects([]));
   }, [load]);
 
   async function save() {
@@ -42,7 +46,7 @@ export default function RecurringPage() {
     try {
       await api("/api/accounting/recurring", {
         method: "POST",
-        json: { kind: form.kind, name: form.name, description: form.description, frequency: form.frequency, startDate: form.startDate, endDate: form.endDate || undefined, amount: Number(form.amount) || 0, accountCode: form.accountCode || undefined, vatRate: Number(form.vatRate) || 0 },
+        json: { kind: form.kind, name: form.name, description: form.description, frequency: form.frequency, startDate: form.startDate, endDate: form.endDate || undefined, amount: Number(form.amount) || 0, accountCode: form.accountCode || undefined, vatRate: Number(form.vatRate) || 0, costCenterCode: form.costCentre || undefined, projectId: form.project || undefined },
       });
       toast.success("Recurring template created.");
       setForm(null);
@@ -143,6 +147,24 @@ export default function RecurringPage() {
               </div>
               <div><label className="label">VAT %</label><input type="number" className={inputCls()} value={form.vatRate} onChange={(e) => setForm({ ...form, vatRate: e.target.value })} /></div>
             </div>
+            {(costCentres.length > 0 || projects.length > 0) && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Cost centre (optional)</label>
+                  <select className={inputCls()} value={form.costCentre} onChange={(e) => setForm({ ...form, costCentre: e.target.value })}>
+                    <option value="">—</option>
+                    {costCentres.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Project (optional)</label>
+                  <select className={inputCls()} value={form.project} onChange={(e) => setForm({ ...form, project: e.target.value })}>
+                    <option value="">—</option>
+                    {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <button className="btn-secondary" onClick={() => setForm(null)} disabled={busy}>Cancel</button>
               <button className="btn-primary" onClick={save} disabled={busy}>{busy ? "Saving…" : "Create template"}</button>

@@ -64,6 +64,8 @@ export const createCarLog = mutation({
     vendor: v.optional(v.string()),
     amount: v.number(),
     logDate: v.string(),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -83,6 +85,8 @@ export const createCarLog = mutation({
       logDate: args.logDate,
       status: "pending",
       requestedBy: args.requestedBy,
+      costCenterCode: args.costCenterCode || undefined,
+      projectId: args.projectId,
       createdAt: tsNow(),
       requisitionNo: reqNo,
     });
@@ -135,8 +139,8 @@ export const updateCarLog = mutation({
           date: row.logDate,
           description: `Car ${row.category} · ${row.vehicleReg}`,
           lines: [
-            { accountCode: expenseCode, debit: row.amount, credit: 0, memo: row.vehicleReg },
-            { accountCode: "1020", debit: 0, credit: row.amount, memo: row.vehicleReg },
+            { accountCode: expenseCode, debit: row.amount, credit: 0, memo: row.vehicleReg, costCenterCode: row.costCenterCode, projectId: row.projectId as never },
+            { accountCode: "1020", debit: 0, credit: row.amount, memo: row.vehicleReg, costCenterCode: row.costCenterCode, projectId: row.projectId as never },
           ],
           postedByName: "Auto (car log approved)",
         });

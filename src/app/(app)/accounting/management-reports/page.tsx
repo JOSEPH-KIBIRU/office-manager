@@ -7,6 +7,7 @@ import { useToast } from "@/components/toast";
 interface DimRow { key: string; label: string; revenue: number; cost: number; profit: number; }
 interface BvaRow { id: string; period: string; accountName: string; dimension: string; budget: number; actual: number; variance: number; variancePct: number | null; }
 interface ProjRow { id: string; code: string; name: string; customerName: string | null; status: string; budget: number; revenue: number; directCosts: number; grossProfit: number; grossMargin: number | null; }
+interface CashFlow { opening: number; operating: number; investing: number; financing: number; net: number; closing: number; }
 interface Account { code: string; name: string; isCash: boolean; active: boolean; }
 interface Req { accountCode: string; accountName: string; requireCostCentre: boolean; requireProject: boolean; }
 
@@ -14,7 +15,7 @@ const fmtKsh = (n: number) => "KSh " + n.toLocaleString("en-KE", { minimumFracti
 const today = () => new Date().toISOString().slice(0, 10);
 const yearStart = () => `${new Date().getFullYear()}-01-01`;
 
-type Tab = "cost_centre" | "project" | "bva" | "profitability" | "rules";
+type Tab = "cost_centre" | "project" | "bva" | "profitability" | "cashflow" | "rules";
 
 export default function ManagementReportsPage() {
   const [tab, setTab] = useState<Tab>("cost_centre");
@@ -23,6 +24,7 @@ export default function ManagementReportsPage() {
   const [dim, setDim] = useState<{ rows: DimRow[]; totals: { revenue: number; cost: number; profit: number } } | null>(null);
   const [bva, setBva] = useState<{ rows: BvaRow[]; totals: { budget: number; actual: number; variance: number } } | null>(null);
   const [proj, setProj] = useState<{ rows: ProjRow[]; totals: { revenue: number; directCosts: number; grossProfit: number } } | null>(null);
+  const [cashflow, setCashflow] = useState<CashFlow | null>(null);
   const [reqs, setReqs] = useState<Req[]>([]);
   const [chart, setChart] = useState<Account[]>([]);
   const [ruleAccount, setRuleAccount] = useState("");
@@ -49,6 +51,9 @@ export default function ManagementReportsPage() {
           `/api/management/reports?type=project-profitability&from=${from}&through=${through}`
         );
         setProj(d);
+      } else if (tab === "cashflow") {
+        const d = await api<CashFlow>(`/api/management/reports?type=cash-flow&from=${from}&through=${through}`);
+        setCashflow(d);
       }
     } catch (e) { setError(e instanceof Error ? e.message : "Failed to load report"); }
   }, [tab, from, through]);
@@ -81,7 +86,7 @@ export default function ManagementReportsPage() {
       {error && <Alert kind="error">{error}</Alert>}
 
       <div className="flex flex-wrap items-center gap-2">
-        {([["cost_centre", "Cost centre P&L"], ["project", "Project P&L"], ["bva", "Budget vs actual"], ["profitability", "Project profitability"], ["rules", "Dimension rules"]] as const).map(([id, label]) => (
+        {([["cost_centre", "Cost centre P&L"], ["project", "Project P&L"], ["bva", "Budget vs actual"], ["profitability", "Project profitability"], ["cashflow", "Cash flow"], ["rules", "Dimension rules"]] as const).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className={`rounded-lg px-3 py-2 text-sm font-medium ${tab === id ? "bg-slate-900 text-white" : "border border-slate-200 bg-white text-slate-600"}`}>{label}</button>
         ))}
         {tab !== "rules" && (
@@ -114,6 +119,24 @@ export default function ManagementReportsPage() {
           head={["Code", "Project", "Customer", "Revenue", "Direct costs", "Gross profit", "Margin"]}
           rows={(proj?.rows ?? []).map((r) => [r.code, r.name, r.customerName ?? "—", fmtKsh(r.revenue), fmtKsh(r.directCosts), fmtKsh(r.grossProfit), r.grossMargin !== null ? `${r.grossMargin}%` : "—"])}
           totals={proj ? ["", "Totals", "", fmtKsh(proj.totals.revenue), fmtKsh(proj.totals.directCosts), fmtKsh(proj.totals.grossProfit), ""] : undefined}
+        />
+      )}
+
+      {tab === "cashflow" && (
+        <ReportTable
+          head={["Section", "Amount"]}
+          rows={
+            cashflow
+              ? [
+                  ["Opening cash", fmtKsh(cashflow.opening)],
+                  ["Operating activities", fmtKsh(cashflow.operating)],
+                  ["Investing activities", fmtKsh(cashflow.investing)],
+                  ["Financing activities", fmtKsh(cashflow.financing)],
+                  ["Net movement", fmtKsh(cashflow.net)],
+                ]
+              : []
+          }
+          totals={cashflow ? ["Closing cash", fmtKsh(cashflow.closing)] : undefined}
         />
       )}
 

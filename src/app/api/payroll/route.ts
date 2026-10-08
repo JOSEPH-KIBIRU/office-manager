@@ -36,6 +36,8 @@ export async function POST(req: NextRequest) {
       leaveDaysPayouts?: Array<{ userId: string; amount: number }>;
       casuals?: Array<{ casualId: string; days: number; statutory: boolean; perDiem?: number }>;
       encashmentIds?: string[];
+      costCenterCode?: string;
+      projectId?: string;
     }>(req);
     requireFields(body, ["month", "year"]);
     const month = Number(body.month);
@@ -63,6 +65,8 @@ export async function POST(req: NextRequest) {
         leaveDaysPayouts: body.leaveDaysPayouts as never,
         casuals: body.casuals as never,
         encashmentIds: body.encashmentIds as never,
+        costCenterCode: body.costCenterCode,
+        projectId: body.projectId as never,
       });
       await recordAudit(session, {
         action: "payroll.run",

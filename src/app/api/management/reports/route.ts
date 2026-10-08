@@ -26,6 +26,10 @@ export async function GET(req: NextRequest) {
         const data = await cx().query(api.management.projectProfitability, { secret: secret(), orgId: session.orgId as never, from, through });
         return ok(data);
       }
+      if (type === "cash-flow") {
+        const data = await cx().query(api.management.cashFlowStatement, { secret: secret(), orgId: session.orgId as never, from, through });
+        return ok(data);
+      }
       if (type === "pnl-by-dimension") {
         const dimension = url.searchParams.get("dimension") === "project" ? "project" : "cost_centre";
         const data = await cx().query(api.management.pnlByDimension, { secret: secret(), orgId: session.orgId as never, dimension, from, through });

@@ -1111,7 +1111,12 @@ export const completeReconciliation = mutation({
             `Match the outstanding items or record an approved adjustment.`
         );
       }
-      const offset = args.adjustmentAccountCode || (await resolveControlCode(ctx, args.orgId, "suspense"));
+      const offset = args.adjustmentAccountCode;
+      if (!offset) {
+        throw new Error(
+          "Forcing a reconciliation that still has a difference requires an explicit adjustment account — no silent suspense posting."
+        );
+      }
       const diff = r.difference;
       adjustmentJournalId = await postJournalForSource(ctx, {
         orgId: args.orgId,

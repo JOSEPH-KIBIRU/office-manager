@@ -116,6 +116,8 @@ export const createPettyCashBatch = mutation({
         amount: v.number(),
         purpose: v.string(),
         dateNeeded: v.string(),
+        costCenterCode: v.optional(v.string()),
+        projectId: v.optional(v.id("projects")),
       })
     ),
   },
@@ -150,6 +152,8 @@ export const createPettyCashBatch = mutation({
         approvedBy: autoApproved ? args.requestedBy : undefined,
         approvedAt: autoApproved ? tsString() : undefined,
         requisitionNo: reqNo,
+        costCenterCode: item.costCenterCode || undefined,
+        projectId: item.projectId,
         createdAt: tsNow(),
       });
       created.push(id);
@@ -162,8 +166,8 @@ export const createPettyCashBatch = mutation({
           date: item.dateNeeded,
           description: `Petty cash ${reqNo} · ${item.purpose}`,
           lines: [
-            { accountCode: "5990", debit: item.amount, credit: 0, memo: reqNo },
-            { accountCode: "1010", debit: 0, credit: item.amount, memo: reqNo },
+            { accountCode: "5990", debit: item.amount, credit: 0, memo: reqNo, costCenterCode: item.costCenterCode, projectId: item.projectId as never },
+            { accountCode: "1010", debit: 0, credit: item.amount, memo: reqNo, costCenterCode: item.costCenterCode, projectId: item.projectId as never },
           ],
           postedByName: "Auto (petty cash approved)",
         });
@@ -221,8 +225,8 @@ export const reviewPettyCash = mutation({
         date: row.dateNeeded,
         description: `Petty cash ${row.requisitionNo ?? ""} · ${row.purpose}`.trim(),
         lines: [
-          { accountCode: "5990", debit: row.amount, credit: 0, memo: row.requisitionNo ?? undefined },
-          { accountCode: "1010", debit: 0, credit: row.amount, memo: row.requisitionNo ?? undefined },
+          { accountCode: "5990", debit: row.amount, credit: 0, memo: row.requisitionNo ?? undefined, costCenterCode: row.costCenterCode, projectId: row.projectId as never },
+          { accountCode: "1010", debit: 0, credit: row.amount, memo: row.requisitionNo ?? undefined, costCenterCode: row.costCenterCode, projectId: row.projectId as never },
         ],
         postedByName: "Auto (petty cash approved)",
       });

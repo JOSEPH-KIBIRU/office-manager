@@ -389,6 +389,8 @@ export const budgetVsActual = query({
           if (!info) continue;
           if (isIncome(info.type)) actual += l.credit - l.debit;
           else if (isCost(info.type)) actual += l.debit - l.credit;
+          else if (info.type === "asset") actual += l.debit - l.credit;
+          else actual += l.credit - l.debit; // liability / equity movement
         }
       }
       actual = roundKes(actual);
@@ -411,6 +413,60 @@ export const budgetVsActual = query({
     });
     const totals = rows.reduce((a, r) => ({ budget: a.budget + r.budget, actual: a.actual + r.actual, variance: a.variance + r.variance }), { budget: 0, actual: 0, variance: 0 });
     return { from: args.from, through: args.through, rows, totals };
+  },
+});
+
+/** Direct-method Statement of Cash Flows summary from cash-account movements. */
+export const cashFlowStatement = query({
+  args: { secret: v.string(), orgId: v.id("organizations"), from: v.string(), through: v.string() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const accounts = await ctx.db.query("ledgerAccounts").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const typeOf = new Map(accounts.map((a) => [a.code, a.type as string]));
+    const cashCodes = new Set(accounts.filter((a) => a.isCash).map((a) => a.code));
+    const journals = await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+
+    let opening = 0;
+    let operating = 0;
+    let investing = 0;
+    let financing = 0;
+    for (const j of journals) {
+      let cashDelta = 0;
+      for (const l of j.lines) if (cashCodes.has(l.accountCode)) cashDelta += l.debit - l.credit;
+      if (Math.abs(cashDelta) < 0.005) continue;
+      if (j.date < args.from) {
+        opening += cashDelta;
+        continue;
+      }
+      if (j.date > args.through) continue;
+      let category = "operating";
+      for (const l of j.lines) {
+        if (cashCodes.has(l.accountCode)) continue;
+        const t = typeOf.get(l.accountCode);
+        if (t === "asset") {
+          category = "investing";
+          break;
+        }
+        if (t === "liability" || t === "equity") {
+          category = "financing";
+          break;
+        }
+      }
+      if (category === "investing") investing += cashDelta;
+      else if (category === "financing") financing += cashDelta;
+      else operating += cashDelta;
+    }
+    const net = roundKes(operating + investing + financing);
+    return {
+      from: args.from,
+      through: args.through,
+      opening: roundKes(opening),
+      operating: roundKes(operating),
+      investing: roundKes(investing),
+      financing: roundKes(financing),
+      net,
+      closing: roundKes(opening + net),
+    };
   },
 });
 

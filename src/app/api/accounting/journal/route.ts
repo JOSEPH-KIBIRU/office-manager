@@ -3,6 +3,7 @@ import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields, amountInRange } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { recordAudit } from "@/lib/audit";
 
 /** Post a manual journal (a balanced set of ledger lines). */
 export async function POST(req: NextRequest) {
@@ -36,6 +37,13 @@ export async function POST(req: NextRequest) {
         postedBy: session.id as never,
         postedByName: session.name,
         adjustment: !!body.adjustment,
+      });
+      await recordAudit(session, {
+        action: body.adjustment ? "accounting.adjustment" : "accounting.journal",
+        module: "accounting",
+        summary: `Posted ${body.adjustment ? "adjustment" : "manual"} journal: ${String(body.description).trim()}`,
+        targetType: "journal",
+        targetId: String(id),
       });
       return ok({ journalId: id });
     } catch (e) {

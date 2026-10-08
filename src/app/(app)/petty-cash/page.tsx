@@ -31,6 +31,15 @@ export default function PettyCashPage() {
     { amount: "", purpose: "", dateNeeded: today },
   ]);
   const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
+  const [costCentres, setCostCentres] = useState<{ code: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ _id: string; name: string }[]>([]);
+  const [costCentre, setCostCentre] = useState("");
+  const [project, setProject] = useState("");
+
+  useEffect(() => {
+    api<{ costCentres: { code: string; name: string }[] }>("/api/management/cost-centres").then((d) => setCostCentres(d.costCentres ?? [])).catch(() => setCostCentres([]));
+    api<{ projects: { _id: string; name: string }[] }>("/api/management/projects").then((d) => setProjects(d.projects ?? [])).catch(() => setProjects([]));
+  }, []);
 
   function newLine(): LineItem {
     return { amount: "", purpose: "", dateNeeded: new Date().toISOString().slice(0, 10) };
@@ -136,6 +145,8 @@ export default function PettyCashPage() {
         amount: Number(l.amount),
         purpose: l.purpose.trim(),
         date_needed: l.dateNeeded,
+        costCenterCode: costCentre || undefined,
+        projectId: project || undefined,
       }));
       const res = await api<{ auto_approved: number; awaiting_approval: number; total: string }>(
         "/api/petty-cash",
@@ -302,6 +313,25 @@ export default function PettyCashPage() {
             <button type="button" onClick={addLine} className="btn-secondary w-full">
               + Add another line
             </button>
+
+            {(costCentres.length > 0 || projects.length > 0) && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-medium text-slate-500">Cost centre (optional)</label>
+                  <select className="input w-full py-1.5 text-sm" value={costCentre} onChange={(e) => setCostCentre(e.target.value)}>
+                    <option value="">—</option>
+                    {costCentres.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-slate-500">Project (optional)</label>
+                  <select className="input w-full py-1.5 text-sm" value={project} onChange={(e) => setProject(e.target.value)}>
+                    <option value="">—</option>
+                    {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
 
             <button type="submit" className="btn-primary w-full" disabled={busy}>
               {busy ? "Submitting…" : `Submit ${lines.length > 1 ? `${lines.length} lines` : "request"}`}

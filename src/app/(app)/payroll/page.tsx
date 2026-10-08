@@ -131,6 +131,15 @@ export default function PayrollPage() {
 
   const [errors, setErrors] = useState<Errors>({});
   const [confirmRun, setConfirmRun] = useState(false);
+  const [costCentres, setCostCentres] = useState<{ code: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ _id: string; name: string }[]>([]);
+  const [costCentre, setCostCentre] = useState("");
+  const [project, setProject] = useState("");
+
+  useEffect(() => {
+    api<{ costCentres: { code: string; name: string }[] }>("/api/management/cost-centres").then((d) => setCostCentres(d.costCentres ?? [])).catch(() => setCostCentres([]));
+    api<{ projects: { _id: string; name: string }[] }>("/api/management/projects").then((d) => setProjects(d.projects ?? [])).catch(() => setProjects([]));
+  }, []);
 
   const [openRun, setOpenRun] = useState<string | null>(null);
   const [openPayslips, setOpenPayslips] = useState<RunPayslip[] | null>(null);
@@ -282,7 +291,9 @@ export default function PayrollPage() {
                   const enc = encashmentUserIds[id];
                   return !!enc && employeeIds.includes(enc);
                 })
-              : [],
+                : [],
+          costCenterCode: costCentre || undefined,
+          projectId: project || undefined,
         },
       });
       setConfirmRun(false);
@@ -653,6 +664,24 @@ export default function PayrollPage() {
           <HelpTip text="Reimbursement for travel/meals. Added to take-home pay but not taxed or subject to statutory deductions." />
         </p>
         <form onSubmit={requestRun} className="space-y-6">
+          {(costCentres.length > 0 || projects.length > 0) && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label" htmlFor="pr-cc">Cost centre (optional — tags the salary expense)</label>
+                <select id="pr-cc" className="input" value={costCentre} onChange={(e) => setCostCentre(e.target.value)}>
+                  <option value="">— none —</option>
+                  {costCentres.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="pr-prj">Project (optional)</label>
+                <select id="pr-prj" className="input" value={project} onChange={(e) => setProject(e.target.value)}>
+                  <option value="">— none —</option>
+                  {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                </select>
+              </div>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <div>
               <label className="label" htmlFor="pr-month">Month</label>

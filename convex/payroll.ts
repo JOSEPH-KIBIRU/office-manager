@@ -636,6 +636,8 @@ export const runPayroll = mutation({
       )
     ),
     encashmentIds: v.optional(v.array(v.id("leaveCarryOvers"))),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -728,6 +730,8 @@ export const runPayroll = mutation({
       month: args.month,
       year: args.year,
       runBy: args.runBy,
+      costCenterCode: args.costCenterCode || undefined,
+      projectId: args.projectId,
       createdAt: tsNow(),
       payslips,
     });
@@ -784,7 +788,7 @@ export const runPayroll = mutation({
       date: lastDay,
       description: `Payroll ${MONTHS[args.month - 1]} ${args.year}`,
       lines: [
-        { accountCode: "5000", debit: totals.gross, credit: 0, memo: "Gross pay" },
+        { accountCode: "5000", debit: totals.gross, credit: 0, memo: "Gross pay", costCenterCode: args.costCenterCode, projectId: args.projectId as never },
         { accountCode: "2100", debit: 0, credit: totals.paye, memo: "PAYE" },
         { accountCode: "2110", debit: 0, credit: totals.nssf, memo: "NSSF" },
         { accountCode: "2120", debit: 0, credit: totals.sha, memo: "SHIF" },

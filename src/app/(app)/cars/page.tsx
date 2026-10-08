@@ -31,8 +31,12 @@ export default function CarLogsPage() {
     vendor: "",
     amount: "",
     log_date: new Date().toISOString().slice(0, 10),
+    cost_centre: "",
+    project: "",
   };
   const [form, setForm] = useState(empty);
+  const [costCentres, setCostCentres] = useState<{ code: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ _id: string; name: string }[]>([]);
   const [errors, setErrors] = useState<Errors>({});
   const [editErrors, setEditErrors] = useState<Errors>({});
 
@@ -54,6 +58,8 @@ export default function CarLogsPage() {
 
   useEffect(() => {
     load();
+    api<{ costCentres: { code: string; name: string }[] }>("/api/management/cost-centres").then((d) => setCostCentres(d.costCentres ?? [])).catch(() => setCostCentres([]));
+    api<{ projects: { _id: string; name: string }[] }>("/api/management/projects").then((d) => setProjects(d.projects ?? [])).catch(() => setProjects([]));
   }, []);
 
   async function submitNew(e: FormEvent) {
@@ -75,7 +81,7 @@ export default function CarLogsPage() {
     try {
       await api("/api/car-logs", {
         method: "POST",
-        json: { ...form, amount: Number(form.amount) || 0 },
+        json: { ...form, amount: Number(form.amount) || 0, costCenterCode: form.cost_centre || undefined, projectId: form.project || undefined },
       });
       setShowNew(false);
       setForm({ ...empty, log_date: form.log_date });
@@ -265,6 +271,24 @@ export default function CarLogsPage() {
               <input id="car-date" type="date" className="input" value={form.log_date}
                 onChange={(e) => setForm({ ...form, log_date: e.target.value })} required />
             </div>
+            {(costCentres.length > 0 || projects.length > 0) && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label" htmlFor="car-cc">Cost centre (optional)</label>
+                  <select id="car-cc" className="input" value={form.cost_centre} onChange={(e) => setForm({ ...form, cost_centre: e.target.value })}>
+                    <option value="">—</option>
+                    {costCentres.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label" htmlFor="car-prj">Project (optional)</label>
+                  <select id="car-prj" className="input" value={form.project} onChange={(e) => setForm({ ...form, project: e.target.value })}>
+                    <option value="">—</option>
+                    {projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
             <button type="submit" className="btn-primary w-full" disabled={busy}>
               {busy ? "Saving…" : "Save entry"}
             </button>

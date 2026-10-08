@@ -288,6 +288,7 @@ export async function postJournalForSource(ctx: MutationCtx, input: PostJournalI
   await ensureChartInternal(ctx, input.orgId);
   const { period, status } = await ensurePeriodInternal(ctx, input.orgId, input.date);
   if (status === "locked") throw new Error(`${monthLabel(period)} is locked — no entries can be posted.`);
+  if (status === "future") throw new Error(`${monthLabel(period)} has not opened yet — cannot post.`);
   if (status === "closed" && !input.allowClosed) {
     throw new Error(`${monthLabel(period)} is closed. Post an adjustment journal or a reversal instead.`);
   }

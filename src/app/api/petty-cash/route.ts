@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   return handle(async () => {
     const session = await requireUser();
     const body = await readJson<{
-      items: { amount: number; purpose: string; date_needed: string }[];
+      items: { amount: number; purpose: string; date_needed: string; costCenterCode?: string; projectId?: string }[];
     }>(req);
     requireFields(body, ["items"]);
 
@@ -35,6 +35,8 @@ export async function POST(req: NextRequest) {
       amount: amountInRange(it.amount, "Amount", 1),
       purpose: (maxLen(String(it.purpose ?? ""), "Purpose", 500), String(it.purpose ?? "").trim()),
       date_needed: validDate(String(it.date_needed ?? ""), "Date needed"),
+      costCenterCode: it.costCenterCode ? String(it.costCenterCode) : undefined,
+      projectId: it.projectId ? String(it.projectId) : undefined,
     }));
     if (items.length === 0) throw new HttpError(400, "At least one line item is required");
 
@@ -48,6 +50,8 @@ export async function POST(req: NextRequest) {
           amount: i.amount,
           purpose: i.purpose,
           dateNeeded: i.date_needed,
+          costCenterCode: i.costCenterCode,
+          projectId: i.projectId,
         })) as never,
       });
       ids = res.ids as string[];

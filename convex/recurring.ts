@@ -51,6 +51,8 @@ export const createRecurring = mutation({
     endDate: v.optional(v.string()),
     amount: v.number(),
     accountCode: v.optional(v.string()),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
     vatRate: v.optional(v.number()),
     taxTreatment: v.optional(v.string()),
     supplierId: v.optional(v.id("contacts")),
@@ -79,6 +81,8 @@ export const createRecurring = mutation({
       nextRun: args.startDate,
       amount: round2(args.amount ?? 0),
       accountCode: args.accountCode || undefined,
+      costCenterCode: args.costCenterCode || undefined,
+      projectId: args.projectId,
       vatRate: args.vatRate,
       taxTreatment: args.taxTreatment || undefined,
       supplierId: args.supplierId,
@@ -195,8 +199,8 @@ async function buildLines(ctx: MutationCtx, orgId: Id<"organizations">, rec: any
   const credit = rec.kind === "bill"
     ? await resolveControlCode(ctx, orgId, "ap")
     : await resolveControlCode(ctx, orgId, "bank");
-  const lines = [{ accountCode: expense, debit: net, credit: 0, memo: rec.name }];
-  if (vat > 0) lines.push({ accountCode: vatIn, debit: vat, credit: 0, memo: "Input VAT" } as never);
-  lines.push({ accountCode: credit, debit: 0, credit: rec.amount, memo: rec.name } as never);
+  const lines = [{ accountCode: expense, debit: net, credit: 0, memo: rec.name, costCenterCode: rec.costCenterCode, projectId: rec.projectId }];
+  if (vat > 0) lines.push({ accountCode: vatIn, debit: vat, credit: 0, memo: "Input VAT", costCenterCode: rec.costCenterCode, projectId: rec.projectId } as never);
+  lines.push({ accountCode: credit, debit: 0, credit: rec.amount, memo: rec.name, costCenterCode: rec.costCenterCode, projectId: rec.projectId } as never);
   return lines;
 }
