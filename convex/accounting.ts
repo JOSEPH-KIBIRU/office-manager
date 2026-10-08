@@ -406,12 +406,17 @@ type JournalLike = { date: string; lines: JournalLine[]; reversedBy?: unknown };
  * reversing entry — so a voided document nets to zero while the full audit
  * trail stays visible.
  */
-function activityByAccount(journals: JournalLike[], opts?: { from?: string; through?: string }) {
+function activityByAccount(
+  journals: JournalLike[],
+  opts?: { from?: string; through?: string; costCenterCode?: string; projectId?: string }
+) {
   const map = new Map<string, { debit: number; credit: number }>();
   for (const j of journals) {
     if (opts?.through && j.date > opts.through) continue;
     if (opts?.from && j.date < opts.from) continue;
     for (const line of j.lines) {
+      if (opts?.costCenterCode && line.costCenterCode !== opts.costCenterCode) continue;
+      if (opts?.projectId && (line.projectId as string) !== opts.projectId) continue;
       const cur = map.get(line.accountCode) ?? { debit: 0, credit: 0 };
       cur.debit += line.debit;
       cur.credit += line.credit;
@@ -736,13 +741,19 @@ export const ledger = query({
     orgId: v.id("organizations"),
     from: v.optional(v.string()),
     through: v.optional(v.string()),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const accounts = await loadAccounts(ctx, args.orgId);
     const journals = await loadJournals(ctx, args.orgId);
+    const lineMatch = (l: JournalLine) =>
+      (!args.costCenterCode || l.costCenterCode === args.costCenterCode) &&
+      (!args.projectId || (l.projectId as string) === args.projectId);
     const filtered = journals
       .filter((j) => (!args.from || j.date >= args.from) && (!args.through || j.date <= args.through))
+      .filter((j) => (!args.costCenterCode && !args.projectId) || j.lines.some(lineMatch))
       .sort((a, b) => (a.date === b.date ? b.postedAt - a.postedAt : b.date.localeCompare(a.date)));
     return filtered.map((j) => ({
       id: j._id,
@@ -755,7 +766,7 @@ export const ledger = query({
       postedByName: j.postedByName ?? null,
       reversed: Boolean(j.reversedBy),
       reversesId: j.reversesId ?? null,
-      lines: j.lines.map((l) => ({
+      lines: j.lines.filter(lineMatch).map((l) => ({
         accountCode: l.accountCode,
         accountName: accounts.get(l.accountCode)?.name ?? l.accountCode,
         debit: l.debit,
@@ -767,12 +778,18 @@ export const ledger = query({
 });
 
 export const trialBalance = query({
-  args: { secret: v.string(), orgId: v.id("organizations"), through: v.optional(v.string()) },
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    through: v.optional(v.string()),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const accounts = await loadAccounts(ctx, args.orgId);
     const journals = await loadJournals(ctx, args.orgId);
-    const act = activityByAccount(journals, { through: args.through });
+    const act = activityByAccount(journals, { through: args.through, costCenterCode: args.costCenterCode, projectId: args.projectId });
     const rows: Array<{ code: string; name: string; debit: number; credit: number }> = [];
     let debitTotal = 0;
     let creditTotal = 0;
@@ -795,14 +812,22 @@ export const trialBalance = query({
 });
 
 export const profitAndLoss = query({
-  args: { secret: v.string(), orgId: v.id("organizations"), from: v.string(), through: v.string() },
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    from: v.string(),
+    through: v.string(),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const accounts = await loadAccounts(ctx, args.orgId);
     const journals = await loadJournals(ctx, args.orgId);
-    const income = rowsOfType(journals, accounts, "income", { from: args.from, through: args.through });
-    const costOfSales = rowsOfType(journals, accounts, "cost_of_sales", { from: args.from, through: args.through });
-    const expense = rowsOfType(journals, accounts, "expense", { from: args.from, through: args.through });
+    const opts = { from: args.from, through: args.through, costCenterCode: args.costCenterCode, projectId: args.projectId };
+    const income = rowsOfType(journals, accounts, "income", opts);
+    const costOfSales = rowsOfType(journals, accounts, "cost_of_sales", opts);
+    const expense = rowsOfType(journals, accounts, "expense", opts);
     const incomeTotal = roundKes(income.reduce((s, r) => s + r.amount, 0));
     const costOfSalesTotal = roundKes(costOfSales.reduce((s, r) => s + r.amount, 0));
     const expenseTotal = roundKes(expense.reduce((s, r) => s + r.amount, 0));
@@ -823,24 +848,31 @@ export const profitAndLoss = query({
 });
 
 export const balanceSheet = query({
-  args: { secret: v.string(), orgId: v.id("organizations"), through: v.string() },
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    through: v.string(),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const accounts = await loadAccounts(ctx, args.orgId);
     const journals = await loadJournals(ctx, args.orgId);
+    const opts = { through: args.through, costCenterCode: args.costCenterCode, projectId: args.projectId };
     // Accumulated result (all years through the date) so equity carries prior
     // years forward even before a formal year-end close is posted.
-    const income = rowsOfType(journals, accounts, "income", { through: args.through });
-    const costOfSales = rowsOfType(journals, accounts, "cost_of_sales", { through: args.through });
-    const expense = rowsOfType(journals, accounts, "expense", { through: args.through });
+    const income = rowsOfType(journals, accounts, "income", opts);
+    const costOfSales = rowsOfType(journals, accounts, "cost_of_sales", opts);
+    const expense = rowsOfType(journals, accounts, "expense", opts);
     const accumulatedResult = roundKes(
       income.reduce((s, r) => s + r.amount, 0) -
         costOfSales.reduce((s, r) => s + r.amount, 0) -
         expense.reduce((s, r) => s + r.amount, 0)
     );
-    const assets = rowsOfType(journals, accounts, "asset", { through: args.through });
-    const liabilities = rowsOfType(journals, accounts, "liability", { through: args.through });
-    const equity = rowsOfType(journals, accounts, "equity", { through: args.through });
+    const assets = rowsOfType(journals, accounts, "asset", opts);
+    const liabilities = rowsOfType(journals, accounts, "liability", opts);
+    const equity = rowsOfType(journals, accounts, "equity", opts);
     const assetTotal = roundKes(assets.reduce((s, r) => s + r.amount, 0));
     const liabTotal = roundKes(liabilities.reduce((s, r) => s + r.amount, 0));
     const equityPosted = roundKes(equity.reduce((s, r) => s + r.amount, 0));

@@ -58,6 +58,7 @@ import type * as subledger from "../subledger.js";
 import type * as subscriptions from "../subscriptions.js";
 import type * as superadmin from "../superadmin.js";
 import type * as tasks from "../tasks.js";
+import type * as tax from "../tax.js";
 import type * as twofa from "../twofa.js";
 import type * as users from "../users.js";
 import type * as visitors from "../visitors.js";
@@ -119,6 +120,7 @@ declare const fullApi: ApiFromModules<{
   subscriptions: typeof subscriptions;
   superadmin: typeof superadmin;
   tasks: typeof tasks;
+  tax: typeof tax;
   twofa: typeof twofa;
   users: typeof users;
   visitors: typeof visitors;

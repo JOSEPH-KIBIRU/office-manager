@@ -65,6 +65,8 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/accounting/fixed-assets", label: "Fixed assets", icon: "🏗️", roles: ["admin", "secretary", "manager"], module: "accounting" },
       { href: "/accounting/recurring", label: "Recurring", icon: "🔁", roles: ["admin", "secretary"], module: "accounting" },
       { href: "/accounting/close", label: "Month-end close", icon: "📆", roles: ["admin", "secretary"], module: "accounting" },
+      { href: "/accounting/reports", label: "Financial reports", icon: "📊", roles: ["admin", "secretary", "manager"], module: "management-reports" },
+      { href: "/accounting/tax", label: "Tax & VAT", icon: "🧾", roles: ["admin", "secretary"], module: "accounting" },
     ],
   },
   {

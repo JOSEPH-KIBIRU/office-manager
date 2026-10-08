@@ -1083,6 +1083,28 @@ export default defineSchema(
     value: v.number(),
   }).index("by_org_key", ["orgId", "key"]),
 
+  // Centralised, configurable tax rates (VAT, PAYE, NSSF, SHIF, Housing Levy, HELB, WHT…).
+  taxConfigs: defineTable({
+    orgId: v.id("organizations"),
+    code: v.string(),
+    name: v.string(),
+    // Percentage rate (e.g. 16 for 16%).
+    rate: v.number(),
+    effectiveDate: v.string(),
+    // Where the tax posts: an input (asset) account, output (liability) account
+    // and the liability account used for withholding, where applicable.
+    inputAccountCode: v.optional(v.string()),
+    outputAccountCode: v.optional(v.string()),
+    liabilityAccountCode: v.optional(v.string()),
+    active: v.boolean(),
+    notes: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_code", ["orgId", "code"]),
+
 
   calendarConnections: defineTable({
     orgId: v.id("organizations"),

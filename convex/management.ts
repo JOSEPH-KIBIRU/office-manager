@@ -470,6 +470,92 @@ export const cashFlowStatement = query({
   },
 });
 
+/** Expense analysis by account (optionally filtered by cost centre / project). */
+export const expenseAnalysis = query({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    from: v.string(),
+    through: v.string(),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const accounts = await loadAccounts(ctx, args.orgId);
+    const journals = await loadJournals(ctx, args.orgId);
+    const map = new Map<string, number>();
+    for (const j of journals) {
+      if (j.date < args.from || j.date > args.through) continue;
+      for (const l of j.lines) {
+        if (args.costCenterCode && l.costCenterCode !== args.costCenterCode) continue;
+        if (args.projectId && (l.projectId as string) !== args.projectId) continue;
+        const info = accounts.get(l.accountCode);
+        if (!info || !isCost(info.type)) continue;
+        map.set(l.accountCode, (map.get(l.accountCode) ?? 0) + (l.debit - l.credit));
+      }
+    }
+    const rows = [...map.entries()]
+      .map(([code, amount]) => ({ code, name: accounts.get(code)?.name ?? code, amount: roundKes(amount) }))
+      .filter((r) => r.amount !== 0)
+      .sort((a, b) => b.amount - a.amount);
+    const total = roundKes(rows.reduce((s, r) => s + r.amount, 0));
+    return { from: args.from, through: args.through, rows, total };
+  },
+});
+
+/** Revenue analysis by account (optionally filtered by cost centre / project). */
+export const revenueAnalysis = query({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    from: v.string(),
+    through: v.string(),
+    costCenterCode: v.optional(v.string()),
+    projectId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const accounts = await loadAccounts(ctx, args.orgId);
+    const journals = await loadJournals(ctx, args.orgId);
+    const map = new Map<string, number>();
+    for (const j of journals) {
+      if (j.date < args.from || j.date > args.through) continue;
+      for (const l of j.lines) {
+        if (args.costCenterCode && l.costCenterCode !== args.costCenterCode) continue;
+        if (args.projectId && (l.projectId as string) !== args.projectId) continue;
+        const info = accounts.get(l.accountCode);
+        if (!info || !isIncome(info.type)) continue;
+        map.set(l.accountCode, (map.get(l.accountCode) ?? 0) + (l.credit - l.debit));
+      }
+    }
+    const rows = [...map.entries()]
+      .map(([code, amount]) => ({ code, name: accounts.get(code)?.name ?? code, amount: roundKes(amount) }))
+      .filter((r) => r.amount !== 0)
+      .sort((a, b) => b.amount - a.amount);
+    const total = roundKes(rows.reduce((s, r) => s + r.amount, 0));
+    return { from: args.from, through: args.through, rows, total };
+  },
+});
+
+/** Depreciation schedule: the depreciation entries posted in the period. */
+export const depreciationSchedule = query({
+  args: { secret: v.string(), orgId: v.id("organizations"), from: v.string(), through: v.string() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const journals = await loadJournals(ctx, args.orgId);
+    const rows = journals
+      .filter((j) => j.source === "depreciation" && j.date >= args.from && j.date <= args.through && !j.reversedBy)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((j) => {
+        const amount = j.lines.reduce((s, l) => s + l.debit, 0);
+        return { id: j._id, date: j.date, description: j.description, ref: j.ref, amount: roundKes(amount) };
+      });
+    const total = roundKes(rows.reduce((s, r) => s + r.amount, 0));
+    return { from: args.from, through: args.through, rows, total };
+  },
+});
+
 export const projectProfitability = query({
   args: { secret: v.string(), orgId: v.id("organizations"), from: v.string(), through: v.string() },
   handler: async (ctx, args) => {

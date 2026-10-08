@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
     const today = new Date().toISOString().slice(0, 10);
     const from = url.searchParams.get("from") || `${today.slice(0, 4)}-01-01`;
     const through = url.searchParams.get("through") || today;
+    const costCenterCode = url.searchParams.get("costCenterCode") || undefined;
+    const projectId = url.searchParams.get("projectId") || undefined;
 
     try {
       if (type === "budget-vs-actual") {
@@ -28,6 +30,18 @@ export async function GET(req: NextRequest) {
       }
       if (type === "cash-flow") {
         const data = await cx().query(api.management.cashFlowStatement, { secret: secret(), orgId: session.orgId as never, from, through });
+        return ok(data);
+      }
+      if (type === "expense-analysis") {
+        const data = await cx().query(api.management.expenseAnalysis, { secret: secret(), orgId: session.orgId as never, from, through, costCenterCode, projectId });
+        return ok(data);
+      }
+      if (type === "revenue-analysis") {
+        const data = await cx().query(api.management.revenueAnalysis, { secret: secret(), orgId: session.orgId as never, from, through, costCenterCode, projectId });
+        return ok(data);
+      }
+      if (type === "depreciation-schedule") {
+        const data = await cx().query(api.management.depreciationSchedule, { secret: secret(), orgId: session.orgId as never, from, through });
         return ok(data);
       }
       if (type === "pnl-by-dimension") {

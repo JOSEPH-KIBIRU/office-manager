@@ -16,6 +16,8 @@ export async function GET(req: NextRequest) {
     const type = url.searchParams.get("type") || "trial";
     const from = url.searchParams.get("from") || undefined;
     const through = url.searchParams.get("through") || undefined;
+    const costCenterCode = url.searchParams.get("costCenterCode") || undefined;
+    const projectId = url.searchParams.get("projectId") || undefined;
     const today = new Date().toISOString().slice(0, 10);
 
     try {
@@ -24,6 +26,8 @@ export async function GET(req: NextRequest) {
           secret: secret(),
           orgId: session.orgId as never,
           through,
+          costCenterCode,
+          projectId,
         });
         return ok({ type, data });
       }
@@ -35,6 +39,8 @@ export async function GET(req: NextRequest) {
           orgId: session.orgId as never,
           from: start,
           through: end,
+          costCenterCode,
+          projectId,
         });
         return ok({ type, data });
       }
@@ -43,6 +49,8 @@ export async function GET(req: NextRequest) {
           secret: secret(),
           orgId: session.orgId as never,
           through: through || today,
+          costCenterCode,
+          projectId,
         });
         return ok({ type, data });
       }
