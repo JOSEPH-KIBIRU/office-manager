@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requirePermission("team", ["admin"]);
+    const session = await requirePermission("user-manage", ["admin"]);
     const body = await readJson<{ name: string; email: string; phone?: string; role: string; employment_type?: string; bank_name?: string; bank_account?: string; mpesa_number?: string }>(req);
     requireFields(body, ["name", "email", "role"]);
 

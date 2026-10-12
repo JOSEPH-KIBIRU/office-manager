@@ -25,7 +25,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   return handle(async () => {
-    const session = await requirePermission("organization", ["admin", "secretary"]);
+    const session = await requirePermission("organization-settings", ["admin", "secretary"]);
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
     const input: Record<string, unknown> = { secret: secret(), orgId: session.orgId as never };

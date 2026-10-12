@@ -10,7 +10,7 @@ import { recordAudit } from "@/lib/audit";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requirePermission("team", ["admin"]);
+    const session = await requirePermission("user-manage", ["admin"]);
     const { id: idStr } = await ctx.params;
     const id = idStr;
 
@@ -162,7 +162,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requirePermission("team", ["admin"]);
+    const session = await requirePermission("user-manage", ["admin"]);
     const { id: idStr } = await ctx.params;
     if (idStr === session.id) throw new HttpError(400, "You cannot delete your own account");
 

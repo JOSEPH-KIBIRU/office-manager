@@ -2,6 +2,7 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useSession } from "@/components/SessionProvider";
+import { usePermissions } from "@/components/usePermissions";
 import { PageHeader, StatusBadge, Alert, FieldError, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import type { PettyCashRow } from "@/lib/types";
@@ -16,7 +17,8 @@ interface LineItem {
 
 export default function PettyCashPage() {
   const session = useSession();
-  const isAdmin = session.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = session.role === "admin" || can("petty-cash-approve");
   const isManager = session.role === "manager" || isAdmin;
   const [rows, setRows] = useState<PettyCashRow[]>([]);
   const [error, setError] = useState<string | null>(null);

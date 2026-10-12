@@ -7,7 +7,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
 /** Update a visitor's status. Reception only (admin + secretary). */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requirePermission("visitors", ["admin", "secretary"]);
+    const session = await requirePermission("visitor-manage", ["admin", "secretary"]);
     const { id } = await ctx.params;
     const body = await readJson<{ status?: "pending" | "seen" | "completed" }>(req);
     if (!body.status) throw new HttpError(400, "Status is required");

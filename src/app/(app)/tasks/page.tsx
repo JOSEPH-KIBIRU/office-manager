@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSession } from "@/components/SessionProvider";
+import { usePermissions } from "@/components/usePermissions";
 import { PageHeader, Alert, Modal, FieldError, inputCls, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 
@@ -57,7 +58,8 @@ const PRIORITY_BADGE: Record<string, string> = {
 
 export default function TasksPage() {
   const session = useSession();
-  const isAdmin = session?.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = session?.role === "admin" || can("task-manage");
   const toast = useToast();
 
   const [scope, setScope] = useState<"assigned" | "created" | "all">("assigned");

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, FormEvent } from "react";
 import { PageHeader, Alert, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useSession } from "@/components/SessionProvider";
+import { usePermissions } from "@/components/usePermissions";
 import type { Role } from "@/lib/types";
 
 interface VisitorRow {
@@ -42,7 +43,8 @@ function fmtDateTime(ms: number): string {
 export default function VisitorsPage() {
   const session = useSession();
   const toast = useToast();
-  const isReception = session?.role === "admin" || session?.role === "secretary";
+  const { can } = usePermissions();
+  const isReception = session?.role === "admin" || session?.role === "secretary" || can("visitor-manage");
   const isAdmin = session?.role === "admin";
 
   const [visitors, setVisitors] = useState<VisitorRow[]>([]);

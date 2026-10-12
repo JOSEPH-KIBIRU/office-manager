@@ -37,6 +37,13 @@ export type ModuleKey =
   | "projects"
   | "budgets"
   | "management-reports"
+  | "leave-approve"
+  | "petty-cash-approve"
+  | "car-approve"
+  | "visitor-manage"
+  | "task-manage"
+  | "user-manage"
+  | "organization-settings"
   | "petty-cash"
   | "accounting"
   | "cars"
@@ -84,6 +91,13 @@ export const MODULES: ModuleDef[] = [
   { key: "projects", label: "Projects", group: "Management" },
   { key: "budgets", label: "Budgets", group: "Management" },
   { key: "management-reports", label: "Management reports", group: "Management" },
+  { key: "leave-approve", label: "Approve leave", group: "Controls" },
+  { key: "petty-cash-approve", label: "Approve petty cash", group: "Controls" },
+  { key: "car-approve", label: "Approve car logs", group: "Controls" },
+  { key: "visitor-manage", label: "Manage visitors", group: "Controls" },
+  { key: "task-manage", label: "Manage tasks", group: "Controls" },
+  { key: "user-manage", label: "Manage team", group: "Controls" },
+  { key: "organization-settings", label: "Company settings", group: "Controls" },
   { key: "petty-cash", label: "Petty Cash", group: "Finance" },
   { key: "accounting", label: "Accounting", group: "Finance" },
   { key: "cars", label: "Car Logs", group: "Finance" },

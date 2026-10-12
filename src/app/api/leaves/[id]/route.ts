@@ -10,7 +10,7 @@ import { queueCalendarSync } from "@/lib/calendar/enqueue";
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     // Only the admin may modify leave requests — employees cannot edit once submitted.
-    const session = await requirePermission("leave", ["admin"]);
+    const session = await requirePermission("leave-approve", ["admin"]);
     const { id } = await ctx.params;
 
     const leave = await cx().query(api.leaves.getLeave, {

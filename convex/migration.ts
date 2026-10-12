@@ -180,6 +180,41 @@ export const ensureAuditLogModule = mutation({
   },
 });
 
+/** New approval/control modules must be added to any company with a restricted cap. */
+const CONTROL_MODULES = [
+  "leave-approve",
+  "petty-cash-approve",
+  "car-approve",
+  "visitor-manage",
+  "task-manage",
+  "user-manage",
+  "organization-settings",
+];
+
+export const ensureControlModulesInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const name = "ensureControlModules";
+    const already = await ctx.db
+      .query("migrations")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .unique();
+    if (already) return { skipped: true, updated: 0 };
+
+    let updated = 0;
+    for (const o of await ctx.db.query("organizations").collect()) {
+      if (Array.isArray(o.enabledModules)) {
+        const merged = Array.from(new Set([...o.enabledModules, ...CONTROL_MODULES]));
+        if (merged.length !== o.enabledModules.length) {
+          await ctx.db.patch(o._id, { enabledModules: merged });
+          updated += 1;
+        }
+      }
+    }
+    await ctx.db.insert("migrations", { name, runAt: tsNow() });
+    return { skipped: false, updated };
+  },
+});
 /** Same as `ensureAuditLogModule` but callable from the Convex CLI/dashboard
  *  (internal, so no server secret is needed): `npx convex run migration:ensureAuditLogModuleInternal`. */
 export const ensureAuditLogModuleInternal = internalMutation({

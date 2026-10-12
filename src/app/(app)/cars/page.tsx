@@ -2,6 +2,7 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useSession } from "@/components/SessionProvider";
+import { usePermissions } from "@/components/usePermissions";
 import { PageHeader, StatusBadge, Modal, Alert, FieldError, inputCls, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { validate, required, minNum, type Errors } from "@/lib/validation";
@@ -11,7 +12,8 @@ const CATEGORIES = ["repair", "insurance", "service"] as const;
 
 export default function CarLogsPage() {
   const session = useSession();
-  const isAdmin = session.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = session.role === "admin" || can("car-approve");
   const [logs, setLogs] = useState<CarLogRow[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<CarLogRow | null>(null);

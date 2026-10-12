@@ -7,7 +7,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requirePermission("team", ["admin"]);
+    const session = await requirePermission("user-manage", ["admin"]);
     const { id } = await ctx.params;
 
     const row = await cx().query(api.profiles.getProfileRequest, {

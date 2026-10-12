@@ -7,7 +7,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requirePermission("petty-cash", ["admin"]);
+    const session = await requirePermission("petty-cash-approve", ["admin"]);
     const { id } = await ctx.params;
 
     const row = await cx().query(api.pettyCash.getPettyCash, {

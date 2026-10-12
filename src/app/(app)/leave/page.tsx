@@ -2,6 +2,7 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useSession } from "@/components/SessionProvider";
+import { usePermissions } from "@/components/usePermissions";
 import { PageHeader, StatusBadge, Modal, Alert, FieldError, inputCls, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { validate, dateOrder, required, type Errors } from "@/lib/validation";
@@ -16,7 +17,8 @@ function daysBetween(start: string, end: string): number {
 
 export default function LeavePage() {
   const session = useSession();
-  const isAdmin = session.role === "admin";
+  const { can } = usePermissions();
+  const isAdmin = session.role === "admin" || can("leave-approve");
   const [leaves, setLeaves] = useState<LeaveRow[]>([]);
   const [balance, setBalance] = useState<number | null>(null);
   const [showApply, setShowApply] = useState(false);

@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 /** Create a task (admin only). */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requirePermission("tasks", ["admin"]);
+    const session = await requirePermission("task-manage", ["admin"]);
     const body = await readJson<{
       title: string;
       description?: string;

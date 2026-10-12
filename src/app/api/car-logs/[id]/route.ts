@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
     try {
       if (body.action) {
-        if (session.role !== "admin") throw new HttpError(403, "Only the admin can approve or reject");
+        await requirePermission("car-approve", ["admin"]);
         await cx().mutation(api.carLogs.updateCarLog, {
           secret: secret(),
           orgId: session.orgId as never,
