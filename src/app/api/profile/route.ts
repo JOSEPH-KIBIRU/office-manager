@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api } from "@/lib/convex";
 
 export async function GET() {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("profile", ["admin", "secretary", "manager", "employee"]);
     const profile = await cx().query(api.auth.getUserById, {
       secret: secret(),
       id: session.id as never,
@@ -29,7 +30,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser();
+    const session = await requirePermission("profile", ["admin", "secretary", "manager", "employee"]);
     const body = await readJson<{ phone?: string }>(req);
 
     if (body.phone !== undefined) {

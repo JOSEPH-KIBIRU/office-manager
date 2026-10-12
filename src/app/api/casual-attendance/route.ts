@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 /** Log casual attendance for a day. Admin only. */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requirePermission("payroll", ["admin"]);
+    const session = await requirePermission("payroll-run", ["admin"]);
     const body = await readJson<{ casualId: string; date: string; days: number; note?: string }>(req);
     requireFields(body, ["casualId", "date"]);
     const days = Number(body.days ?? 1);

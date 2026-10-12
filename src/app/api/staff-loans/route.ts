@@ -23,7 +23,7 @@ export async function GET() {
 /** Create a staff loan / advance. Admin only. */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requirePermission("payroll", ["admin"]);
+    const session = await requirePermission("payroll-run", ["admin"]);
     const body = await readJson<{
       userId: string;
       kind: "loan" | "advance";

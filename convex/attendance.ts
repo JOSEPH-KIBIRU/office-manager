@@ -70,6 +70,66 @@ export const clockOut = mutation({
   },
 });
 
+/** Admin/manager correction: upsert a person's record for a given day.
+ *  Sets clock-in/out from "HH:MM" (EAT). Passing no clockOut re-opens the day;
+ *  passing no clock-in on an existing record keeps the stored value. */
+export const correctAttendance = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    date: v.string(),
+    clockIn: v.optional(v.string()),
+    clockOut: v.optional(v.string()),
+    note: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.userId);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) throw new Error("Invalid date (expected YYYY-MM-DD)");
+
+    const rows = await ctx.db
+      .query("attendance")
+      .withIndex("by_org_date", (q) => q.eq("orgId", args.orgId).eq("date", args.date))
+      .collect();
+    const existing = rows.find((r) => r.userId === args.userId);
+
+    const clockInMs = args.clockIn ? atDateMinutes(args.date, minutesOf(args.clockIn)) : existing?.clockInAt;
+    const clockOutMs =
+      args.clockOut !== undefined
+        ? args.clockOut
+          ? atDateMinutes(args.date, minutesOf(args.clockOut))
+          : undefined
+        : existing?.clockOutAt;
+    if (clockInMs === undefined) throw new Error("A clock-in time is required");
+    if (clockOutMs !== undefined && clockOutMs < clockInMs) {
+      throw new Error("Clock-out cannot be before clock-in");
+    }
+
+    const now = tsNow();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        clockInAt: clockInMs,
+        clockOutAt: clockOutMs,
+        note: args.note?.trim() || undefined,
+        updatedAt: now,
+      });
+      return { id: existing._id, created: false };
+    }
+    const id = await ctx.db.insert("attendance", {
+      orgId: args.orgId,
+      userId: args.userId,
+      date: args.date,
+      clockInAt: clockInMs,
+      clockOutAt: clockOutMs,
+      note: args.note?.trim() || undefined,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return { id, created: true };
+  },
+});
+
 /** Today's attendance record for the viewer (or null). */
 export const today = query({
   args: { secret: v.string(), orgId: v.id("organizations"), userId: v.id("users") },
@@ -97,11 +157,12 @@ export const list = query({
     userId: v.optional(v.id("users")),
     from: v.optional(v.string()),
     to: v.optional(v.string()),
+    seeAll: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const viewer = await requireMember(ctx, args.orgId, args.viewerId);
-    const seeAll = viewer.role !== "employee";
+    const seeAll = args.seeAll ?? viewer.role !== "employee";
 
     let rows = await ctx.db
       .query("attendance")

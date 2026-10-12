@@ -5,6 +5,7 @@ import { PageHeader, Alert, FieldError, inputCls, Modal, ConfirmDialog, HelpTip,
 import { PayslipLines, type PayslipDetail } from "@/components/payslip";
 import { type Errors } from "@/lib/validation";
 import { ROLE_LABELS, type Role } from "@/lib/types";
+import { usePermissions } from "@/components/usePermissions";
 
 interface EmployeeForPayroll {
   id: string;
@@ -95,6 +96,8 @@ const emptyCasualForm = { name: "", phone: "", idNumber: "", dailyRate: "" };
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export default function PayrollPage() {
+  const { can } = usePermissions();
+  const canRun = can("payroll-run");
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [employees, setEmployees] = useState<EmployeeForPayroll[]>([]);
   const [casuals, setCasuals] = useState<CasualRow[]>([]);
@@ -770,7 +773,7 @@ export default function PayrollPage() {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-700">Casual workers</h3>
-              <button type="button" className="btn-secondary px-3 py-1 text-xs" onClick={openNewCasual}>+ Add casual</button>
+              {canRun && <button type="button" className="btn-secondary px-3 py-1 text-xs" onClick={openNewCasual}>+ Add casual</button>}
             </div>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="table-base">
@@ -823,9 +826,13 @@ export default function PayrollPage() {
               <span className="font-medium">{selectedCount}</span> of {eligible.length + casualsEligible.length} payee(s) selected
               <FieldError msg={errors.selected} />
             </div>
-            <button type="submit" className="btn-primary" disabled={busy}>
-              {busy ? "Processing…" : `Process payroll (${selectedCount})`}
-            </button>
+            {canRun ? (
+              <button type="submit" className="btn-primary" disabled={busy}>
+                {busy ? "Processing…" : `Process payroll (${selectedCount})`}
+              </button>
+            ) : (
+              <span className="text-xs font-medium text-slate-500">You do not have permission to run payroll.</span>
+            )}
           </div>
         </form>
       </div>
@@ -837,7 +844,7 @@ export default function PayrollPage() {
             <h2 className="text-sm font-semibold text-slate-600">Casual workers</h2>
             <p className="mt-1 text-xs text-slate-500">Register daily-rate workers, then log their attendance or enter days in the run.</p>
           </div>
-          <button className="btn-secondary px-3 py-1.5 text-sm" onClick={openNewCasual}>+ Add casual</button>
+          {canRun && <button className="btn-secondary px-3 py-1.5 text-sm" onClick={openNewCasual}>+ Add casual</button>}
         </div>
         <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
           <table className="table-base">
@@ -851,8 +858,12 @@ export default function PayrollPage() {
                   <td className="text-right">{fmt(c.dailyRate)}</td>
                   <td><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${c.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{c.active ? "Active" : "Inactive"}</span></td>
                   <td className="whitespace-nowrap text-right">
-                    <button onClick={() => openEditCasual(c)} className="btn-secondary px-2 py-1 text-xs">Edit</button>
-                    <button onClick={() => setDeletingCasual(c)} className="btn-danger ml-1 px-2 py-1 text-xs">Delete</button>
+                    {canRun && (
+                      <>
+                        <button onClick={() => openEditCasual(c)} className="btn-secondary px-2 py-1 text-xs">Edit</button>
+                        <button onClick={() => setDeletingCasual(c)} className="btn-danger ml-1 px-2 py-1 text-xs">Delete</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -877,7 +888,7 @@ export default function PayrollPage() {
           <div><label className="label">Date</label><input type="date" className="input" value={attForm.date} onChange={(e) => setAttForm((p) => ({ ...p, date: e.target.value }))} required /></div>
           <div><label className="label">Days</label><input type="number" min={0.5} step="0.5" className="input w-24" value={attForm.days} onChange={(e) => setAttForm((p) => ({ ...p, days: e.target.value }))} /></div>
           <div className="min-w-[12rem] flex-1"><label className="label">Note</label><input className="input" value={attForm.note} onChange={(e) => setAttForm((p) => ({ ...p, note: e.target.value }))} placeholder="Optional" /></div>
-          <button type="submit" className="btn-primary" disabled={attBusy}>{attBusy ? "Saving…" : "Log attendance"}</button>
+          {canRun && <button type="submit" className="btn-primary" disabled={attBusy}>{attBusy ? "Saving…" : "Log attendance"}</button>}
           <button type="button" className="btn-secondary" onClick={loadAttendance}>Refresh</button>
         </form>
         <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
@@ -900,7 +911,7 @@ export default function PayrollPage() {
             <h2 className="text-sm font-semibold text-slate-600">Staff loans &amp; advances</h2>
             <p className="mt-1 text-xs text-slate-500">Recovered automatically from each payroll run until the balance clears.</p>
           </div>
-          <button className="btn-secondary px-3 py-1.5 text-sm" onClick={openNewLoan}>+ Add loan / advance</button>
+          {canRun && <button className="btn-secondary px-3 py-1.5 text-sm" onClick={openNewLoan}>+ Add loan / advance</button>}
         </div>
         <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200">
           <table className="table-base">
@@ -915,9 +926,13 @@ export default function PayrollPage() {
                   <td className="text-right">{fmt(l.monthlyDeduction)}</td>
                   <td><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${l.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{l.active ? "Active" : "Closed"}</span></td>
                   <td className="whitespace-nowrap text-right">
-                    <button onClick={() => openEditLoan(l)} className="btn-secondary px-2 py-1 text-xs">Edit</button>
-                    <button onClick={() => toggleLoanActive(l)} className="btn-secondary ml-1 px-2 py-1 text-xs">{l.active ? "Stop" : "Resume"}</button>
-                    <button onClick={() => setDeletingLoan(l)} className="btn-danger ml-1 px-2 py-1 text-xs">Delete</button>
+                    {canRun && (
+                      <>
+                        <button onClick={() => openEditLoan(l)} className="btn-secondary px-2 py-1 text-xs">Edit</button>
+                        <button onClick={() => toggleLoanActive(l)} className="btn-secondary ml-1 px-2 py-1 text-xs">{l.active ? "Stop" : "Resume"}</button>
+                        <button onClick={() => setDeletingLoan(l)} className="btn-danger ml-1 px-2 py-1 text-xs">Delete</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -953,9 +968,13 @@ export default function PayrollPage() {
                 <td className="text-slate-500">{r.created_at}</td>
                 <td className="whitespace-nowrap text-right">
                   <button onClick={() => (openRun === r.id ? setOpenRun(null) : showRun(r.id))} className="btn-secondary btn-xs">{openRun === r.id ? "Hide" : "View"}</button>
-                  <button onClick={() => openEdit(r)} className="btn-secondary ml-1 px-2 py-1 text-xs">Edit</button>
-                  <button onClick={() => markPaid(r, !r.paid)} className="btn-secondary ml-1 px-2 py-1 text-xs">{r.paid ? "Unmark" : "Mark paid"}</button>
-                  <button onClick={() => setDeletingRun(r)} className="btn-danger ml-1 px-2 py-1 text-xs">Delete</button>
+                  {canRun && (
+                    <>
+                      <button onClick={() => openEdit(r)} className="btn-secondary ml-1 px-2 py-1 text-xs">Edit</button>
+                      <button onClick={() => markPaid(r, !r.paid)} className="btn-secondary ml-1 px-2 py-1 text-xs">{r.paid ? "Unmark" : "Mark paid"}</button>
+                      <button onClick={() => setDeletingRun(r)} className="btn-danger ml-1 px-2 py-1 text-xs">Delete</button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

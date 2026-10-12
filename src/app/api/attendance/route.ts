@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { HttpError } from "@/lib/auth";
-import { requirePermission } from "@/lib/permissionGuard";
+import { requirePermission, getEffectivePermissions } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
     }
 
     try {
+      const perms = await getEffectivePermissions(session.orgId as string, session.role);
+      const seeAll = perms.includes("attendance-manage");
       const [records, today] = await Promise.all([
         cx().query(api.attendance.list, {
           secret: secret(),
@@ -32,6 +34,7 @@ export async function GET(req: NextRequest) {
           viewerId: session.id as never,
           from,
           to,
+          seeAll,
         }),
         cx().query(api.attendance.today, {
           secret: secret(),

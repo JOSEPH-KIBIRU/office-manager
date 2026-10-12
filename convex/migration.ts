@@ -189,6 +189,8 @@ const CONTROL_MODULES = [
   "task-manage",
   "user-manage",
   "organization-settings",
+  "payroll-run",
+  "attendance-manage",
 ];
 
 export const ensureControlModulesInternal = internalMutation({
@@ -215,8 +217,33 @@ export const ensureControlModulesInternal = internalMutation({
     return { skipped: false, updated };
   },
 });
-/** Same as `ensureAuditLogModule` but callable from the Convex CLI/dashboard
- *  (internal, so no server secret is needed): `npx convex run migration:ensureAuditLogModuleInternal`. */
+/** Adds the finer-grained payroll/attendance control keys to capped companies. */
+export const ensurePayrollControlModulesInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const name = "ensurePayrollControlModules";
+    const already = await ctx.db
+      .query("migrations")
+      .withIndex("by_name", (q) => q.eq("name", name))
+      .unique();
+    if (already) return { skipped: true, updated: 0 };
+
+    const keys = ["payroll-run", "attendance-manage"];
+    let updated = 0;
+    for (const o of await ctx.db.query("organizations").collect()) {
+      if (Array.isArray(o.enabledModules)) {
+        const merged = Array.from(new Set([...o.enabledModules, ...keys]));
+        if (merged.length !== o.enabledModules.length) {
+          await ctx.db.patch(o._id, { enabledModules: merged });
+          updated += 1;
+        }
+      }
+    }
+    await ctx.db.insert("migrations", { name, runAt: tsNow() });
+    return { skipped: false, updated };
+  },
+});
+
 export const ensureAuditLogModuleInternal = internalMutation({
   args: {},
   handler: async (ctx) => {

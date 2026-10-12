@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { PageHeader, Alert, api } from "@/components/ui";
+import { PageHeader, Alert, Modal, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useSession } from "@/components/SessionProvider";
+import { usePermissions } from "@/components/usePermissions";
 
 interface AttendRec {
   id: string;
@@ -38,11 +39,19 @@ function fmtTime(ms: number | null): string {
 function fmtHours(min: number): string {
   return `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}m`;
 }
+/** EAT "HH:MM" for a timestamp (for the correction form). */
+function toHHMM(ms: number | null): string {
+  if (!ms) return "";
+  const d = new Date(ms + 3 * 3600_000);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+}
 
 export default function AttendancePage() {
   const session = useSession();
   const toast = useToast();
+  const { can } = usePermissions();
   const isAdmin = session?.role === "admin" || session?.role === "secretary" || session?.role === "manager";
+  const canManage = can("attendance-manage");
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -52,6 +61,9 @@ export default function AttendancePage() {
   const [today, setToday] = useState<{ clock_in_at: number; clock_out_at: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fix, setFix] = useState<AttendRec | "new" | null>(null);
+  const [fixForm, setFixForm] = useState({ userId: "", date: "", clockIn: "", clockOut: "", note: "" });
+  const [fixBusy, setFixBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -91,6 +103,48 @@ export default function AttendancePage() {
     }
   }
 
+  function openFix(rec: AttendRec | "new") {
+    if (rec === "new") {
+      setFixForm({ userId: "", date: `${year}-${String(month).padStart(2, "0")}-01`, clockIn: "", clockOut: "", note: "" });
+    } else {
+      setFixForm({
+        userId: rec.user_id,
+        date: rec.date,
+        clockIn: toHHMM(rec.clock_in_at),
+        clockOut: rec.clock_out_at ? toHHMM(rec.clock_out_at) : "",
+        note: rec.note ?? "",
+      });
+    }
+    setFix(rec);
+  }
+
+  async function submitFix() {
+    if (!fix) return;
+    if (!fixForm.userId) return toast.error("Select an employee");
+    if (!fixForm.date) return toast.error("Pick a date");
+    if (!fixForm.clockIn) return toast.error("Clock-in time is required");
+    setFixBusy(true);
+    try {
+      await api("/api/attendance/correct", {
+        method: "POST",
+        json: {
+          user_id: fixForm.userId,
+          date: fixForm.date,
+          clock_in: fixForm.clockIn,
+          clock_out: fixForm.clockOut === "" ? null : fixForm.clockOut,
+          note: fixForm.note,
+        },
+      });
+      toast.success("Attendance saved");
+      setFix(null);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setFixBusy(false);
+    }
+  }
+
   return (
     <>
       <PageHeader title="Attendance" subtitle="Clock in and out, and review hours, lateness and overtime." />
@@ -123,6 +177,9 @@ export default function AttendancePage() {
           {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
         </select>
         <input type="number" className="input w-28" value={year} min={2000} max={2100} onChange={(e) => setYear(Number(e.target.value))} />
+        {canManage && (
+          <button className="btn-secondary ml-auto" onClick={() => openFix("new")}>Manual entry</button>
+        )}
       </div>
 
       {/* Team summary (admins) */}
@@ -153,7 +210,7 @@ export default function AttendancePage() {
         <h2 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Records</h2>
         <table className="table-base">
           <thead>
-            <tr><th>Date</th>{isAdmin && <th>Employee</th>}<th>In</th><th>Out</th><th className="text-right">Worked</th><th>Flags</th></tr>
+            <tr><th>Date</th>{isAdmin && <th>Employee</th>}<th>In</th><th>Out</th><th className="text-right">Worked</th><th>Flags</th>{canManage && <th></th>}</tr>
           </thead>
           <tbody>
             {records.map((r) => (
@@ -169,14 +226,61 @@ export default function AttendancePage() {
                     {r.overtime_minutes > 0 && <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700">OT {fmtHours(r.overtime_minutes)}</span>}
                   </span>
                 </td>
+                {canManage && (
+                  <td className="text-right">
+                    <button className="text-xs font-semibold text-indigo-600 hover:underline" onClick={() => openFix(r)}>Fix</button>
+                  </td>
+                )}
               </tr>
             ))}
             {records.length === 0 && (
-              <tr><td colSpan={isAdmin ? 6 : 5} className="py-8 text-center text-sm text-slate-500">No attendance recorded for this month.</td></tr>
+              <tr><td colSpan={(isAdmin ? 6 : 5) + (canManage ? 1 : 0)} className="py-8 text-center text-sm text-slate-500">No attendance recorded for this month.</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {fix && (
+        <Modal title={fix === "new" ? "Add attendance record" : "Correct attendance"} onClose={() => setFix(null)}>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-500">Employee</label>
+              <select
+                className="input"
+                value={fixForm.userId}
+                disabled={fix !== "new"}
+                onChange={(e) => setFixForm({ ...fixForm, userId: e.target.value })}
+              >
+                <option value="">Select…</option>
+                {(summary ?? []).map((s) => <option key={s.user_id} value={s.user_id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-500">Date</label>
+              <input type="date" className="input" value={fixForm.date} onChange={(e) => setFixForm({ ...fixForm, date: e.target.value })} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500">Clock in</label>
+                <input type="time" className="input" value={fixForm.clockIn} onChange={(e) => setFixForm({ ...fixForm, clockIn: e.target.value })} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-slate-500">Clock out</label>
+                <input type="time" className="input" value={fixForm.clockOut} onChange={(e) => setFixForm({ ...fixForm, clockOut: e.target.value })} />
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-500">Note (optional)</label>
+              <input className="input" value={fixForm.note} onChange={(e) => setFixForm({ ...fixForm, note: e.target.value })} placeholder="Reason for correction" />
+            </div>
+            <p className="text-xs text-slate-500">Leave clock-out blank to re-open the day. The correction is recorded in the audit log.</p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button className="btn-secondary" onClick={() => setFix(null)} disabled={fixBusy}>Cancel</button>
+              <button className="btn-primary" onClick={submitFix} disabled={fixBusy}>{fixBusy ? "Saving…" : "Save"}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

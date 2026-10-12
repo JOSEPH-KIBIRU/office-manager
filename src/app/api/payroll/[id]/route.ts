@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
 /** Admin only: edit a payroll run (recalculates payslips). */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requirePermission("payroll", ["admin"]);
+    const session = await requirePermission("payroll-run", ["admin"]);
     const { id } = await ctx.params;
     const body = await readJson<{
       basicSalaries?: Array<{ userId: string; amount: number }>;
@@ -85,7 +85,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 /** Admin only: delete a payroll run. */
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requirePermission("payroll", ["admin"]);
+    const session = await requirePermission("payroll-run", ["admin"]);
     const { id } = await ctx.params;
     try {
       const result = await cx().mutation(api.payroll.deletePayroll, {

@@ -44,6 +44,8 @@ export type ModuleKey =
   | "task-manage"
   | "user-manage"
   | "organization-settings"
+  | "payroll-run"
+  | "attendance-manage"
   | "petty-cash"
   | "accounting"
   | "cars"
@@ -98,6 +100,8 @@ export const MODULES: ModuleDef[] = [
   { key: "task-manage", label: "Manage tasks", group: "Controls" },
   { key: "user-manage", label: "Manage team", group: "Controls" },
   { key: "organization-settings", label: "Company settings", group: "Controls" },
+  { key: "payroll-run", label: "Run & pay payroll", group: "Controls" },
+  { key: "attendance-manage", label: "Manage attendance", group: "Controls" },
   { key: "petty-cash", label: "Petty Cash", group: "Finance" },
   { key: "accounting", label: "Accounting", group: "Finance" },
   { key: "cars", label: "Car Logs", group: "Finance" },
@@ -124,12 +128,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, ModuleKey[]> = {
     "customers", "suppliers", "receipts", "payments",
     "petty-cash", "accounting", "reports", "tasks", "meetings", "minutes",
     "visitors", "assets", "organization", "documents", "profile",
-    "management-reports",
+    "management-reports", "attendance-manage",
   ],
   manager: [
     "dashboard", "analytics", "leave", "leave-calendar", "attendance",
     "my-payslips", "invoices", "bills", "customers", "suppliers", "petty-cash", "accounting", "cars",
-    "tasks", "documents", "profile", "projects", "management-reports",
+    "tasks", "documents", "profile", "projects", "management-reports", "attendance-manage",
   ],
   employee: [
     "dashboard", "analytics", "leave", "leave-calendar", "attendance",

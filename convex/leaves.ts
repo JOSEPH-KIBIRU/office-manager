@@ -27,6 +27,36 @@ async function enrich(ctx: QueryCtx, l: LeaveDoc) {
   };
 }
 
+/**
+ * Authoritative working-day count for a date range: only the org's working
+ * weekdays, excluding public holidays. Lives in Convex so day counts cannot be
+ * spoofed by a caller — the client's number is never trusted.
+ */
+async function computeWorkingDays(
+  ctx: { db: QueryCtx["db"] },
+  orgId: Id<"organizations">,
+  start: string,
+  end: string
+): Promise<number> {
+  const org = await ctx.db.get(orgId);
+  const working = new Set<number>(
+    org?.workingDays && org.workingDays.length ? org.workingDays : [1, 2, 3, 4, 5]
+  );
+  const holidays = await ctx.db
+    .query("holidays")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .collect();
+  const holidaySet = new Set(holidays.map((h) => h.date));
+
+  const s = new Date(start + "T00:00:00Z");
+  const e = new Date(end + "T00:00:00Z");
+  let count = 0;
+  for (const dt = new Date(s); dt <= e; dt.setUTCDate(dt.getUTCDate() + 1)) {
+    if (working.has(dt.getUTCDay()) && !holidaySet.has(dt.toISOString().slice(0, 10))) count += 1;
+  }
+  return count;
+}
+
 export const listLeaves = query({
   args: {
     secret: v.string(),
@@ -90,9 +120,11 @@ export const applyLeave = mutation({
     assertSecret(args.secret);
     const user = await ctx.db.get(args.userId);
     if (!user || user.orgId !== args.orgId) throw new Error("User not found");
-    if (user.leaveBalance < args.days) {
+    const days = await computeWorkingDays(ctx, args.orgId, args.startDate, args.endDate);
+    if (days <= 0) throw new Error("The selected dates contain no working days.");
+    if (user.leaveBalance < days) {
       throw new Error(
-        `Insufficient leave balance. You have ${user.leaveBalance} day(s) left but requested ${args.days}.`
+        `Insufficient leave balance. You have ${user.leaveBalance} day(s) left but requested ${days}.`
       );
     }
     // Prevent overlapping leave requests for the same person.
@@ -107,13 +139,13 @@ export const applyLeave = mutation({
         args.startDate <= l.endDate
     );
     if (overlap) throw new Error("There is already a leave request covering those dates.");
-    await ctx.db.patch(user._id, { leaveBalance: user.leaveBalance - args.days });
+    await ctx.db.patch(user._id, { leaveBalance: user.leaveBalance - days });
     const id = await ctx.db.insert("leaves", {
       orgId: args.orgId,
       userId: user._id,
       startDate: args.startDate,
       endDate: args.endDate,
-      days: args.days,
+      days,
       leaveType: args.leaveType,
       reason: args.reason,
       status: "pending",
@@ -123,7 +155,7 @@ export const applyLeave = mutation({
       userId: "",
       type: "leave",
       title: "New leave request",
-      body: `${user.name} requested ${args.days} day(s) of ${args.leaveType} leave (${args.startDate} → ${args.endDate}).`,
+      body: `${user.name} requested ${days} day(s) of ${args.leaveType} leave (${args.startDate} → ${args.endDate}).`,
       link: "/leave",
     });
     return id;
@@ -203,11 +235,8 @@ export const editLeave = mutation({
     const end = args.endDate ?? leave.endDate;
     if (end < start) throw new Error("End date cannot be before the start date");
 
-    // Prefer the caller-supplied working-day count (weekends/holidays excluded);
-    // only fall back to a calendar-day count when none is provided.
-    const s = new Date(start + "T00:00:00").getTime();
-    const e = new Date(end + "T00:00:00").getTime();
-    const newDays = args.days !== undefined ? args.days : Math.round((e - s) / 86400000) + 1;
+    // Working days are always recomputed server-side (weekends/holidays excluded).
+    const newDays = await computeWorkingDays(ctx, args.orgId, start, end);
 
     const delta = leave.days - newDays;
     const user = await ctx.db.get(leave.userId);

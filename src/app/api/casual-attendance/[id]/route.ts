@@ -6,7 +6,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
 /** Delete a casual attendance record. Admin only. */
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requirePermission("payroll", ["admin"]);
+    const session = await requirePermission("payroll-run", ["admin"]);
     const { id } = await ctx.params;
     try {
       const res = await cx().mutation(api.payroll.deleteCasualAttendance, {

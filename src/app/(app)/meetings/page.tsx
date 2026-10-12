@@ -22,7 +22,7 @@ interface Meeting {
 interface StaffMember {
   id: string;
   name: string;
-  role: string;
+  is_director: boolean;
 }
 
 function fmtDate(s: string) {
@@ -242,7 +242,7 @@ export default function MeetingsPage() {
               <label className="label" htmlFor="mt-director">Chairing director</label>
               <select id="mt-director" className="input" value={directorId} onChange={(e) => setDirectorId(e.target.value)}>
                 <option value="">— None —</option>
-                {staff.filter((s) => s.role === "admin").map((s) => (
+                {staff.filter((s) => s.is_director).map((s) => (
                   <option key={s.id} value={s.id}>{s.name} (Director)</option>
                 ))}
               </select>
