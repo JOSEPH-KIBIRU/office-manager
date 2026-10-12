@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { sendNewUserCredentials, notifyUser } from "@/lib/notify";
 import { generateTempPassword } from "@/lib/passwords";
@@ -9,7 +10,7 @@ import { recordAudit } from "@/lib/audit";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("team", ["admin"]);
     const { id: idStr } = await ctx.params;
     const id = idStr;
 
@@ -161,7 +162,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("team", ["admin"]);
     const { id: idStr } = await ctx.params;
     if (idStr === session.id) throw new HttpError(400, "You cannot delete your own account");
 

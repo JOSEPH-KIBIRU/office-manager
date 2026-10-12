@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
-import { requireUser, HttpError } from "@/lib/auth";
+import { HttpError } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { sendNewUserCredentials } from "@/lib/notify";
 import { generateTempPassword } from "@/lib/passwords";
@@ -10,7 +11,7 @@ import { recordAudit } from "@/lib/audit";
 export async function GET(req: NextRequest) {
   return handle(async () => {
     // Admin manages users; secretary needs the staff list for meeting attendees.
-    const session = await requireUser(["admin", "secretary"]);
+    const session = await requirePermission("team", ["admin", "secretary"]);
     const url = new URL(req.url);
     const full = url.searchParams.get("full") === "1" && session.role === "admin";
 
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const session = await requireUser(["admin"]);
+    const session = await requirePermission("team", ["admin"]);
     const body = await readJson<{ name: string; email: string; phone?: string; role: string; employment_type?: string; bank_name?: string; bank_account?: string; mpesa_number?: string }>(req);
     requireFields(body, ["name", "email", "role"]);
 
