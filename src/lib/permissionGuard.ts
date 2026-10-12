@@ -40,13 +40,15 @@ export async function getEffectivePermissions(orgId: string, role: string): Prom
 /**
  * Module-level access guard.
  *
- * `fallbackRoles` preserves the existing coarse role gate for the built-in
- * roles. On top of that:
+ * Rules:
  *   - the module must be within the platform cap (applies to every role,
  *     including admin — a disabled module is fully masked);
- *   - when a built-in role has saved permissions, the module must be granted;
- *   - a company-defined (custom) role is never covered by `fallbackRoles`, so it
- *     is allowed only when the module is explicitly granted to it.
+ *   - an admin (Director) always has full access;
+ *   - a company-defined (custom) role is allowed only when the module is granted;
+ *   - a built-in role that has saved permissions is governed by those grants
+ *     (they may extend *or* restrict beyond the default role list);
+ *   - a built-in role with no saved permissions keeps the legacy coarse role gate
+ *     (`fallbackRoles`).
  */
 export async function requirePermission(
   module: string,
@@ -59,28 +61,23 @@ export async function requirePermission(
   const { enabled, granted } = await resolveAccess(session.orgId, session.role);
   const isCustom = !BUILTIN_ROLES.has(session.role);
 
-  // Built-in roles keep their coarse role gate; custom roles are grant-driven.
-  if (!isCustom && !fallbackRoles.includes(session.role)) {
-    throw new HttpError(403, "You do not have permission to perform this action");
-  }
-
   // Platform cap — the hard ceiling for every role, admin included.
   if (enabled && !enabled.includes(module)) {
     throw new HttpError(403, "This module is not available on your plan");
   }
   if (session.role === "admin") return session;
 
-  // Custom roles: allowed only when the module is explicitly granted.
-  if (isCustom) {
+  // Custom roles and configured built-in roles are grant-driven.
+  if (isCustom || Array.isArray(granted)) {
     if (!Array.isArray(granted) || !granted.includes(module)) {
       throw new HttpError(403, "You do not have permission to access this module");
     }
     return session;
   }
 
-  // Built-in, non-admin: enforce saved grants when present.
-  if (Array.isArray(granted) && !granted.includes(module)) {
-    throw new HttpError(403, "You do not have permission to access this module");
+  // Unconfigured built-in role — legacy coarse role gate.
+  if (!fallbackRoles.includes(session.role)) {
+    throw new HttpError(403, "You do not have permission to perform this action");
   }
   return session;
 }
