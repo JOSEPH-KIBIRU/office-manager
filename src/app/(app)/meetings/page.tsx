@@ -43,7 +43,14 @@ export default function MeetingsPage() {
   const [statusBusy, setStatusBusy] = useState(false);
   const toast = useToast();
 
-  const isScheduler = session.role === "admin" || session.role === "secretary";
+  const [canSchedule, setCanSchedule] = useState(session.role === "admin" || session.role === "secretary");
+
+  useEffect(() => {
+    if (canSchedule) return;
+    api<{ modules: string[] }>("/api/permissions/mine")
+      .then((d) => { if (Array.isArray(d.modules) && d.modules.includes("meetings")) setCanSchedule(true); })
+      .catch(() => {});
+  }, [canSchedule]);
 
   const [title, setTitle] = useState("");
   const [agenda, setAgenda] = useState("");
@@ -62,15 +69,6 @@ export default function MeetingsPage() {
     try {
       const m = await api<{ meetings: Meeting[] }>("/api/meetings");
       setMeetings(m.meetings);
-      // Only schedulers may read the staff directory; others just view meetings.
-      if (isScheduler) {
-        try {
-          const u = await api<{ users: StaffMember[] }>("/api/users");
-          setStaff(u.users);
-        } catch {
-          /* attendee list is optional */
-        }
-      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -82,6 +80,14 @@ export default function MeetingsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Attendee directory is only needed by schedulers.
+  useEffect(() => {
+    if (!canSchedule) return;
+    api<{ users: StaffMember[] }>("/api/meetings/attendees")
+      .then((u) => setStaff(u.users))
+      .catch(() => {});
+  }, [canSchedule]);
 
   function toggleAttendee(id: string) {
     setAttendeeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -162,7 +168,7 @@ export default function MeetingsPage() {
       <PageHeader
         title="Meetings"
         subtitle="Schedule board and directors' meetings and notify attendees."
-        action={isScheduler ? <button className="btn-primary" onClick={() => setShowNew(true)}>+ Schedule meeting</button> : undefined}
+        action={canSchedule ? <button className="btn-primary" onClick={() => setShowNew(true)}>+ Schedule meeting</button> : undefined}
       />
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
@@ -185,16 +191,16 @@ export default function MeetingsPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={m.status} />
-                  {isScheduler && m.status === "scheduled" && (
+                  {canSchedule && m.status === "scheduled" && (
                     <>
                       <button onClick={() => setPendingStatus({ id: m.id, status: "completed" })} className="btn-success btn-xs">Complete</button>
                       <button onClick={() => setPendingStatus({ id: m.id, status: "cancelled" })} className="btn-danger btn-xs">Cancel</button>
                     </>
                   )}
-                  {isScheduler && (
+                  {canSchedule && (
                     <a href="/minutes" className="btn-secondary btn-xs">Minutes →</a>
                   )}
-                  {isScheduler && (
+                  {canSchedule && (
                     <button onClick={() => setDeletingId(m.id)} className="btn-secondary btn-xs text-red-600">Del</button>
                   )}
                 </div>
