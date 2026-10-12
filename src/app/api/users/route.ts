@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     const session = await requirePermission("user-manage", ["admin"]);
     const body = await readJson<{ name: string; email: string; phone?: string; role: string; employment_type?: string; bank_name?: string; bank_account?: string; mpesa_number?: string }>(req);
     requireFields(body, ["name", "email", "role"]);
+    if (String(body.role) === "super_admin") throw new HttpError(400, "The platform owner role cannot be assigned.");
 
     const email = String(body.email).toLowerCase().trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Invalid email address");

@@ -5,10 +5,13 @@ import { seedDefaultsForUser } from "./checklists";
 
 const roleValidator = v.string();
 
-const BUILTIN_ROLES = ["admin", "secretary", "manager", "employee", "super_admin"];
+// Built-in *organisation* roles a company admin may assign. The platform
+// "super_admin" role is deliberately excluded so company admins cannot escalate.
+const BUILTIN_ROLES = ["admin", "secretary", "manager", "employee"];
 
-/** A role must be a built-in or one the company has defined in customRoles. */
+/** A role must be a built-in org role or one the company has defined. */
 async function assertValidRole(ctx: any, orgId: string, role: string) {
+  if (role === "super_admin") throw new ConvexError("The platform owner role cannot be assigned here.");
   if (BUILTIN_ROLES.includes(role)) return;
   const org = await ctx.db.get(orgId);
   const custom = ((org?.customRoles ?? []) as Array<{ key: string }>).map((r) => r.key);

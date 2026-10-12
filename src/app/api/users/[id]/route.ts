@@ -43,6 +43,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (target._id === session.id && (body.role || body.active === false)) {
       throw new HttpError(400, "You cannot change your own role or deactivate your own account");
     }
+    if (body.role === "super_admin") throw new HttpError(400, "The platform owner role cannot be assigned.");
 
     let tempPassword: string | null = null;
     if (body.resetPassword) tempPassword = generateTempPassword();

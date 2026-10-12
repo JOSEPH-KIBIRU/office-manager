@@ -7,6 +7,22 @@ import { LEAVE_TYPES } from "@/lib/types";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { queueCalendarSync } from "@/lib/calendar/enqueue";
 
+/** Actual leave days: only working weekdays, excluding public holidays. */
+function workingLeaveDays(start: string, end: string, workingDays: number[], holidays: Set<string>): number {
+  const wd = new Set(workingDays && workingDays.length ? workingDays : [1, 2, 3, 4, 5]);
+  const s = new Date(start + "T00:00:00");
+  const e = new Date(end + "T00:00:00");
+  let count = 0;
+  const dt = new Date(s);
+  while (dt <= e) {
+    const dow = dt.getDay();
+    const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    if (wd.has(dow) && !holidays.has(iso)) count += 1;
+    dt.setDate(dt.getDate() + 1);
+  }
+  return count;
+}
+
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     // Only the admin may modify leave requests — employees cannot edit once submitted.
@@ -55,12 +71,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
           );
         }
       } else {
+        let days: number | undefined;
+        if (body.start_date && body.end_date) {
+          try {
+            const orgCfg = await cx().query(api.organizations.getOrganization, { secret: secret(), orgId: session.orgId as never });
+            const hols = await cx().query(api.holidays.listHolidays, { secret: secret(), orgId: session.orgId as never });
+            days = workingLeaveDays(body.start_date, body.end_date, orgCfg.workingDays ?? [1, 2, 3, 4, 5], new Set(hols.map((h) => h.date)));
+          } catch {
+            /* fall back to calendar days */
+          }
+        }
         await cx().mutation(api.leaves.editLeave, {
           secret: secret(),
           orgId: session.orgId as never,
           id: id as never,
           startDate: body.start_date,
           endDate: body.end_date,
+          days,
           reason: body.reason?.trim() || undefined,
           leaveType:
             body.leave_type && (LEAVE_TYPES as readonly string[]).includes(body.leave_type)

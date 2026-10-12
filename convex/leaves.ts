@@ -95,6 +95,18 @@ export const applyLeave = mutation({
         `Insufficient leave balance. You have ${user.leaveBalance} day(s) left but requested ${args.days}.`
       );
     }
+    // Prevent overlapping leave requests for the same person.
+    const existing = await ctx.db
+      .query("leaves")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    const overlap = existing.find(
+      (l) =>
+        (l.status === "pending" || l.status === "approved") &&
+        l.startDate <= args.endDate &&
+        args.startDate <= l.endDate
+    );
+    if (overlap) throw new Error("There is already a leave request covering those dates.");
     await ctx.db.patch(user._id, { leaveBalance: user.leaveBalance - args.days });
     const id = await ctx.db.insert("leaves", {
       orgId: args.orgId,
@@ -177,6 +189,7 @@ export const editLeave = mutation({
     id: v.id("leaves"),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
+    days: v.optional(v.number()),
     reason: v.optional(v.string()),
     leaveType: v.optional(v.string()),
     adminNote: v.optional(v.string()),
@@ -190,9 +203,11 @@ export const editLeave = mutation({
     const end = args.endDate ?? leave.endDate;
     if (end < start) throw new Error("End date cannot be before the start date");
 
+    // Prefer the caller-supplied working-day count (weekends/holidays excluded);
+    // only fall back to a calendar-day count when none is provided.
     const s = new Date(start + "T00:00:00").getTime();
     const e = new Date(end + "T00:00:00").getTime();
-    const newDays = Math.round((e - s) / 86400000) + 1;
+    const newDays = args.days !== undefined ? args.days : Math.round((e - s) / 86400000) + 1;
 
     const delta = leave.days - newDays;
     const user = await ctx.db.get(leave.userId);
