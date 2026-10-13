@@ -80,19 +80,22 @@ export const MODULES: ModuleDef[] = [
   { key: "attendance", label: "Attendance", group: "People & HR" },
   { key: "payroll", label: "Payroll", group: "People & HR" },
   { key: "my-payslips", label: "My Payslips", group: "People & HR" },
-  { key: "invoices", label: "Invoicing", group: "Finance" },
-  { key: "customers", label: "Customers", group: "Finance" },
-  { key: "receipts", label: "Receipts", group: "Finance" },
-  { key: "bills", label: "Bills", group: "Finance" },
-  { key: "suppliers", label: "Suppliers", group: "Finance" },
-  { key: "payments", label: "Payments", group: "Finance" },
-  { key: "chart-of-accounts", label: "Chart of accounts", group: "Finance" },
-  { key: "accounting-post", label: "Post accounting transactions", group: "Finance" },
-  { key: "accounting-reverse", label: "Reverse / void transactions", group: "Finance" },
-  { key: "cost-centres", label: "Cost centres", group: "Management" },
-  { key: "projects", label: "Projects", group: "Management" },
-  { key: "budgets", label: "Budgets", group: "Management" },
-  { key: "management-reports", label: "Management reports", group: "Management" },
+  // Accounting — one centralized group so the whole firm-level suite can be
+  // granted/enabled together (see ACCOUNTING_MODULE_KEYS) or item by item.
+  { key: "accounting", label: "Accounting", group: "Accounting" },
+  { key: "chart-of-accounts", label: "Chart of accounts", group: "Accounting" },
+  { key: "accounting-post", label: "Post accounting transactions", group: "Accounting" },
+  { key: "accounting-reverse", label: "Reverse / void transactions", group: "Accounting" },
+  { key: "invoices", label: "Invoicing", group: "Accounting" },
+  { key: "customers", label: "Customers", group: "Accounting" },
+  { key: "receipts", label: "Receipts", group: "Accounting" },
+  { key: "bills", label: "Bills", group: "Accounting" },
+  { key: "suppliers", label: "Suppliers", group: "Accounting" },
+  { key: "payments", label: "Payments", group: "Accounting" },
+  { key: "cost-centres", label: "Cost centres", group: "Accounting" },
+  { key: "projects", label: "Projects", group: "Accounting" },
+  { key: "budgets", label: "Budgets", group: "Accounting" },
+  { key: "management-reports", label: "Management reports", group: "Accounting" },
   { key: "leave-approve", label: "Approve leave", group: "Controls" },
   { key: "petty-cash-approve", label: "Approve petty cash", group: "Controls" },
   { key: "car-approve", label: "Approve car logs", group: "Controls" },
@@ -102,8 +105,8 @@ export const MODULES: ModuleDef[] = [
   { key: "organization-settings", label: "Company settings", group: "Controls" },
   { key: "payroll-run", label: "Run & pay payroll", group: "Controls" },
   { key: "attendance-manage", label: "Manage attendance", group: "Controls" },
+  // Kept separate from the Accounting bundle (operational expenses).
   { key: "petty-cash", label: "Petty Cash", group: "Finance" },
-  { key: "accounting", label: "Accounting", group: "Finance" },
   { key: "cars", label: "Car Logs", group: "Finance" },
   { key: "reports", label: "Reports", group: "Reporting" },
   { key: "tasks", label: "Tasks", group: "Operations" },
@@ -118,6 +121,40 @@ export const MODULES: ModuleDef[] = [
 ];
 
 export const ALL_MODULE_KEYS: ModuleKey[] = MODULES.map((m) => m.key);
+
+/** Display order of module groups (shared by the permissions, features and modules pages). */
+export const GROUP_ORDER = [
+  "Overview",
+  "People & HR",
+  "Accounting",
+  "Controls",
+  "Finance",
+  "Reporting",
+  "Operations",
+  "Company",
+];
+
+/**
+ * The core accounting suite. Enabling/granting these keys together gives a firm
+ * a complete accounting module without the rest of the app. Petty cash, car logs
+ * and the generic Reports hub are deliberately excluded.
+ */
+export const ACCOUNTING_MODULE_KEYS: ModuleKey[] = [
+  "accounting",
+  "chart-of-accounts",
+  "accounting-post",
+  "accounting-reverse",
+  "invoices",
+  "customers",
+  "receipts",
+  "bills",
+  "suppliers",
+  "payments",
+  "cost-centres",
+  "projects",
+  "budgets",
+  "management-reports",
+];
 
 /** What each built-in role can access out of the box (mirrors the sidebar). */
 export const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, ModuleKey[]> = {

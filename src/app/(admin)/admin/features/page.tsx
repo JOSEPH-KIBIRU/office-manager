@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader, Alert, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
-import { MODULES } from "@/lib/permissions";
+import { MODULES, GROUP_ORDER } from "@/lib/permissions";
 
 interface Company {
   id: string;
@@ -11,8 +11,6 @@ interface Company {
   active: boolean;
   enabledModules: string[] | null;
 }
-
-const GROUP_ORDER = ["Overview", "People & HR", "Finance", "Management", "Controls", "Reporting", "Operations", "Company"];
 
 export default function FeaturesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);

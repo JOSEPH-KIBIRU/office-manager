@@ -5,9 +5,7 @@ import Link from "next/link";
 import { PageHeader, Alert, api } from "@/components/ui";
 import { useSession } from "@/components/SessionProvider";
 import OrgSectionNav from "@/components/org/OrgSectionNav";
-import { MODULES } from "@/lib/permissions";
-
-const GROUP_ORDER = ["Overview", "People & HR", "Finance", "Management", "Controls", "Reporting", "Operations", "Company"];
+import { MODULES, GROUP_ORDER } from "@/lib/permissions";
 
 export default function ModulesPage() {
   const session = useSession();

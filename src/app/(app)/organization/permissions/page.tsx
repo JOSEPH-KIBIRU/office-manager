@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import OrgSectionNav from "@/components/org/OrgSectionNav";
 import {
   MODULES,
+  GROUP_ORDER,
   ORG_ROLES,
   ROLE_LABELS,
   type ModuleKey,
@@ -13,8 +14,6 @@ import {
 } from "@/lib/permissions";
 
 type Config = Record<string, { granted: string[]; overridden: boolean }>;
-
-const GROUP_ORDER = ["Overview", "People & HR", "Finance", "Management", "Controls", "Reporting", "Operations", "Company"];
 
 export default function PermissionsPage() {
   const [config, setConfig] = useState<Config | null>(null);
