@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useMemo, useState, FormEvent } from "react";
 import { PageHeader, Alert, FieldError, inputCls, Modal, ConfirmDialog, HelpTip, api } from "@/components/ui";
 import { PayslipLines, type PayslipDetail } from "@/components/payslip";
 import { type Errors } from "@/lib/validation";
@@ -169,6 +169,8 @@ export default function PayrollPage() {
   // Casual attendance
   const [attForm, setAttForm] = useState({ casualId: "", date: todayISO(), days: "1", note: "" });
   const [attBusy, setAttBusy] = useState(false);
+  const [payeeQuery, setPayeeQuery] = useState("");
+  const [showAllRuns, setShowAllRuns] = useState(false);
 
   async function load() {
     try {
@@ -213,6 +215,17 @@ export default function PayrollPage() {
   const allSelected = eligible.length > 0 && eligible.filter((e) => selected[e.id]).length === eligible.length;
   const allCasualsSelected =
     casualsEligible.length > 0 && casualsEligible.filter((c) => casualSelected[c.id]).length === casualsEligible.length;
+
+  const payeeQ = payeeQuery.trim().toLowerCase();
+  const shownEligible = useMemo(
+    () => (payeeQ ? eligible.filter((e) => e.name.toLowerCase().includes(payeeQ)) : eligible),
+    [eligible, payeeQ]
+  );
+  const shownCasuals = useMemo(
+    () => (payeeQ ? casualsEligible.filter((c) => c.name.toLowerCase().includes(payeeQ)) : casualsEligible),
+    [casualsEligible, payeeQ]
+  );
+  const shownRuns = showAllRuns ? runs : runs.slice(0, 12);
 
   function toggleSelect(id: string) {
     setSelected((p) => ({ ...p, [id]: !p[id] }));
@@ -717,7 +730,15 @@ export default function PayrollPage() {
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">Employees</h3>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-700">Employees</h3>
+              <input
+                className="input w-full py-1 text-xs sm:w-56"
+                placeholder="Search payee…"
+                value={payeeQuery}
+                onChange={(e) => setPayeeQuery(e.target.value)}
+              />
+            </div>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="table-base">
                 <thead>
@@ -739,7 +760,7 @@ export default function PayrollPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {eligible.map((e) => (
+                  {shownEligible.map((e) => (
                     <tr key={e.id} className={selected[e.id] ? "bg-indigo-50/60" : ""}>
                       <td>
                         <label className="flex cursor-pointer items-center gap-2">
@@ -760,9 +781,11 @@ export default function PayrollPage() {
                       <td><input type="number" min={0} className="input w-24 py-1 text-xs" placeholder="0" value={leavePayouts[e.id] ?? ""} onChange={(ev) => setLeavePayouts((p) => ({ ...p, [e.id]: ev.target.value }))} /></td>
                     </tr>
                   ))}
-                  {eligible.length === 0 && (
+                  {shownEligible.length === 0 && (
                     <tr><td colSpan={10} className="py-6 text-center text-sm text-slate-500">
-                      No employees with a basic salary set yet. Set salaries on the Team page first.
+                      {eligible.length === 0
+                        ? "No employees with a basic salary set yet. Set salaries on the Team page first."
+                        : "No employees match your search."}
                     </td></tr>
                   )}
                 </tbody>
@@ -793,7 +816,7 @@ export default function PayrollPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {casualsEligible.map((c) => (
+                  {shownCasuals.map((c) => (
                     <tr key={c.id} className={casualSelected[c.id] ? "bg-indigo-50/60" : ""}>
                       <td>
                         <label className="flex cursor-pointer items-center gap-2">
@@ -813,8 +836,12 @@ export default function PayrollPage() {
                       <td className="text-right">{fmt(casualGross(c))}</td>
                     </tr>
                   ))}
-                  {casualsEligible.length === 0 && (
-                    <tr><td colSpan={7} className="py-6 text-center text-sm text-slate-500">No active casual workers. Click “Add casual” to register one.</td></tr>
+                  {shownCasuals.length === 0 && (
+                    <tr><td colSpan={7} className="py-6 text-center text-sm text-slate-500">
+                      {casualsEligible.length === 0
+                        ? "No active casual workers. Click “Add casual” to register one."
+                        : "No casual workers match your search."}
+                    </td></tr>
                   )}
                 </tbody>
               </table>
@@ -944,7 +971,14 @@ export default function PayrollPage() {
 
       {/* Payroll history */}
       <div className="card overflow-x-auto">
-        <h2 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Payroll history</h2>
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+          <h2 className="text-sm font-semibold text-slate-600">Payroll history</h2>
+          {runs.length > 12 && (
+            <button className="btn-secondary px-2 py-1 text-xs" onClick={() => setShowAllRuns((v) => !v)}>
+              {showAllRuns ? "Show latest 12" : `Show all ${runs.length}`}
+            </button>
+          )}
+        </div>
         <table className="table-base">
           <thead>
             <tr>
@@ -958,7 +992,7 @@ export default function PayrollPage() {
             </tr>
           </thead>
           <tbody>
-            {runs.map((r) => (
+            {shownRuns.map((r) => (
               <tr key={r.id}>
                 <td className="font-medium">{MONTHS[r.month - 1]} {r.year}</td>
                 <td className="text-right">{r.count}</td>

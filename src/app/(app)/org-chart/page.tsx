@@ -31,18 +31,30 @@ export default function OrgChartPage() {
   const [depts, setDepts] = useState<Dept[]>([]);
   const [org, setOrg] = useState<ApiOrg | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    let failed = false;
     Promise.all([
-      api<{ users: U[] }>("/api/users?full=1").catch(() => ({ users: [] as U[] })),
-      api<{ departments: Dept[] }>("/api/departments").catch(() => ({ departments: [] as Dept[] })),
-      api<ApiOrg>("/api/organization").catch(() => null),
+      api<{ users: U[] }>("/api/users?full=1").catch(() => { failed = true; return { users: [] as U[] }; }),
+      api<{ departments: Dept[] }>("/api/departments").catch(() => { failed = true; return { departments: [] as Dept[] }; }),
+      api<ApiOrg>("/api/organization").catch(() => { failed = true; return null; }),
     ]).then(([u, d, o]) => {
       setUsers(u.users.filter((x) => x.active === 1));
       setDepts(d.departments);
       setOrg(o);
+      if (failed) setError("Some company data could not be loaded. Please refresh the page.");
     });
   }, []);
+
+  function toggleDept(id: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const admins = useMemo(() => users.filter((u) => u.role === "admin"), [users]);
   const unassigned = useMemo(() => users.filter((u) => !u.department_id && u.role !== "admin"), [users]);
@@ -75,15 +87,38 @@ export default function OrgChartPage() {
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {depts.map((d) => {
             const members = byDept.get(d.id) ?? [];
+            const isCollapsed = collapsed.has(d.id);
             return (
               <div key={d.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="mb-3 text-sm font-bold text-slate-700">{d.name}</p>
-                <div className="space-y-2">
-                  {members.map((m) => (
-                    <Node key={m.id} name={m.name} sub={ROLE_LABELS[m.role]} />
-                  ))}
-                  {members.length === 0 && <p className="text-xs text-slate-400">No members</p>}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleDept(d.id)}
+                  aria-expanded={!isCollapsed}
+                  className="mb-3 flex w-full items-center justify-between text-left"
+                >
+                  <span className="text-sm font-bold text-slate-700">{d.name}</span>
+                  <span className="flex items-center gap-2 text-xs text-slate-400">
+                    {members.length}
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      aria-hidden="true"
+                      className={`h-3.5 w-3.5 transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m9 6 6 6-6 6" />
+                    </svg>
+                  </span>
+                </button>
+                {!isCollapsed && (
+                  <div className="space-y-2">
+                    {members.map((m) => (
+                      <Node key={m.id} name={m.name} sub={ROLE_LABELS[m.role]} />
+                    ))}
+                    {members.length === 0 && <p className="text-xs text-slate-400">No members</p>}
+                  </div>
+                )}
               </div>
             );
           })}

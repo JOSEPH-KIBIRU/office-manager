@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "@/components/SessionProvider";
 
 const SECTIONS = [
   { href: "/organization", label: "Branding" },
@@ -11,17 +12,20 @@ const SECTIONS = [
   { href: "/organization/reminders", label: "Reminders" },
   { href: "/organization/leave", label: "Leave policy" },
   { href: "/organization/holidays", label: "Public holidays" },
+  { href: "/organization/modules", label: "Modules & features", adminOnly: true },
   { href: "/organization/permissions", label: "Permissions" },
 ];
 
 /** Top navigation across the "Branding & Company" section pages. */
 export default function OrgSectionNav() {
   const pathname = usePathname();
+  const session = useSession();
+  const sections = SECTIONS.filter((s) => !("adminOnly" in s && s.adminOnly) || session.role === "admin");
 
   return (
     <nav aria-label="Branding and company settings" className="border-b border-slate-200">
       <ul className="-mb-px flex gap-1 overflow-x-auto">
-        {SECTIONS.map((s) => {
+        {sections.map((s) => {
           const active = pathname === s.href;
           return (
             <li key={s.href} className="shrink-0">

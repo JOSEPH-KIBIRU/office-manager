@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useMemo, useState, FormEvent } from "react";
 import { useSession } from "@/components/SessionProvider";
 import { PageHeader, Modal, Alert, FieldError, inputCls, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
@@ -69,6 +69,9 @@ export default function UsersPage() {
   const [payBankName, setPayBankName] = useState("");
   const [payBankAccount, setPayBankAccount] = useState("");
   const [payMpesa, setPayMpesa] = useState("");
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [deptFilter, setDeptFilter] = useState("");
 
   function clearError(field: string) {
     setErrors((p) => ({ ...p, [field]: undefined }));
@@ -193,6 +196,22 @@ export default function UsersPage() {
   const roleOptions = [...ROLES, ...customRoles.map((c) => c.key)];
   const labelFor = (r: string) => ROLE_LABELS[r] ?? customRoles.find((c) => c.key === r)?.label ?? r;
 
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return users.filter((u) => {
+      if (roleFilter && u.role !== roleFilter) return false;
+      if (deptFilter && (u.department_id ?? "") !== deptFilter) return false;
+      if (!q) return true;
+      return (
+        u.name.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.employee_number ?? "").toLowerCase().includes(q) ||
+        (u.phone ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [users, query, roleFilter, deptFilter]);
+  const hasFilters = query.trim() !== "" || roleFilter !== "" || deptFilter !== "";
+
   return (
     <>
       <PageHeader
@@ -236,6 +255,32 @@ export default function UsersPage() {
         </section>
       )}
 
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          className="input w-full sm:w-64"
+          placeholder="Search name, email, phone or emp no…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <select className="input w-44" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+          <option value="">All roles</option>
+          {roleOptions.map((r) => <option key={r} value={r}>{labelFor(r)}</option>)}
+        </select>
+        <select className="input w-48" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
+          <option value="">All departments</option>
+          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        <span className="text-xs text-slate-500">{filtered.length} of {users.length}</span>
+        {hasFilters && (
+          <button
+            className="btn-secondary px-2 py-1 text-xs"
+            onClick={() => { setQuery(""); setRoleFilter(""); setDeptFilter(""); }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       <div className="card overflow-x-auto">
         <table className="table-base">
           <thead>
@@ -260,7 +305,10 @@ export default function UsersPage() {
             {!loading && users.length === 0 && (
               <tr><td colSpan={11} className="py-8 text-center text-slate-500">No team members yet. Add your first user.</td></tr>
             )}
-            {!loading && users.map((u) => (
+            {!loading && users.length > 0 && filtered.length === 0 && (
+              <tr><td colSpan={11} className="py-8 text-center text-slate-500">No team members match your filters.</td></tr>
+            )}
+            {!loading && filtered.map((u) => (
               <tr key={u.id} className={u.active ? "" : "opacity-50"}>
                 <td className="font-medium">
                   {u.name}

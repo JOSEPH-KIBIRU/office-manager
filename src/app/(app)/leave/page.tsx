@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useMemo, useState, FormEvent } from "react";
 import { useSession } from "@/components/SessionProvider";
 import { usePermissions } from "@/components/usePermissions";
 import { PageHeader, StatusBadge, Modal, Alert, FieldError, inputCls, ConfirmDialog, api } from "@/components/ui";
@@ -31,6 +31,10 @@ export default function LeavePage() {
   const [pendingDecision, setPendingDecision] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [editErrors, setEditErrors] = useState<Errors>({});
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const toast = useToast();
 
   // apply form state
@@ -171,6 +175,55 @@ export default function LeavePage() {
 
   const requestedDays = daysBetween(startDate, endDate);
 
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return leaves.filter((l) => {
+      if (statusFilter !== "all" && l.status !== statusFilter) return false;
+      if (q && !(l.requester_name ?? "").toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [leaves, statusFilter, query]);
+
+  const pendingVisibleIds = visible.filter((l) => l.status === "pending").map((l) => l.id);
+  const allPendingSelected = pendingVisibleIds.length > 0 && pendingVisibleIds.every((id) => selected.has(id));
+  const selectedPendingCount = pendingVisibleIds.filter((id) => selected.has(id)).length;
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAllPending() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allPendingSelected) pendingVisibleIds.forEach((id) => next.delete(id));
+      else pendingVisibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  async function bulkDecide(action: "approve" | "reject") {
+    const ids = pendingVisibleIds.filter((id) => selected.has(id));
+    if (ids.length === 0) return;
+    setBulkBusy(true);
+    let done = 0;
+    for (const id of ids) {
+      try {
+        await api(`/api/leaves/${id}`, { method: "PATCH", json: { action } });
+        done += 1;
+      } catch {
+        /* keep going; report the count below */
+      }
+    }
+    setBulkBusy(false);
+    setSelected(new Set());
+    toast.success(`${done} request(s) ${action === "approve" ? "approved" : "rejected"}.`);
+    await load();
+  }
+
   return (
     <>
       <PageHeader
@@ -203,20 +256,69 @@ export default function LeavePage() {
         </p>
       )}
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <input
+          className="input w-full sm:w-60"
+          placeholder={isAdmin ? "Search by employee…" : "Search…"}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <select
+          className="input w-40"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+        >
+          <option value="all">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <span className="text-xs text-slate-500">{visible.length} of {leaves.length}</span>
+        {(query || statusFilter !== "all") && (
+          <button className="btn-secondary px-2 py-1 text-xs" onClick={() => { setQuery(""); setStatusFilter("all"); }}>
+            Clear
+          </button>
+        )}
+        {isAdmin && selectedPendingCount > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-600">{selectedPendingCount} selected</span>
+            <button className="btn-success btn-xs" disabled={bulkBusy} onClick={() => bulkDecide("approve")}>
+              {bulkBusy ? "Working…" : "Approve selected"}
+            </button>
+            <button className="btn-danger btn-xs" disabled={bulkBusy} onClick={() => bulkDecide("reject")}>
+              Reject selected
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Mobile card list */}
       <div className="space-y-3 md:hidden">
         {loading && <p className="card p-6 text-center text-slate-500">Loading leave requests…</p>}
         {!loading && leaves.length === 0 && <p className="card p-6 text-center text-slate-500">No leave requests yet.</p>}
-        {!loading && leaves.map((l) => (
+        {!loading && leaves.length > 0 && visible.length === 0 && <p className="card p-6 text-center text-slate-500">No requests match your filters.</p>}
+        {!loading && visible.map((l) => (
           <div key={l.id} className="card p-4">
             <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                {isAdmin && <p className="font-medium text-slate-800">{l.requester_name}</p>}
-                <p className="text-sm text-slate-600">
-                  {LEAVE_TYPE_LABELS[l.leave_type] ?? l.leave_type} · {l.days} day(s)
-                </p>
-                <p className="text-xs text-slate-500">{l.start_date} → {l.end_date}</p>
-                <p className="mt-1 text-xs text-slate-500">{l.reason}</p>
+              <div className="flex min-w-0 items-start gap-3">
+                {isAdmin && (
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-blue-700"
+                    disabled={l.status !== "pending"}
+                    checked={selected.has(l.id)}
+                    onChange={() => toggleSelect(l.id)}
+                    aria-label={`Select ${l.requester_name}'s request`}
+                  />
+                )}
+                <div className="min-w-0">
+                  {isAdmin && <p className="font-medium text-slate-800">{l.requester_name}</p>}
+                  <p className="text-sm text-slate-600">
+                    {LEAVE_TYPE_LABELS[l.leave_type] ?? l.leave_type} · {l.days} day(s)
+                  </p>
+                  <p className="text-xs text-slate-500">{l.start_date} → {l.end_date}</p>
+                  <p className="mt-1 text-xs text-slate-500">{l.reason}</p>
+                </div>
               </div>
               <StatusBadge status={l.status} />
             </div>
@@ -245,6 +347,17 @@ export default function LeavePage() {
         <table className="table-base">
           <thead>
             <tr>
+              {isAdmin && (
+                <th className="w-8">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-blue-700"
+                    checked={allPendingSelected}
+                    onChange={toggleAllPending}
+                    aria-label="Select all pending requests"
+                  />
+                </th>
+              )}
               {isAdmin && <th>Employee</th>}
               <th>Type</th>
               <th>Period</th>
@@ -257,13 +370,28 @@ export default function LeavePage() {
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={isAdmin ? 8 : 7} className="py-8 text-center text-slate-500">Loading leave requests…</td></tr>
+              <tr><td colSpan={isAdmin ? 9 : 7} className="py-8 text-center text-slate-500">Loading leave requests…</td></tr>
             )}
             {!loading && leaves.length === 0 && (
-              <tr><td colSpan={isAdmin ? 8 : 7} className="py-8 text-center text-slate-500">No leave requests yet.</td></tr>
+              <tr><td colSpan={isAdmin ? 9 : 7} className="py-8 text-center text-slate-500">No leave requests yet.</td></tr>
             )}
-            {!loading && leaves.map((l) => (
+            {!loading && leaves.length > 0 && visible.length === 0 && (
+              <tr><td colSpan={isAdmin ? 9 : 7} className="py-8 text-center text-slate-500">No requests match your filters.</td></tr>
+            )}
+            {!loading && visible.map((l) => (
               <tr key={l.id}>
+                {isAdmin && (
+                  <td>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-blue-700"
+                      disabled={l.status !== "pending"}
+                      checked={selected.has(l.id)}
+                      onChange={() => toggleSelect(l.id)}
+                      aria-label={`Select ${l.requester_name}'s request`}
+                    />
+                  </td>
+                )}
                 {isAdmin && <td className="font-medium">{l.requester_name}</td>}
                 <td><span className="badge bg-slate-100 text-slate-700 capitalize">{LEAVE_TYPE_LABELS[l.leave_type] ?? l.leave_type}</span></td>
                 <td>{l.start_date} → {l.end_date}</td>

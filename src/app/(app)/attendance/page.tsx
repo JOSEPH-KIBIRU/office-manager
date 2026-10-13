@@ -61,6 +61,7 @@ export default function AttendancePage() {
   const [today, setToday] = useState<{ clock_in_at: number; clock_out_at: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [nameQuery, setNameQuery] = useState("");
   const [fix, setFix] = useState<AttendRec | "new" | null>(null);
   const [fixForm, setFixForm] = useState({ userId: "", date: "", clockIn: "", clockOut: "", note: "" });
   const [fixBusy, setFixBusy] = useState(false);
@@ -89,6 +90,12 @@ export default function AttendancePage() {
     if (!today.clock_out_at) return { label: `Clocked in at ${fmtTime(today.clock_in_at)}`, tone: "bg-emerald-50 text-emerald-700" };
     return { label: `Done — ${fmtTime(today.clock_in_at)} to ${fmtTime(today.clock_out_at)}`, tone: "bg-blue-50 text-blue-700" };
   }, [today]);
+
+  const shownRecords = useMemo(() => {
+    const q = nameQuery.trim().toLowerCase();
+    if (!q) return records;
+    return records.filter((r) => r.name.toLowerCase().includes(q));
+  }, [records, nameQuery]);
 
   async function clock(action: "in" | "out") {
     setBusy(true);
@@ -177,6 +184,12 @@ export default function AttendancePage() {
           {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
         </select>
         <input type="number" className="input w-28" value={year} min={2000} max={2100} onChange={(e) => setYear(Number(e.target.value))} />
+        <input
+          className="input w-full sm:w-56"
+          placeholder="Search employee…"
+          value={nameQuery}
+          onChange={(e) => setNameQuery(e.target.value)}
+        />
         {canManage && (
           <button className="btn-secondary ml-auto" onClick={() => openFix("new")}>Manual entry</button>
         )}
