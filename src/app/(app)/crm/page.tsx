@@ -77,8 +77,8 @@ export default function CrmOverviewPage() {
   const cards: Array<{ label: string; key: string; value?: number; href?: string }> = [
     { label: "Companies", key: "crm-companies", value: counts.companies, href: "/crm/companies" },
     { label: "Contacts", key: "crm-companies", value: counts.contacts, href: "/crm/contacts" },
-    { label: "Open leads", key: "crm-leads", value: counts.leads },
-    { label: "Open deals", key: "crm-pipeline", value: counts.deals },
+    { label: "Open leads", key: "crm-leads", value: counts.leads, href: "/crm/leads" },
+    { label: "Open deals", key: "crm-pipeline", value: counts.deals, href: "/crm/deals" },
     { label: "Quotations", key: "crm-quotations", value: counts.quotations },
   ];
 

@@ -18,9 +18,11 @@ small and independently shippable behind the `crm` feature flag.
 | T1.4 Next API routes | ✅ done |
 | T2.1 CRM nav + layout + overview | ✅ done |
 | T2.2 Companies & contacts UI + AccountingPort | ✅ done |
-| T3.1 Pipeline/stage management UI | ⏳ next |
-| T3.2 Leads · T3.3 Deals board | ⏳ pending |
-| T5 quotations · T6/T7 email | ⏳ pending |
+| T3.1 Pipeline/stage management UI | ✅ done |
+| T3.2 Leads + conversion | ✅ done |
+| T3.3 Deals kanban board | ✅ done |
+| T4 activities/timeline · T5 quotations | ⏳ next |
+| T6/T7 email integrations | ⏳ pending |
 
 ---
 

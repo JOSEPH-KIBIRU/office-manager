@@ -48,6 +48,9 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { href: "/crm", label: "CRM", icon: "🤝", roles: ["admin"], module: "crm" },
       { href: "/crm/companies", label: "Companies", icon: "🏢", roles: ["admin"], module: "crm-companies" },
       { href: "/crm/contacts", label: "Contacts", icon: "👤", roles: ["admin"], module: "crm-companies" },
+      { href: "/crm/leads", label: "Leads", icon: "🎣", roles: ["admin"], module: "crm-leads" },
+      { href: "/crm/pipeline", label: "Pipeline", icon: "🎯", roles: ["admin"], module: "crm-pipeline" },
+      { href: "/crm/deals", label: "Deals", icon: "📈", roles: ["admin"], module: "crm-pipeline" },
     ],
   },
   {

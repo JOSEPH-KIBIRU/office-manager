@@ -148,6 +148,106 @@ export const updateLead = mutation({
   },
 });
 
+export const convertLead = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    actorId: v.id("users"),
+    id: v.id("crmLeads"),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.actorId);
+    const lead = await ctx.db.get(args.id);
+    if (!lead || lead.orgId !== args.orgId) throw new Error("Lead not found");
+    if (lead.status === "converted") throw new Error("This lead has already been converted");
+
+    const now = tsNow();
+
+    // 1. Company (only when the lead carries a company name).
+    let companyId: any = undefined;
+    const companyName = clean(lead.companyName);
+    if (companyName) {
+      companyId = await ctx.db.insert("crmCompanies", {
+        orgId: args.orgId,
+        name: companyName,
+        phone: lead.phone,
+        source: lead.source,
+        ownerId: lead.ownerId,
+        active: true,
+        createdBy: args.actorId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // 2. Contact (when there is a person or email to record).
+    let contactId: any = undefined;
+    const contactName = clean(lead.contactName) ?? clean(lead.email);
+    if (contactName) {
+      contactId = await ctx.db.insert("crmContacts", {
+        orgId: args.orgId,
+        companyId,
+        name: contactName,
+        email: lead.email,
+        phone: lead.phone,
+        ownerId: lead.ownerId,
+        createdBy: args.actorId,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // 3. Default pipeline + first open stage.
+    const pipelines = await ctx.db
+      .query("crmPipelines")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const pipeline =
+      pipelines.find((p) => p.isDefault && p.active) ??
+      pipelines.find((p) => p.active) ??
+      pipelines[0];
+    if (!pipeline) throw new Error("Create a pipeline with a stage before converting leads");
+
+    const stageRows = await ctx.db
+      .query("crmStages")
+      .withIndex("by_org_pipeline", (q) => q.eq("orgId", args.orgId).eq("pipelineId", pipeline._id))
+      .collect();
+    const ordered = [...stageRows].sort((a, b) => a.order - b.order);
+    const stage = ordered.find((s) => !s.isWon && !s.isLost) ?? ordered[0];
+    if (!stage) throw new Error("Add a stage to your pipeline before converting leads");
+
+    // 4. Deal.
+    const dealId = await ctx.db.insert("crmDeals", {
+      orgId: args.orgId,
+      pipelineId: pipeline._id,
+      stageId: stage._id,
+      companyId,
+      contactId,
+      leadId: lead._id,
+      title: companyName ?? contactName ?? "New deal",
+      value: lead.value ?? 0,
+      currency: "KES",
+      ownerId: lead.ownerId,
+      status: "open",
+      notes: lead.notes,
+      createdBy: args.actorId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await ctx.db.patch(lead._id, {
+      status: "converted",
+      convertedCompanyId: companyId,
+      convertedContactId: contactId,
+      convertedDealId: dealId,
+      updatedAt: now,
+    });
+
+    return { dealId, companyId, contactId };
+  },
+});
+
 export const deleteLead = mutation({
   args: {
     secret: v.string(),

@@ -8,6 +8,9 @@ const SECTIONS = [
   { href: "/crm", label: "Overview", module: "crm" },
   { href: "/crm/companies", label: "Companies", module: "crm-companies" },
   { href: "/crm/contacts", label: "Contacts", module: "crm-companies" },
+  { href: "/crm/leads", label: "Leads", module: "crm-leads" },
+  { href: "/crm/pipeline", label: "Pipeline", module: "crm-pipeline" },
+  { href: "/crm/deals", label: "Deals", module: "crm-pipeline" },
 ];
 
 /** Section tabs across the CRM workspace (only the sections the user can open). */
