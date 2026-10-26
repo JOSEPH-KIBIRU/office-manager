@@ -15,6 +15,9 @@ export async function GET(req: NextRequest) {
         assigneeId: (p.get("assigneeId") ?? undefined) as never,
         status: (p.get("status") ?? undefined) as never,
         dealId: (p.get("dealId") ?? undefined) as never,
+        companyId: (p.get("companyId") ?? undefined) as never,
+        contactId: (p.get("contactId") ?? undefined) as never,
+        leadId: (p.get("leadId") ?? undefined) as never,
       });
       return ok({ tasks });
     } catch (e) {

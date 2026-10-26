@@ -21,8 +21,11 @@ small and independently shippable behind the `crm` feature flag.
 | T3.1 Pipeline/stage management UI | ✅ done |
 | T3.2 Leads + conversion | ✅ done |
 | T3.3 Deals kanban board | ✅ done |
-| T4 activities/timeline · T5 quotations | ⏳ next |
-| T6/T7 email integrations | ⏳ pending |
+| T4 Activities/timeline + follow-up tasks | ✅ done |
+| T5 Quotations + invoice conversion | ✅ done |
+| T6 Gmail read integration | ✅ done (code) |
+| T7 Outlook read integration | ✅ done (code) |
+| T8 automated tests & controlled pilot | ⏳ next |
 
 ---
 

@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import { PageHeader, Alert, Modal, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { usePermissions } from "@/components/usePermissions";
+import CrmTimeline from "@/components/crm/CrmTimeline";
+import CrmTasksPanel from "@/components/crm/CrmTasksPanel";
 
 interface Company {
   _id: string;
@@ -268,6 +270,13 @@ export default function CompanyDetailPage() {
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {company && (
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <CrmTimeline entityType="company" entityId={id} />
+          <CrmTasksPanel scope={{ companyId: id }} />
         </div>
       )}
 

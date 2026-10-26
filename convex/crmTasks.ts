@@ -18,6 +18,9 @@ export const listTasks = query({
     assigneeId: v.optional(v.id("users")),
     status: v.optional(STATUS),
     dealId: v.optional(v.id("crmDeals")),
+    companyId: v.optional(v.id("crmCompanies")),
+    contactId: v.optional(v.id("crmContacts")),
+    leadId: v.optional(v.id("crmLeads")),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -30,6 +33,9 @@ export const listTasks = query({
       .filter((t) => (args.assigneeId ? t.assigneeId === args.assigneeId : true))
       .filter((t) => (args.status ? t.status === args.status : true))
       .filter((t) => (args.dealId ? t.dealId === args.dealId : true))
+      .filter((t) => (args.companyId ? t.companyId === args.companyId : true))
+      .filter((t) => (args.contactId ? t.contactId === args.contactId : true))
+      .filter((t) => (args.leadId ? t.leadId === args.leadId : true))
       .sort((a, b) => {
         if ((a.status === "open") !== (b.status === "open")) return a.status === "open" ? -1 : 1;
         const ad = a.dueAt ?? Number.MAX_SAFE_INTEGER;

@@ -6,7 +6,16 @@ import { TERMS_VERSION } from "./lib/terms";
 
 const PUBLIC_PAGES = ["/", "/login", "/forgot-password", "/terms", "/privacy", "/cookie-policy"];
 const PUBLIC_PAGES_PREFIXES = ["/solutions"];
-const PUBLIC_APIS = ["/api/auth/login", "/api/enquiries", "/api/public", "/api/health", "/api/cron"];
+const PUBLIC_APIS = [
+  "/api/auth/login",
+  "/api/enquiries",
+  "/api/public",
+  "/api/health",
+  "/api/cron",
+  // Shared-secret sync runners (no session cookie; authorised by their own secret).
+  "/api/integrations/sync/run",
+  "/api/crm/integrations/sync/run",
+];
 
 interface MiddlewareSession {
   mustChangePassword?: boolean;

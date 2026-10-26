@@ -262,6 +262,29 @@ export const setQuotationStatus = mutation({
   },
 });
 
+export const markConverted = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    actorId: v.id("users"),
+    id: v.id("crmQuotations"),
+    invoiceId: v.id("invoices"),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.actorId);
+    const doc = await ctx.db.get(args.id);
+    if (!doc || doc.orgId !== args.orgId) throw new Error("Quotation not found");
+    if (doc.invoiceId) return { invoiceId: doc.invoiceId, already: true };
+    await ctx.db.patch(args.id, {
+      invoiceId: args.invoiceId,
+      status: "converted",
+      updatedAt: tsNow(),
+    });
+    return { invoiceId: args.invoiceId, already: false };
+  },
+});
+
 export const deleteQuotation = mutation({
   args: {
     secret: v.string(),

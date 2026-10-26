@@ -26,6 +26,7 @@ import type * as crmActivities from "../crmActivities.js";
 import type * as crmCompanies from "../crmCompanies.js";
 import type * as crmContacts from "../crmContacts.js";
 import type * as crmDeals from "../crmDeals.js";
+import type * as crmEmail from "../crmEmail.js";
 import type * as crmLeads from "../crmLeads.js";
 import type * as crmLib from "../crmLib.js";
 import type * as crmPipelines from "../crmPipelines.js";
@@ -97,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   crmCompanies: typeof crmCompanies;
   crmContacts: typeof crmContacts;
   crmDeals: typeof crmDeals;
+  crmEmail: typeof crmEmail;
   crmLeads: typeof crmLeads;
   crmLib: typeof crmLib;
   crmPipelines: typeof crmPipelines;
