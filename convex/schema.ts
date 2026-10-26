@@ -1246,6 +1246,302 @@ export default defineSchema(
     .index("by_org_module", ["orgId", "module"])
     .index("by_org_action", ["orgId", "action"]),
 
+  // ---------------------------------------------------------------------------
+  // CRM (see docs/crm/data-model.md). Every table is org-scoped; the Next API
+  // layer enforces module permissions and Convex re-checks tenant membership.
+  // ---------------------------------------------------------------------------
+
+  crmCompanies: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    domain: v.optional(v.string()),
+    industry: v.optional(v.string()),
+    website: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    address: v.optional(v.string()),
+    city: v.optional(v.string()),
+    country: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    ownerId: v.optional(v.id("users")),
+    // Link to the authoritative accounting customer, set when promoted.
+    accountingContactId: v.optional(v.id("contacts")),
+    source: v.optional(v.string()),
+    active: v.optional(v.boolean()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_name", ["orgId", "name"])
+    .index("by_org_owner", ["orgId", "ownerId"])
+    .index("by_org_accounting_contact", ["orgId", "accountingContactId"]),
+
+  crmContacts: defineTable({
+    orgId: v.id("organizations"),
+    companyId: v.optional(v.id("crmCompanies")),
+    name: v.string(),
+    title: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    linkedin: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    ownerId: v.optional(v.id("users")),
+    accountingContactId: v.optional(v.id("contacts")),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_company", ["orgId", "companyId"])
+    .index("by_org_email", ["orgId", "email"]),
+
+  crmPipelines: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    isDefault: v.boolean(),
+    active: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_active", ["orgId", "active"]),
+
+  crmStages: defineTable({
+    orgId: v.id("organizations"),
+    pipelineId: v.id("crmPipelines"),
+    name: v.string(),
+    order: v.number(),
+    probability: v.optional(v.number()),
+    isWon: v.boolean(),
+    isLost: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_pipeline", ["pipelineId"])
+    .index("by_org_pipeline", ["orgId", "pipelineId"]),
+
+  crmLeads: defineTable({
+    orgId: v.id("organizations"),
+    companyName: v.optional(v.string()),
+    contactName: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    source: v.optional(v.string()),
+    status: v.union(
+      v.literal("new"),
+      v.literal("contacted"),
+      v.literal("qualified"),
+      v.literal("disqualified"),
+      v.literal("converted")
+    ),
+    ownerId: v.optional(v.id("users")),
+    value: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    convertedCompanyId: v.optional(v.id("crmCompanies")),
+    convertedContactId: v.optional(v.id("crmContacts")),
+    convertedDealId: v.optional(v.id("crmDeals")),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_status", ["orgId", "status"])
+    .index("by_org_owner", ["orgId", "ownerId"])
+    .index("by_org_email", ["orgId", "email"]),
+
+  crmDeals: defineTable({
+    orgId: v.id("organizations"),
+    pipelineId: v.id("crmPipelines"),
+    stageId: v.id("crmStages"),
+    companyId: v.optional(v.id("crmCompanies")),
+    contactId: v.optional(v.id("crmContacts")),
+    leadId: v.optional(v.id("crmLeads")),
+    title: v.string(),
+    value: v.number(),
+    currency: v.string(),
+    expectedCloseDate: v.optional(v.string()),
+    ownerId: v.optional(v.id("users")),
+    status: v.union(v.literal("open"), v.literal("won"), v.literal("lost")),
+    lostReason: v.optional(v.string()),
+    closedAt: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_pipeline", ["orgId", "pipelineId"])
+    .index("by_org_stage", ["orgId", "stageId"])
+    .index("by_org_company", ["orgId", "companyId"])
+    .index("by_org_owner", ["orgId", "ownerId"])
+    .index("by_org_status", ["orgId", "status"]),
+
+  crmActivities: defineTable({
+    orgId: v.id("organizations"),
+    entityType: v.union(
+      v.literal("company"),
+      v.literal("contact"),
+      v.literal("lead"),
+      v.literal("deal"),
+      v.literal("quotation")
+    ),
+    entityId: v.string(),
+    type: v.union(
+      v.literal("note"),
+      v.literal("call"),
+      v.literal("email"),
+      v.literal("meeting"),
+      v.literal("stage_change"),
+      v.literal("task"),
+      v.literal("quotation")
+    ),
+    subject: v.optional(v.string()),
+    body: v.optional(v.string()),
+    occurredAt: v.number(),
+    actorId: v.optional(v.id("users")),
+    metadata: v.optional(v.any()),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_entity", ["entityType", "entityId"])
+    .index("by_org_entity", ["orgId", "entityType", "entityId"])
+    .index("by_org_occurred", ["orgId", "occurredAt"]),
+
+  crmTasks: defineTable({
+    orgId: v.id("organizations"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    dueAt: v.optional(v.number()),
+    status: v.union(v.literal("open"), v.literal("done"), v.literal("cancelled")),
+    priority: v.optional(
+      v.union(v.literal("low"), v.literal("normal"), v.literal("high"), v.literal("urgent"))
+    ),
+    assigneeId: v.optional(v.id("users")),
+    companyId: v.optional(v.id("crmCompanies")),
+    contactId: v.optional(v.id("crmContacts")),
+    leadId: v.optional(v.id("crmLeads")),
+    dealId: v.optional(v.id("crmDeals")),
+    completedAt: v.optional(v.number()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_assignee", ["orgId", "assigneeId"])
+    .index("by_org_status", ["orgId", "status"])
+    .index("by_org_due", ["orgId", "dueAt"])
+    .index("by_org_deal", ["orgId", "dealId"]),
+
+  crmQuotations: defineTable({
+    orgId: v.id("organizations"),
+    number: v.string(),
+    companyId: v.optional(v.id("crmCompanies")),
+    contactId: v.optional(v.id("crmContacts")),
+    dealId: v.optional(v.id("crmDeals")),
+    status: v.union(
+      v.literal("draft"),
+      v.literal("sent"),
+      v.literal("accepted"),
+      v.literal("rejected"),
+      v.literal("expired"),
+      v.literal("converted")
+    ),
+    issueDate: v.string(),
+    validUntil: v.optional(v.string()),
+    currency: v.string(),
+    notes: v.optional(v.string()),
+    terms: v.optional(v.string()),
+    subtotal: v.number(),
+    taxTotal: v.number(),
+    total: v.number(),
+    invoiceId: v.optional(v.id("invoices")),
+    sentAt: v.optional(v.number()),
+    acceptedAt: v.optional(v.number()),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_company", ["orgId", "companyId"])
+    .index("by_org_deal", ["orgId", "dealId"])
+    .index("by_org_status", ["orgId", "status"])
+    .index("by_org_number", ["orgId", "number"]),
+
+  crmQuotationItems: defineTable({
+    orgId: v.id("organizations"),
+    quotationId: v.id("crmQuotations"),
+    description: v.string(),
+    qty: v.number(),
+    unitPrice: v.number(),
+    taxRate: v.number(),
+    order: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_quotation", ["quotationId"]),
+
+  // Email integration (Gmail / Outlook). Tokens are AES-256-GCM ciphertext and
+  // must never be returned to callers. Email functions are implemented in Phase 6.
+  crmEmailConnections: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    provider: v.union(v.literal("gmail"), v.literal("outlook")),
+    email: v.optional(v.string()),
+    accessTokenEnc: v.string(),
+    refreshTokenEnc: v.optional(v.string()),
+    expiresAt: v.number(),
+    scope: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("error")),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_org", ["orgId"])
+    .index("by_user_provider", ["userId", "provider"]),
+
+  crmEmailMessages: defineTable({
+    orgId: v.id("organizations"),
+    connectionId: v.id("crmEmailConnections"),
+    provider: v.union(v.literal("gmail"), v.literal("outlook")),
+    providerMessageId: v.string(),
+    threadId: v.optional(v.string()),
+    internetMessageId: v.optional(v.string()),
+    direction: v.union(v.literal("inbound"), v.literal("outbound")),
+    from: v.string(),
+    to: v.array(v.string()),
+    cc: v.optional(v.array(v.string())),
+    subject: v.optional(v.string()),
+    snippet: v.optional(v.string()),
+    receivedAt: v.number(),
+    hasAttachments: v.optional(v.boolean()),
+    companyId: v.optional(v.id("crmCompanies")),
+    contactId: v.optional(v.id("crmContacts")),
+    leadId: v.optional(v.id("crmLeads")),
+    dealId: v.optional(v.id("crmDeals")),
+    quotationId: v.optional(v.id("crmQuotations")),
+    createdAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_connection", ["connectionId"])
+    .index("by_org_provider_message", ["orgId", "provider", "providerMessageId"])
+    .index("by_org_company", ["orgId", "companyId"])
+    .index("by_org_contact", ["orgId", "contactId"])
+    .index("by_org_deal", ["orgId", "dealId"]),
+
+  crmEmailSyncState: defineTable({
+    orgId: v.id("organizations"),
+    connectionId: v.id("crmEmailConnections"),
+    provider: v.union(v.literal("gmail"), v.literal("outlook")),
+    cursor: v.optional(v.string()),
+    lastSyncedAt: v.optional(v.number()),
+    status: v.union(v.literal("idle"), v.literal("syncing"), v.literal("error")),
+    error: v.optional(v.string()),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_connection", ["connectionId"]),
+
   healthChecks: defineTable({
     status: v.union(v.literal("up"), v.literal("down")),
     source: v.optional(v.string()),

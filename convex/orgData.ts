@@ -32,6 +32,20 @@ export const ORG_TABLES = [
   "calendarConnections",
   "calendarEvents",
   "calendarSyncJobs",
+  // CRM (all org-scoped, all have by_org indexes).
+  "crmCompanies",
+  "crmContacts",
+  "crmPipelines",
+  "crmStages",
+  "crmLeads",
+  "crmDeals",
+  "crmActivities",
+  "crmTasks",
+  "crmQuotations",
+  "crmQuotationItems",
+  "crmEmailConnections",
+  "crmEmailMessages",
+  "crmEmailSyncState",
 ] as const;
 
 /** Tables without a `by_org` index — scanned and filtered in memory. */

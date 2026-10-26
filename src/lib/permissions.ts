@@ -24,6 +24,12 @@ export type ModuleKey =
   | "attendance"
   | "payroll"
   | "my-payslips"
+  | "crm"
+  | "crm-companies"
+  | "crm-leads"
+  | "crm-pipeline"
+  | "crm-quotations"
+  | "crm-email"
   | "invoices"
   | "bills"
   | "customers"
@@ -80,6 +86,13 @@ export const MODULES: ModuleDef[] = [
   { key: "attendance", label: "Attendance", group: "People & HR" },
   { key: "payroll", label: "Payroll", group: "People & HR" },
   { key: "my-payslips", label: "My Payslips", group: "People & HR" },
+  // CRM — grantable as one bundle (see CRM_MODULE_KEYS) for CRM-only tenants.
+  { key: "crm", label: "CRM", group: "CRM" },
+  { key: "crm-companies", label: "Companies & contacts", group: "CRM" },
+  { key: "crm-leads", label: "Leads", group: "CRM" },
+  { key: "crm-pipeline", label: "Pipelines & deals", group: "CRM" },
+  { key: "crm-quotations", label: "Quotations", group: "CRM" },
+  { key: "crm-email", label: "Email integration", group: "CRM" },
   // Accounting — one centralized group so the whole firm-level suite can be
   // granted/enabled together (see ACCOUNTING_MODULE_KEYS) or item by item.
   { key: "accounting", label: "Accounting", group: "Accounting" },
@@ -126,6 +139,7 @@ export const ALL_MODULE_KEYS: ModuleKey[] = MODULES.map((m) => m.key);
 export const GROUP_ORDER = [
   "Overview",
   "People & HR",
+  "CRM",
   "Accounting",
   "Controls",
   "Finance",
@@ -154,6 +168,20 @@ export const ACCOUNTING_MODULE_KEYS: ModuleKey[] = [
   "projects",
   "budgets",
   "management-reports",
+];
+
+/**
+ * The CRM suite. Enabling/granting these keys together gives a firm a complete
+ * CRM (companies/contacts, leads, pipelines/deals, quotations, email) without
+ * the rest of the app.
+ */
+export const CRM_MODULE_KEYS: ModuleKey[] = [
+  "crm",
+  "crm-companies",
+  "crm-leads",
+  "crm-pipeline",
+  "crm-quotations",
+  "crm-email",
 ];
 
 /** What each built-in role can access out of the box (mirrors the sidebar). */
