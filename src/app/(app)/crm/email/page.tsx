@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { PageHeader, Alert, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { usePermissions } from "@/components/usePermissions";
@@ -32,6 +33,7 @@ export default function CrmEmailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,6 +65,19 @@ export default function CrmEmailPage() {
     }
   }, [toast, load]);
 
+  async function syncNow() {
+    setSyncing(true);
+    try {
+      const res = await api<{ synced: number }>("/api/crm/email/sync", { method: "POST" });
+      toast.success(`Synced ${res.synced} mailbox(es)`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function disconnect(provider: "gmail" | "outlook") {
     if (!confirm(`Disconnect ${provider === "gmail" ? "Gmail" : "Outlook"}?`)) return;
     setBusy(provider);
@@ -91,6 +106,14 @@ export default function CrmEmailPage() {
       <PageHeader
         title="Email"
         subtitle="Connect a mailbox so emails can be linked to companies, contacts and deals."
+        action={
+          <div className="flex gap-2">
+            <button className="btn-secondary" onClick={syncNow} disabled={syncing}>
+              {syncing ? "Syncing…" : "Sync now"}
+            </button>
+            <Link href="/crm/email/inbox" className="btn-primary">Open inbox</Link>
+          </div>
+        }
       />
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}

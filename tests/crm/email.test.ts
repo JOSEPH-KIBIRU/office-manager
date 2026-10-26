@@ -136,4 +136,61 @@ describe("CRM email connections", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].contactId).toBe(contactId);
   });
+
+  it("creates a lead from an inbound email and dedupes", async () => {
+    const { t, orgA, userA } = await setup();
+    const connId = await t.mutation(api.crmEmail.upsertConnection, {
+      secret: SECRET,
+      orgId: orgA,
+      userId: userA,
+      provider: "gmail",
+      accessTokenEnc: "enc",
+      expiresAt: Date.now() + 3_600_000,
+    });
+    await t.mutation(api.crmEmail.upsertMessages, {
+      secret: SECRET,
+      orgId: orgA,
+      connectionId: connId,
+      provider: "gmail",
+      messages: [
+        {
+          providerMessageId: "m-lead",
+          direction: "inbound",
+          from: "New Person <new@prospect.test>",
+          to: ["me@example.test"],
+          subject: "Interested",
+          receivedAt: Date.now(),
+        },
+      ],
+    });
+
+    const unlinked = await t.query(api.crmEmail.listInbox, { secret: SECRET, orgId: orgA, filter: "unlinked" });
+    expect(unlinked).toHaveLength(1);
+
+    const msgId = unlinked[0].id;
+    const res = await t.mutation(api.crmEmail.convertToLead, {
+      secret: SECRET,
+      orgId: orgA,
+      actorId: userA,
+      id: msgId as never,
+    });
+    expect(res.created).toBe(true);
+
+    const lead = await t.query(api.crmLeads.getLead, { secret: SECRET, orgId: orgA, id: res.leadId });
+    expect(lead?.email).toBe("new@prospect.test");
+    expect(lead?.contactName).toBe("New Person");
+    expect(lead?.companyName).toBe("Prospect");
+
+    const again = await t.mutation(api.crmEmail.convertToLead, {
+      secret: SECRET,
+      orgId: orgA,
+      actorId: userA,
+      id: msgId as never,
+    });
+    expect(again.created).toBe(false);
+    expect(again.leadId).toBe(res.leadId);
+
+    const linked = await t.query(api.crmEmail.listInbox, { secret: SECRET, orgId: orgA, filter: "linked" });
+    expect(linked).toHaveLength(1);
+  });
 });

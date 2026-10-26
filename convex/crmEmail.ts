@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { assertSecret, requireMember, tsNow } from "./lib";
+import { assertSecret, requireOrg, requireMember, tsNow } from "./lib";
+import { requireOptionalRef } from "./crmLib";
 
 const providerValidator = v.union(v.literal("gmail"), v.literal("outlook"));
 
@@ -322,3 +323,193 @@ export const upsertMessages = mutation({
     return { inserted, updated };
   },
 });
+
+const INBOX_FILTER = v.union(
+  v.literal("unlinked"),
+  v.literal("linked"),
+  v.literal("ignored"),
+  v.literal("all")
+);
+
+/** Synced messages for the CRM inbox, enriched with linked record names. */
+export const listInbox = query({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    filter: v.optional(INBOX_FILTER),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireOrg(ctx, args.orgId);
+    const filter = args.filter ?? "unlinked";
+
+    const rows = await ctx.db
+      .query("crmEmailMessages")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+
+    const filtered = rows.filter((m) => {
+      if (filter === "ignored") return m.ignored === true;
+      if (m.ignored) return false;
+      const linked = Boolean(m.contactId || m.companyId || m.leadId || m.dealId);
+      if (filter === "unlinked") return !linked;
+      if (filter === "linked") return linked;
+      return true;
+    });
+
+    const sorted = [...filtered]
+      .sort((a, b) => b.receivedAt - a.receivedAt)
+      .slice(0, Math.min(args.limit ?? 100, 300));
+
+    const contacts = await ctx.db
+      .query("crmContacts")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const companies = await ctx.db
+      .query("crmCompanies")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const leads = await ctx.db
+      .query("crmLeads")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const contactName = new Map(contacts.map((c) => [c._id as string, c.name] as const));
+    const companyName = new Map(companies.map((c) => [c._id as string, c.name] as const));
+    const leadName = new Map(
+      leads.map((l) => [l._id as string, l.companyName ?? l.contactName ?? l.email ?? "Lead"] as const)
+    );
+
+    return sorted.map((m) => ({
+      id: m._id,
+      provider: m.provider,
+      direction: m.direction,
+      from: m.from,
+      to: m.to,
+      subject: m.subject ?? null,
+      snippet: m.snippet ?? null,
+      receivedAt: m.receivedAt,
+      hasAttachments: m.hasAttachments ?? false,
+      ignored: m.ignored ?? false,
+      contactId: m.contactId ?? null,
+      contactName: m.contactId ? contactName.get(m.contactId as string) ?? null : null,
+      companyId: m.companyId ?? null,
+      companyName: m.companyId ? companyName.get(m.companyId as string) ?? null : null,
+      leadId: m.leadId ?? null,
+      leadName: m.leadId ? leadName.get(m.leadId as string) ?? null : null,
+      dealId: m.dealId ?? null,
+    }));
+  },
+});
+
+/** Link a message to CRM records or mark it ignored. */
+export const updateMessage = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    actorId: v.id("users"),
+    id: v.id("crmEmailMessages"),
+    contactId: v.optional(v.union(v.id("crmContacts"), v.null())),
+    companyId: v.optional(v.union(v.id("crmCompanies"), v.null())),
+    leadId: v.optional(v.union(v.id("crmLeads"), v.null())),
+    dealId: v.optional(v.union(v.id("crmDeals"), v.null())),
+    ignored: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.actorId);
+    const msg = await ctx.db.get(args.id);
+    if (!msg || msg.orgId !== args.orgId) throw new Error("Email not found");
+
+    const patch: Record<string, unknown> = {};
+    if (args.contactId !== undefined) {
+      if (args.contactId !== null) await requireOptionalRef(ctx, args.orgId, args.contactId, "Contact");
+      patch.contactId = args.contactId ?? undefined;
+    }
+    if (args.companyId !== undefined) {
+      if (args.companyId !== null) await requireOptionalRef(ctx, args.orgId, args.companyId, "Company");
+      patch.companyId = args.companyId ?? undefined;
+    }
+    if (args.leadId !== undefined) {
+      if (args.leadId !== null) await requireOptionalRef(ctx, args.orgId, args.leadId, "Lead");
+      patch.leadId = args.leadId ?? undefined;
+    }
+    if (args.dealId !== undefined) {
+      if (args.dealId !== null) await requireOptionalRef(ctx, args.orgId, args.dealId, "Deal");
+      patch.dealId = args.dealId ?? undefined;
+    }
+    if (args.ignored !== undefined) patch.ignored = args.ignored;
+
+    await ctx.db.patch(args.id, patch);
+    return true;
+  },
+});
+
+function parseFrom(from: string): { name?: string; email?: string } {
+  const angle = from.match(/^(.*)<([^>]+)>/);
+  if (angle) {
+    const name = angle[1].trim().replace(/^["']+|["']+$/g, "");
+    return { name: name || undefined, email: angle[2].trim().toLowerCase() };
+  }
+  const email = from.trim().toLowerCase();
+  return email.includes("@") ? { email } : {};
+}
+
+function domainToName(email?: string): string | undefined {
+  if (!email || !email.includes("@")) return undefined;
+  const domain = email.split("@")[1] ?? "";
+  const first = domain.split(".")[0] ?? "";
+  if (!first) return undefined;
+  return first.replace(/[-_]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Turn an inbound email into a CRM lead (deduped by sender email). */
+export const convertToLead = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    actorId: v.id("users"),
+    id: v.id("crmEmailMessages"),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireMember(ctx, args.orgId, args.actorId);
+    const msg = await ctx.db.get(args.id);
+    if (!msg || msg.orgId !== args.orgId) throw new Error("Email not found");
+    if (msg.direction !== "inbound") throw new Error("Only inbound emails can be turned into a lead");
+    if (msg.leadId) return { leadId: msg.leadId, created: false };
+
+    const { name, email } = parseFrom(msg.from);
+    if (!email) throw new Error("This email has no usable sender address");
+
+    const existing = await ctx.db
+      .query("crmLeads")
+      .withIndex("by_org_email", (q) => q.eq("orgId", args.orgId).eq("email", email))
+      .first();
+
+    let leadId: any;
+    let created = false;
+    if (existing && existing.status !== "converted" && existing.status !== "disqualified") {
+      leadId = existing._id;
+    } else {
+      const now = tsNow();
+      leadId = await ctx.db.insert("crmLeads", {
+        orgId: args.orgId,
+        companyName: domainToName(email),
+        contactName: name,
+        email,
+        source: "email",
+        status: "new",
+        notes: `From email: ${msg.subject ?? "(no subject)"}`,
+        createdBy: args.actorId,
+        createdAt: now,
+        updatedAt: now,
+      });
+      created = true;
+    }
+
+    await ctx.db.patch(args.id, { leadId, ignored: false });
+    return { leadId, created };
+  },
+});
+

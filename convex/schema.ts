@@ -1515,6 +1515,7 @@ export default defineSchema(
     snippet: v.optional(v.string()),
     receivedAt: v.number(),
     hasAttachments: v.optional(v.boolean()),
+    ignored: v.optional(v.boolean()),
     companyId: v.optional(v.id("crmCompanies")),
     contactId: v.optional(v.id("crmContacts")),
     leadId: v.optional(v.id("crmLeads")),

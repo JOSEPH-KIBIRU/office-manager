@@ -297,6 +297,7 @@ Cached message metadata linked to CRM entities (not full mail bodies by default)
 | `snippet` | `string?` | short preview |
 | `receivedAt` | `number` | |
 | `hasAttachments` | `boolean?` | |
+| `ignored` | `boolean?` | hidden from the inbox "needs attention" list |
 | `companyId` / `contactId` / `leadId` / `dealId` / `quotationId` | refs | links |
 | `createdAt` | `number` | |
 
