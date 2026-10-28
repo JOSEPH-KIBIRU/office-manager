@@ -20,12 +20,15 @@ interface Message {
   authorId: string;
   authorName: string;
   body: string;
+  mentionIds: string[];
   createdAt: number;
   editedAt: number | null;
   deleted: boolean;
   mine: boolean;
 }
 interface Member { id: string; name: string; role: string; }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function fmt(ms: number) {
   return new Date(ms).toLocaleString("en-GB", {
@@ -36,10 +39,22 @@ function fmt(ms: number) {
   });
 }
 
+function renderMentions(text: string, mine: boolean) {
+  return text.split(/(@[A-Za-z0-9._-]+)/g).map((part, i) =>
+    part.startsWith("@") ? (
+      <span key={i} className={mine ? "font-semibold underline" : "font-semibold text-indigo-600"}>{part}</span>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 export default function ChatPage() {
   const toast = useToast();
   const { modules, can } = usePermissions();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lastRef = useRef(0);
 
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeId, setActiveId] = useState("");
@@ -59,6 +74,18 @@ export default function ChatPage() {
   const [dmUserId, setDmUserId] = useState("");
   const [dmBusy, setDmBusy] = useState(false);
 
+  const [mentionSet, setMentionSet] = useState<Set<string>>(new Set());
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+
+  const mergeMessages = useCallback((incoming: Message[]) => {
+    setMessages((prev) => {
+      const map = new Map(prev.map((m) => [m.id, m] as const));
+      for (const m of incoming) map.set(m.id, m);
+      return [...map.values()].sort((a, b) => a.createdAt - b.createdAt);
+    });
+  }, []);
+
   const loadChannels = useCallback(async (selectId?: string) => {
     try {
       const data = await api<{ channels: Channel[] }>("/api/chat/channels");
@@ -77,44 +104,94 @@ export default function ChatPage() {
 
   useEffect(() => {
     loadChannels();
+    api<{ members: Member[] }>("/api/chat/members")
+      .then((d) => setMembers(d.members))
+      .catch(() => {});
   }, [loadChannels]);
 
-  // Refresh unread counts periodically.
+  // Keep channel unread counts reasonably fresh.
   useEffect(() => {
-    const timer = setInterval(() => {
-      loadChannels();
-    }, 15000);
+    const timer = setInterval(() => loadChannels(), 15000);
     return () => clearInterval(timer);
   }, [loadChannels]);
 
+  // Long-poll messages for the active channel (near real-time).
   useEffect(() => {
     if (!activeId) {
       setMessages([]);
       return;
     }
-    let active = true;
-    const fetchMessages = async () => {
+    let cancelled = false;
+    lastRef.current = 0;
+
+    const markRead = () =>
+      api(`/api/chat/channels/${activeId}/read`, { method: "POST" }).catch(() => {});
+
+    async function loop() {
+      while (!cancelled) {
+        try {
+          const data = await api<{ messages: Message[] }>(
+            `/api/chat/channels/${activeId}/messages?after=${lastRef.current}`
+          );
+          if (cancelled) return;
+          if (data.messages.length) {
+            mergeMessages(data.messages);
+            lastRef.current = Math.max(lastRef.current, ...data.messages.map((m) => m.createdAt));
+            void markRead();
+          }
+        } catch {
+          if (cancelled) return;
+          await sleep(2000);
+        }
+      }
+    }
+
+    async function initial() {
+      try {
+        const data = await api<{ messages: Message[]; serverTime?: number }>(
+          `/api/chat/channels/${activeId}/messages`
+        );
+        if (cancelled) return;
+        setMessages(data.messages);
+        lastRef.current = data.messages.length
+          ? data.messages[data.messages.length - 1].createdAt
+          : data.serverTime ?? Date.now();
+        setMentionSet(new Set());
+        setMentionQuery(null);
+        setLoading(false);
+        await markRead();
+        loop();
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load messages");
+          setLoading(false);
+        }
+      }
+    }
+
+    setLoading(true);
+    initial();
+
+    // Periodic full refresh catches edits/deletes (incremental poll only adds).
+    const refresh = setInterval(async () => {
       try {
         const data = await api<{ messages: Message[] }>(`/api/chat/channels/${activeId}/messages`);
-        if (active) {
+        if (!cancelled) {
           setMessages(data.messages);
-          setError(null);
+          lastRef.current = data.messages.length
+            ? data.messages[data.messages.length - 1].createdAt
+            : lastRef.current;
         }
-        await api(`/api/chat/channels/${activeId}/read`, { method: "POST" }).catch(() => {});
-      } catch (e) {
-        if (active) setError(e instanceof Error ? e.message : "Failed to load messages");
-      } finally {
-        if (active) setLoading(false);
+      } catch {
+        /* ignore */
       }
-    };
-    setLoading(true);
-    fetchMessages();
-    const timer = setInterval(fetchMessages, 5000);
+    }, 60000);
+
     return () => {
-      active = false;
-      clearInterval(timer);
+      cancelled = true;
+      clearInterval(refresh);
     };
-  }, [activeId]);
+  }, [activeId, mergeMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -124,15 +201,49 @@ export default function ChatPage() {
   const textChannels = channels.filter((c) => c.kind !== "dm");
   const dms = channels.filter((c) => c.kind === "dm");
 
+  const mentionSuggestions =
+    mentionQuery !== null
+      ? members
+          .filter((m) => {
+            const q = mentionQuery.toLowerCase();
+            return m.name.toLowerCase().includes(q) || m.role.toLowerCase().includes(q);
+          })
+          .slice(0, 6)
+      : [];
+
+  function pickMention(m: Member) {
+    setBody((prev) => prev.replace(/@([A-Za-z0-9._-]*)$/, `@${m.name} `));
+    setMentionSet((prev) => new Set(prev).add(m.id));
+    setMentionQuery(null);
+    textareaRef.current?.focus();
+  }
+
+  function reconcileMentions(text: string): string[] {
+    return [...mentionSet].filter((id) => {
+      const m = members.find((x) => x.id === id);
+      return m ? text.toLowerCase().includes("@" + m.name.toLowerCase()) : false;
+    });
+  }
+
   async function submit() {
     const text = body.trim();
     if (!text || !activeId || sending) return;
     setSending(true);
     try {
-      await api(`/api/chat/channels/${activeId}/messages`, { method: "POST", json: { body: text } });
+      await api(`/api/chat/channels/${activeId}/messages`, {
+        method: "POST",
+        json: { body: text, mentionIds: reconcileMentions(text) },
+      });
       setBody("");
-      const data = await api<{ messages: Message[] }>(`/api/chat/channels/${activeId}/messages`);
-      setMessages(data.messages);
+      setMentionSet(new Set());
+      setMentionQuery(null);
+      const data = await api<{ messages: Message[] }>(
+        `/api/chat/channels/${activeId}/messages?after=${lastRef.current}&wait=0`
+      );
+      if (data.messages.length) {
+        mergeMessages(data.messages);
+        lastRef.current = Math.max(lastRef.current, ...data.messages.map((m) => m.createdAt));
+      }
       await api(`/api/chat/channels/${activeId}/read`, { method: "POST" }).catch(() => {});
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to send message");
@@ -245,7 +356,7 @@ export default function ChatPage() {
 
   return (
     <>
-      <PageHeader title="Team chat" subtitle="Chat with people in your organization." />
+      <PageHeader title="Team chat" subtitle="Chat with people in your organization. Type @ to mention someone." />
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
 
@@ -288,7 +399,9 @@ export default function ChatPage() {
                     <span className="font-semibold">{m.mine ? "You" : m.authorName}</span>
                     <span>{fmt(m.createdAt)}</span>
                   </div>
-                  <p className={`whitespace-pre-wrap text-sm ${m.deleted ? "italic opacity-70" : ""}`}>{m.body}</p>
+                  <p className={`whitespace-pre-wrap text-sm ${m.deleted ? "italic opacity-70" : ""}`}>
+                    {m.deleted ? m.body : renderMentions(m.body, m.mine)}
+                  </p>
                 </div>
                 {m.mine && !m.deleted && (
                   <button
@@ -305,20 +418,71 @@ export default function ChatPage() {
           </div>
 
           <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-slate-100 px-3 py-3">
-            <textarea
-              className="input min-h-[2.5rem] flex-1 resize-none"
-              rows={1}
-              placeholder={activeId ? "Write a message…" : "Select a channel"}
-              value={body}
-              disabled={!activeId}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void submit();
-                }
-              }}
-            />
+            <div className="relative flex-1">
+              {mentionQuery !== null && mentionSuggestions.length > 0 && (
+                <div className="absolute bottom-full left-0 mb-1 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                  {mentionSuggestions.map((m, i) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        pickMention(m);
+                      }}
+                      className={`block w-full px-3 py-2 text-left text-sm ${
+                        i === mentionIndex ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {m.name}
+                      <span className="ml-2 text-xs capitalize text-slate-400">{m.role}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <textarea
+                ref={textareaRef}
+                className="input min-h-[2.5rem] w-full resize-none"
+                rows={1}
+                placeholder={activeId ? "Write a message…  (type @ to mention)" : "Select a channel"}
+                value={body}
+                disabled={!activeId}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setBody(value);
+                  const m = value.match(/(?:^|\s)@([A-Za-z0-9._-]*)$/);
+                  setMentionQuery(m ? m[1] : null);
+                  setMentionIndex(0);
+                }}
+                onKeyDown={(e) => {
+                  if (mentionQuery !== null && mentionSuggestions.length > 0) {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setMentionIndex((i) => (i + 1) % mentionSuggestions.length);
+                      return;
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setMentionIndex((i) => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length);
+                      return;
+                    }
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      pickMention(mentionSuggestions[mentionIndex] ?? mentionSuggestions[0]);
+                      return;
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setMentionQuery(null);
+                      return;
+                    }
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void submit();
+                  }
+                }}
+              />
+            </div>
             <button type="submit" className="btn-primary px-4 py-2" disabled={sending || !activeId || !body.trim()}>
               {sending ? "…" : "Send"}
             </button>

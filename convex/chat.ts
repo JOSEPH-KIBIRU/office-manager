@@ -2,6 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { assertSecret, requireMember, tsNow } from "./lib";
 import { requireOptionalRef } from "./crmLib";
+import { pushNotification } from "./notifications";
 
 /** Direct (DM) channels are visible only to their two participants. */
 function assertChannelAccess(channel: any, actorId: any) {
@@ -235,6 +236,7 @@ export const listMessages = query({
     actorId: v.id("users"),
     channelId: v.id("chatChannels"),
     limit: v.optional(v.number()),
+    after: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -248,7 +250,13 @@ export const listMessages = query({
       .withIndex("by_org_channel", (q) => q.eq("orgId", args.orgId).eq("channelId", args.channelId))
       .collect();
     const limit = Math.min(Math.max(args.limit ?? 100, 1), 200);
-    const recent = [...rows].sort((a, b) => a.createdAt - b.createdAt).slice(-limit);
+    const recent =
+      args.after !== undefined
+        ? [...rows]
+            .filter((m) => m.createdAt > args.after!)
+            .sort((a, b) => a.createdAt - b.createdAt)
+            .slice(0, 200)
+        : [...rows].sort((a, b) => a.createdAt - b.createdAt).slice(-limit);
 
     const users = await ctx.db
       .query("users")
@@ -262,6 +270,7 @@ export const listMessages = query({
       authorId: m.authorId,
       authorName: names.get(m.authorId as string) ?? "Unknown",
       body: m.deletedAt ? "This message was deleted" : m.body,
+      mentionIds: (m.mentionIds ?? []) as string[],
       createdAt: m.createdAt,
       editedAt: m.editedAt ?? null,
       deleted: Boolean(m.deletedAt),
@@ -277,25 +286,75 @@ export const sendMessage = mutation({
     actorId: v.id("users"),
     channelId: v.id("chatChannels"),
     body: v.string(),
+    mentionIds: v.optional(v.array(v.id("users"))),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    await requireMember(ctx, args.orgId, args.actorId);
+    const author = await requireMember(ctx, args.orgId, args.actorId);
     const channel = await ctx.db.get(args.channelId);
     if (!channel || channel.orgId !== args.orgId) throw new Error("Channel not found");
     assertChannelAccess(channel, args.actorId);
     const body = args.body.trim();
     if (!body) throw new Error("Message cannot be empty");
     if (body.length > 4000) throw new Error("Message must be 4000 characters or fewer");
+
+    // Resolve mentions from the explicit list plus @tokens in the text.
+    const users = await ctx.db
+      .query("users")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const dmParticipants = channel.kind === "dm" ? new Set((channel.dmUserIds ?? []).map(String)) : null;
+    const mentionSet = new Set<string>();
+
+    for (const id of args.mentionIds ?? []) {
+      const u = users.find((x) => x._id === id);
+      if (u && u.active && u._id !== args.actorId && (!dmParticipants || dmParticipants.has(String(u._id)))) {
+        mentionSet.add(String(u._id));
+      }
+    }
+
+    const tokens = [...body.matchAll(/@([A-Za-z0-9._-]+)/g)].map((m) => m[1].toLowerCase());
+    if (tokens.length) {
+      for (const u of users) {
+        if (!u.active || u._id === args.actorId) continue;
+        if (dmParticipants && !dmParticipants.has(String(u._id))) continue;
+        const nameLower = u.name.toLowerCase();
+        const emailLower = u.email.toLowerCase();
+        const matched = tokens.some(
+          (t) =>
+            emailLower === t ||
+            nameLower === t ||
+            nameLower.startsWith(t + " ") ||
+            nameLower.split(/\s+/).some((part) => part === t)
+        );
+        if (matched) mentionSet.add(String(u._id));
+      }
+    }
+
     const createdAt = tsNow();
     const id = await ctx.db.insert("chatMessages", {
       orgId: args.orgId,
       channelId: args.channelId,
       authorId: args.actorId,
       body,
+      mentionIds: mentionSet.size ? ([...mentionSet] as never) : undefined,
       createdAt,
     });
-    return { id, createdAt };
+
+    if (mentionSet.size) {
+      const where = channel.kind === "dm" ? "a direct message" : `# ${channel.name}`;
+      for (const uid of mentionSet) {
+        await pushNotification(ctx, args.orgId, {
+          userId: uid,
+          type: "mention",
+          title: `${author.name} mentioned you in ${where}`,
+          body: body.slice(0, 140),
+          link: "/chat",
+        });
+      }
+    }
+
+    return { id, createdAt, mentionIds: [...mentionSet] };
   },
 });
 

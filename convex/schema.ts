@@ -1574,6 +1574,7 @@ export default defineSchema(
     channelId: v.id("chatChannels"),
     authorId: v.id("users"),
     body: v.string(),
+    mentionIds: v.optional(v.array(v.id("users"))),
     createdAt: v.number(),
     editedAt: v.optional(v.number()),
     deletedAt: v.optional(v.number()),

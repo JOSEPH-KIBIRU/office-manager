@@ -26,6 +26,7 @@ const TYPE_STYLES: Record<string, string> = {
   petty: "bg-orange-100 text-orange-700",
   meeting: "bg-violet-100 text-violet-700",
   payroll: "bg-teal-100 text-teal-700",
+  mention: "bg-indigo-100 text-indigo-700",
 };
 
 const TYPE_ICONS: Record<string, string> = {
@@ -34,6 +35,7 @@ const TYPE_ICONS: Record<string, string> = {
   petty: "💵",
   meeting: "📅",
   payroll: "💰",
+  mention: "💬",
 };
 
 export default function NotificationBell() {
@@ -53,7 +55,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 30000);
+    const t = setInterval(load, 15000);
     return () => clearInterval(t);
   }, []);
 

@@ -172,4 +172,35 @@ describe("in-house chat", () => {
     const after = await t.query(api.chat.listChannels, { secret: SECRET, orgId: orgA, actorId: empA });
     expect(after.find((c) => c.id === dmId)?.unreadCount).toBe(0);
   });
+
+  it("creates mention notifications for the mentioned user", async () => {
+    const { t, orgA, adminA, empA } = await setup();
+    const channelId = await t.mutation(api.chat.ensureDefaultChannel, {
+      secret: SECRET,
+      orgId: orgA,
+      actorId: adminA,
+    });
+    await t.mutation(api.chat.sendMessage, {
+      secret: SECRET,
+      orgId: orgA,
+      actorId: adminA,
+      channelId,
+      body: "Please review this",
+      mentionIds: [empA],
+    });
+
+    const msgs = await t.query(api.chat.listMessages, {
+      secret: SECRET,
+      orgId: orgA,
+      actorId: adminA,
+      channelId,
+    });
+    expect(msgs[0].mentionIds).toContain(empA);
+
+    const notifications = await t.run((ctx) => ctx.db.query("notifications").collect());
+    const forEmp = notifications.filter((n) => n.type === "mention" && n.userId === empA);
+    expect(forEmp).toHaveLength(1);
+    expect(forEmp[0].link).toBe("/chat");
+    expect(notifications.some((n) => n.type === "mention" && n.userId === adminA)).toBe(false);
+  });
 });
