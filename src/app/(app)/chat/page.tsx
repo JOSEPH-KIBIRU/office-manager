@@ -1,0 +1,367 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState, FormEvent } from "react";
+import { PageHeader, Alert, Modal, api } from "@/components/ui";
+import { useToast } from "@/components/toast";
+import { usePermissions } from "@/components/usePermissions";
+
+interface Channel {
+  id: string;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  kind: "channel" | "dm";
+  dmUserId: string | null;
+  unreadCount: number;
+}
+interface Message {
+  id: string;
+  channelId: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: number;
+  editedAt: number | null;
+  deleted: boolean;
+  mine: boolean;
+}
+interface Member { id: string; name: string; role: string; }
+
+function fmt(ms: number) {
+  return new Date(ms).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+export default function ChatPage() {
+  const toast = useToast();
+  const { modules, can } = usePermissions();
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [activeId, setActiveId] = useState("");
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [body, setBody] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const [showNew, setShowNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const [showDm, setShowDm] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [dmUserId, setDmUserId] = useState("");
+  const [dmBusy, setDmBusy] = useState(false);
+
+  const loadChannels = useCallback(async (selectId?: string) => {
+    try {
+      const data = await api<{ channels: Channel[] }>("/api/chat/channels");
+      setChannels(data.channels);
+      setActiveId((prev) => {
+        if (selectId) return selectId;
+        if (prev && data.channels.some((c) => c.id === prev)) return prev;
+        return data.channels.find((c) => c.isDefault)?.id ?? data.channels[0]?.id ?? "";
+      });
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load chat");
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadChannels();
+  }, [loadChannels]);
+
+  // Refresh unread counts periodically.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      loadChannels();
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [loadChannels]);
+
+  useEffect(() => {
+    if (!activeId) {
+      setMessages([]);
+      return;
+    }
+    let active = true;
+    const fetchMessages = async () => {
+      try {
+        const data = await api<{ messages: Message[] }>(`/api/chat/channels/${activeId}/messages`);
+        if (active) {
+          setMessages(data.messages);
+          setError(null);
+        }
+        await api(`/api/chat/channels/${activeId}/read`, { method: "POST" }).catch(() => {});
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : "Failed to load messages");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    setLoading(true);
+    fetchMessages();
+    const timer = setInterval(fetchMessages, 5000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [activeId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length, activeId]);
+
+  const activeChannel = channels.find((c) => c.id === activeId) ?? null;
+  const textChannels = channels.filter((c) => c.kind !== "dm");
+  const dms = channels.filter((c) => c.kind === "dm");
+
+  async function submit() {
+    const text = body.trim();
+    if (!text || !activeId || sending) return;
+    setSending(true);
+    try {
+      await api(`/api/chat/channels/${activeId}/messages`, { method: "POST", json: { body: text } });
+      setBody("");
+      const data = await api<{ messages: Message[] }>(`/api/chat/channels/${activeId}/messages`);
+      setMessages(data.messages);
+      await api(`/api/chat/channels/${activeId}/read`, { method: "POST" }).catch(() => {});
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to send message");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    void submit();
+  }
+
+  async function removeMessage(id: string) {
+    try {
+      await api(`/api/chat/messages/${id}`, { method: "DELETE" });
+      const data = await api<{ messages: Message[] }>(`/api/chat/channels/${activeId}/messages`);
+      setMessages(data.messages);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete message");
+    }
+  }
+
+  async function createChannel(e: FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) {
+      toast.error("Channel name is required");
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await api<{ id: string }>("/api/chat/channels", {
+        method: "POST",
+        json: { name: newName, description: newDesc || undefined },
+      });
+      toast.success("Channel created");
+      setShowNew(false);
+      setNewName("");
+      setNewDesc("");
+      await loadChannels(res.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to create channel");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function openDmPicker() {
+    setShowDm(true);
+    setDmUserId("");
+    try {
+      const data = await api<{ members: Member[] }>("/api/chat/members");
+      setMembers(data.members);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to load members");
+    }
+  }
+
+  async function startDm(e: FormEvent) {
+    e.preventDefault();
+    if (!dmUserId) {
+      toast.error("Choose a colleague");
+      return;
+    }
+    setDmBusy(true);
+    try {
+      const res = await api<{ id: string }>("/api/chat/dm", {
+        method: "POST",
+        json: { userId: dmUserId },
+      });
+      setShowDm(false);
+      await loadChannels(res.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to start conversation");
+    } finally {
+      setDmBusy(false);
+    }
+  }
+
+  if (Array.isArray(modules) && !can("chat")) {
+    return (
+      <>
+        <PageHeader title="Team chat" />
+        <Alert kind="error">You do not have access to team chat.</Alert>
+      </>
+    );
+  }
+
+  const renderChannelButton = (c: Channel) => (
+    <button
+      key={c.id}
+      onClick={() => setActiveId(c.id)}
+      className={
+        c.id === activeId
+          ? "flex w-full items-center justify-between rounded-lg bg-indigo-50 px-3 py-2 text-left text-sm font-semibold text-indigo-700"
+          : "flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-slate-600 hover:bg-slate-50"
+      }
+    >
+      <span className="truncate">{c.kind === "dm" ? c.name : `# ${c.name}`}</span>
+      <span className="ml-1 flex items-center gap-1">
+        {c.id !== activeId && c.unreadCount > 0 && (
+          <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            {c.unreadCount}
+          </span>
+        )}
+        {c.kind !== "dm" && c.isDefault && <span className="text-[10px] uppercase text-slate-400">default</span>}
+      </span>
+    </button>
+  );
+
+  return (
+    <>
+      <PageHeader title="Team chat" subtitle="Chat with people in your organization." />
+
+      {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[240px_1fr]">
+        <div className="card p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Channels</h2>
+            <button className="text-xs font-semibold text-indigo-600 hover:underline" onClick={() => setShowNew(true)}>+ New</button>
+          </div>
+          <div className="space-y-1">
+            {textChannels.map(renderChannelButton)}
+            {textChannels.length === 0 && <p className="px-2 py-2 text-sm text-slate-400">No channels.</p>}
+          </div>
+
+          <div className="mb-2 mt-4 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Direct messages</h2>
+            <button className="text-xs font-semibold text-indigo-600 hover:underline" onClick={openDmPicker}>+ New</button>
+          </div>
+          <div className="space-y-1">
+            {dms.map(renderChannelButton)}
+            {dms.length === 0 && <p className="px-2 py-2 text-sm text-slate-400">No direct messages.</p>}
+          </div>
+        </div>
+
+        <div className="card flex h-[70vh] flex-col">
+          <div className="border-b border-slate-100 px-4 py-3">
+            <h2 className="text-sm font-semibold text-slate-700">
+              {activeChannel ? (activeChannel.kind === "dm" ? activeChannel.name : `# ${activeChannel.name}`) : "Chat"}
+            </h2>
+            {activeChannel?.description && <p className="text-xs text-slate-500">{activeChannel.description}</p>}
+          </div>
+
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+            {loading && <p className="text-sm text-slate-500">Loading messages…</p>}
+            {!loading && messages.length === 0 && <p className="text-sm text-slate-500">No messages yet. Say hello.</p>}
+            {messages.map((m) => (
+              <div key={m.id} className={`flex ${m.mine ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${m.mine ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-800"}`}>
+                  <div className={`mb-0.5 flex items-center gap-2 text-[11px] ${m.mine ? "text-indigo-100" : "text-slate-500"}`}>
+                    <span className="font-semibold">{m.mine ? "You" : m.authorName}</span>
+                    <span>{fmt(m.createdAt)}</span>
+                  </div>
+                  <p className={`whitespace-pre-wrap text-sm ${m.deleted ? "italic opacity-70" : ""}`}>{m.body}</p>
+                </div>
+                {m.mine && !m.deleted && (
+                  <button
+                    className="ml-1 self-center text-xs text-slate-300 hover:text-red-500"
+                    onClick={() => removeMessage(m.id)}
+                    aria-label="Delete message"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+
+          <form onSubmit={onSubmit} className="flex items-end gap-2 border-t border-slate-100 px-3 py-3">
+            <textarea
+              className="input min-h-[2.5rem] flex-1 resize-none"
+              rows={1}
+              placeholder={activeId ? "Write a message…" : "Select a channel"}
+              value={body}
+              disabled={!activeId}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
+            />
+            <button type="submit" className="btn-primary px-4 py-2" disabled={sending || !activeId || !body.trim()}>
+              {sending ? "…" : "Send"}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      {showNew && (
+        <Modal title="New channel" onClose={() => setShowNew(false)}>
+          <form onSubmit={createChannel} className="space-y-3">
+            <div>
+              <label className="label">Channel name</label>
+              <input className="input" value={newName} onChange={(e) => setNewName(e.target.value)} required autoFocus placeholder="e.g. Sales" />
+            </div>
+            <div>
+              <label className="label">Description (optional)</label>
+              <input className="input" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" className="btn-secondary" onClick={() => setShowNew(false)}>Cancel</button>
+              <button type="submit" className="btn-primary" disabled={creating}>{creating ? "Creating…" : "Create channel"}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {showDm && (
+        <Modal title="New direct message" onClose={() => setShowDm(false)}>
+          <form onSubmit={startDm} className="space-y-3">
+            <div>
+              <label className="label">Colleague</label>
+              <select className="input" value={dmUserId} onChange={(e) => setDmUserId(e.target.value)} required autoFocus>
+                <option value="">Select…</option>
+                {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" className="btn-secondary" onClick={() => setShowDm(false)}>Cancel</button>
+              <button type="submit" className="btn-primary" disabled={dmBusy}>{dmBusy ? "Starting…" : "Start chat"}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
+  );
+}

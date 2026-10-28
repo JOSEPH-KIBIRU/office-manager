@@ -20,6 +20,7 @@ import type * as banking from "../banking.js";
 import type * as bills from "../bills.js";
 import type * as calendar from "../calendar.js";
 import type * as carLogs from "../carLogs.js";
+import type * as chat from "../chat.js";
 import type * as checklists from "../checklists.js";
 import type * as close from "../close.js";
 import type * as crmActivities from "../crmActivities.js";
@@ -92,6 +93,7 @@ declare const fullApi: ApiFromModules<{
   bills: typeof bills;
   calendar: typeof calendar;
   carLogs: typeof carLogs;
+  chat: typeof chat;
   checklists: typeof checklists;
   close: typeof close;
   crmActivities: typeof crmActivities;

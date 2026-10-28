@@ -1543,6 +1543,46 @@ export default defineSchema(
     .index("by_org", ["orgId"])
     .index("by_connection", ["connectionId"]),
 
+  // In-house team chat. Org-scoped channels and messages.
+  chatChannels: defineTable({
+    orgId: v.id("organizations"),
+    name: v.string(),
+    description: v.optional(v.string()),
+    isDefault: v.boolean(),
+    // "channel" (default) or "dm" (direct conversation between dmUserIds).
+    kind: v.optional(v.union(v.literal("channel"), v.literal("dm"))),
+    dmUserIds: v.optional(v.array(v.id("users"))),
+    createdBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_name", ["orgId", "name"]),
+
+  chatReads: defineTable({
+    orgId: v.id("organizations"),
+    userId: v.id("users"),
+    channelId: v.id("chatChannels"),
+    lastReadAt: v.number(),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_user", ["userId"])
+    .index("by_user_channel", ["userId", "channelId"]),
+
+  chatMessages: defineTable({
+    orgId: v.id("organizations"),
+    channelId: v.id("chatChannels"),
+    authorId: v.id("users"),
+    body: v.string(),
+    createdAt: v.number(),
+    editedAt: v.optional(v.number()),
+    deletedAt: v.optional(v.number()),
+    deletedBy: v.optional(v.id("users")),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_channel", ["channelId"])
+    .index("by_org_channel", ["orgId", "channelId"]),
+
   healthChecks: defineTable({
     status: v.union(v.literal("up"), v.literal("down")),
     source: v.optional(v.string()),

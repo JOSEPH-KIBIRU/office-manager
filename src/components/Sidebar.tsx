@@ -111,6 +111,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: "Operations",
     items: [
       { href: "/tasks", label: "Tasks", icon: "✅", roles: ["admin", "secretary", "manager", "employee"], module: "tasks" },
+      { href: "/chat", label: "Chat", icon: "💬", roles: ["admin", "secretary", "manager", "employee"], module: "chat" },
       { href: "/meetings", label: "Meetings", icon: "📅", roles: ["admin", "secretary"], module: "meetings" },
       { href: "/minutes", label: "Minutes", icon: "📝", roles: ["admin", "secretary"], module: "minutes" },
       { href: "/visitors", label: "Visitors", icon: "🛎️", roles: ["admin", "secretary"], module: "visitors" },

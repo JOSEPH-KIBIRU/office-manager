@@ -61,6 +61,7 @@ export type ModuleKey =
   | "minutes"
   | "visitors"
   | "assets"
+  | "chat"
   | "organization"
   | "audit-log"
   | "documents"
@@ -123,6 +124,7 @@ export const MODULES: ModuleDef[] = [
   { key: "cars", label: "Car Logs", group: "Finance" },
   { key: "reports", label: "Reports", group: "Reporting" },
   { key: "tasks", label: "Tasks", group: "Operations" },
+  { key: "chat", label: "Team chat", group: "Operations" },
   { key: "meetings", label: "Meetings", group: "Operations" },
   { key: "minutes", label: "Minutes", group: "Operations" },
   { key: "visitors", label: "Visitors", group: "Operations" },
@@ -191,18 +193,18 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<OrgRole, ModuleKey[]> = {
     "dashboard", "analytics", "org-chart", "onboarding", "leave",
     "leave-calendar", "attendance", "my-payslips", "invoices", "bills",
     "customers", "suppliers", "receipts", "payments",
-    "petty-cash", "accounting", "reports", "tasks", "meetings", "minutes",
+    "petty-cash", "accounting", "reports", "tasks", "chat", "meetings", "minutes",
     "visitors", "assets", "organization", "documents", "profile",
     "management-reports", "attendance-manage",
   ],
   manager: [
     "dashboard", "analytics", "leave", "leave-calendar", "attendance",
     "my-payslips", "invoices", "bills", "customers", "suppliers", "petty-cash", "accounting", "cars",
-    "tasks", "documents", "profile", "projects", "management-reports", "attendance-manage",
+    "tasks", "chat", "documents", "profile", "projects", "management-reports", "attendance-manage",
   ],
   employee: [
     "dashboard", "analytics", "leave", "leave-calendar", "attendance",
-    "my-payslips", "petty-cash", "tasks", "documents", "profile",
+    "my-payslips", "petty-cash", "tasks", "chat", "documents", "profile",
   ],
 };
 

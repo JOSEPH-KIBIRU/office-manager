@@ -46,6 +46,10 @@ export const ORG_TABLES = [
   "crmEmailConnections",
   "crmEmailMessages",
   "crmEmailSyncState",
+  // In-house chat.
+  "chatChannels",
+  "chatMessages",
+  "chatReads",
 ] as const;
 
 /** Tables without a `by_org` index — scanned and filtered in memory. */
