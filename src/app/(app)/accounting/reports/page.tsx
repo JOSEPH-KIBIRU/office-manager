@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import * as XLSX from "xlsx";
+import { csvCell, htmlCell } from "@/lib/csv";
 import { PageHeader, Alert, api, inputCls } from "@/components/ui";
 
 interface Report { title: string; headers: string[]; rows: (string | number)[][]; note?: string; }
@@ -73,10 +73,16 @@ export default function ReportsHubPage() {
   }
   function toExcel() {
     if (!report) return;
-    const ws = XLSX.utils.aoa_to_sheet([report.headers, ...report.rows]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
-    XLSX.writeFile(wb, `${exportName}.xlsx`);
+    const table =
+      `<table><tr>${report.headers.map((h) => `<th>${htmlCell(h)}</th>`).join("")}</tr>` +
+      report.rows.map((r) => `<tr>${r.map((c) => `<td>${htmlCell(c)}</td>`).join("")}</tr>`).join("") +
+      `</table>`;
+    const html = `<html><head><meta charset="utf-8"></head><body>${table}</body></html>`;
+    const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${exportName}.xls`; a.click();
+    URL.revokeObjectURL(url);
   }
   function toPdf() { window.print(); }
 
@@ -148,10 +154,6 @@ export default function ReportsHubPage() {
   );
 }
 
-function csvCell(v: string | number) {
-  const s = String(v ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
 const money = (n: number) => n.toLocaleString("en-KE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface AccountRow { code: string; name: string; amount: number; group?: string; }

@@ -3,6 +3,7 @@ import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { toCsv } from "@/lib/csv";
 
 /** Statutory return exports: ?type=p10|nssf|shif|housing */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -23,11 +24,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
       return mapConvexError(e);
     }
 
-    const esc = (v: unknown) => {
-      const s = String(v ?? "");
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const toCsv = (rows: unknown[][]) => rows.map((r) => r.map(esc).join(",")).join("\r\n");
     const period = `${String(run.month).padStart(2, "0")}-${run.year}`;
     const employees = run.payslips.filter((p) => p.personType === "employee");
     const pensionable = (p: (typeof run.payslips)[number]) => p.grossPay - p.perDiem;

@@ -371,13 +371,13 @@ export default function BankingTransactionsPage() {
               <label className="label">Upload a statement file</label>
               <input
                 type="file"
-                accept=".csv,.tsv,.txt,.xlsx,.xls,.pdf"
+                accept=".csv,.tsv,.txt,.pdf"
                 className="input"
                 disabled={fileBusy}
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) void parseFile(f); }}
               />
               <p className="mt-1 text-xs text-slate-500">
-                CSV, Excel (.xlsx/.xls) or PDF. Debit/Credit (or a single Amount) columns are detected
+                CSV or PDF. Debit/Credit (or a single Amount) columns are detected
                 automatically; the running Balance column is ignored. Password-protected PDFs can be
                 unlocked below.
               </p>

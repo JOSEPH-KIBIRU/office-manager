@@ -4,6 +4,7 @@ import { requireUser, HttpError } from "@/lib/auth";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { verifyTotp } from "@/lib/totp";
+import { decryptTotpSecret } from "@/lib/twofaSecret";
 
 /** Turn 2FA off (requires a current authenticator or recovery code). */
 export async function POST(req: NextRequest) {
@@ -20,7 +21,8 @@ export async function POST(req: NextRequest) {
     if (!user?.twoFactorEnabledAt) throw new HttpError(400, "Two-factor authentication is not enabled");
 
     const code = String(body.code).trim();
-    const okTotp = user.twoFactorSecret ? verifyTotp(user.twoFactorSecret, code) : false;
+    const totpSecret = decryptTotpSecret(user.twoFactorSecret);
+    const okTotp = totpSecret ? verifyTotp(totpSecret, code) : false;
     const okRecovery = (user.twoFactorRecoveryHashes ?? []).some((h) => bcrypt.compareSync(code, h));
     if (!okTotp && !okRecovery) throw new HttpError(400, "That code is not valid");
 

@@ -5,6 +5,7 @@ import { requireUser, HttpError } from "@/lib/auth";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { verifyTotp } from "@/lib/totp";
+import { decryptTotpSecret, encryptTotpSecret } from "@/lib/twofaSecret";
 
 function makeRecoveryCodes(n = 10): string[] {
   return Array.from({ length: n }, () => {
@@ -26,12 +27,20 @@ export async function POST(req: NextRequest) {
       orgId: session.orgId as never,
     });
     if (!user?.twoFactorSecret) throw new HttpError(400, "Start the setup again");
-    if (!verifyTotp(user.twoFactorSecret, String(body.code))) {
+    const totpSecret = decryptTotpSecret(user.twoFactorSecret);
+    if (!totpSecret || !verifyTotp(totpSecret, String(body.code))) {
       throw new HttpError(400, "That code is not valid. Check your phone's clock and try again.");
     }
 
     const recoveryCodes = makeRecoveryCodes();
     try {
+      // Re-store the secret encrypted (migrates legacy plaintext values).
+      await cx().mutation(api.twofa.setPendingSecret, {
+        secret: secret(),
+        orgId: session.orgId as never,
+        userId: session.id as never,
+        twoFactorSecret: encryptTotpSecret(totpSecret),
+      });
       await cx().mutation(api.twofa.enable, {
         secret: secret(),
         orgId: session.orgId as never,

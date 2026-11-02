@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { generateTotpSecret, totpUri } from "@/lib/totp";
+import { encryptTotpSecret } from "@/lib/twofaSecret";
 
 /** Start 2FA setup: generate a secret and return the QR to scan. */
 export async function POST() {
@@ -29,7 +30,7 @@ export async function POST() {
         secret: secret(),
         orgId: session.orgId as never,
         userId: session.id as never,
-        twoFactorSecret: value,
+        twoFactorSecret: encryptTotpSecret(value),
       });
     } catch (e) {
       return mapConvexError(e);

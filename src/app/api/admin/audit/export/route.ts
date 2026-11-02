@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser, HttpError } from "@/lib/auth";
 import { cx, secret, api } from "@/lib/convex";
+import { csvCell } from "@/lib/csv";
 
 /**
  * GET /api/admin/audit/export?orgId= - download one company's full audit trail
  * (including platform actions) as CSV. Super admin only.
  */
-function csvCell(value: unknown): string {
-  const s = value == null ? "" : String(value);
-  return `"${s.replace(/"/g, '""')}"`;
-}
 
 export async function GET(req: NextRequest) {
   try {

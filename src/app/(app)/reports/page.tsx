@@ -8,6 +8,7 @@ import { OrgHeader, OrgFooter, type OrgBrandingData } from "@/components/OrgBran
 import { printDocument } from "@/lib/print";
 import ShareButton from "@/components/ShareButton";
 import { useToast } from "@/components/toast";
+import { toCsv, htmlCell } from "@/lib/csv";
 import type { LeaveRow, CarLogRow, PettyCashRow } from "@/lib/types";
 
 type ReportType = "leave" | "cars" | "petty" | "invoices" | "bills" | "tasks" | "visitors" | "assets";
@@ -126,22 +127,9 @@ function triggerDownload(filename: string, content: string, mime: string) {
   URL.revokeObjectURL(url);
 }
 
-function toCsv(rows: string[][]) {
-  return rows
-    .map((r) =>
-      r
-        .map((cell) => {
-          const s = String(cell ?? "");
-          return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-        })
-        .join(",")
-    )
-    .join("\n");
-}
-
 function toExcelHtml(title: string, headers: string[], rows: string[][]) {
   const trs = rows
-    .map((r) => `<tr>${r.map((c) => `<td>${String(c ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;")}</td>`).join("")}</tr>`)
+    .map((r) => `<tr>${r.map((c) => `<td>${htmlCell(c)}</td>`).join("")}</tr>`)
     .join("");
   return `<html><head><meta charset="utf-8"></head><body><h3>${title}</h3><table border="1">${headers
     .map((h) => `<th>${h}</th>`)

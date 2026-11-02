@@ -4,6 +4,7 @@ import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { assertSafeOutboundHttpUrl } from "@/lib/ssrf";
 
 /**
  * Submit an invoice to KRA eTIMS (electronic tax invoice management system).
@@ -59,6 +60,11 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     if (invoice.status === "cancelled") {
       throw new HttpError(400, "Cancelled invoices cannot be submitted to eTIMS.");
     }
+
+    // SSRF guard: reject non-HTTP(S), credentials, and private/reserved targets.
+    const baseUrl = await assertSafeOutboundHttpUrl(
+      cfg.baseUrl || "https://etims-api-sbx.kra.go.ke"
+    );
 
     // Mark pending so the UI can show progress.
     await cx().mutation(api.invoicing.setEtimsResult, {
@@ -118,7 +124,7 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
       headers["X-Signature"] = crypto.createHmac("sha256", cfg.apiSecret).update(bodyStr).digest("base64");
     }
 
-    const base = (cfg.baseUrl || "https://etims-api-sbx.kra.go.ke").replace(/\/$/, "");
+    const base = baseUrl.toString().replace(/\/$/, "");
     const url = `${base}/trnsSales/saveSales`;
 
     let text = "";
@@ -126,7 +132,13 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
     try {
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 15_000);
-      const res = await fetch(url, { method: "POST", headers, body: bodyStr, signal: controller.signal });
+      const res = await fetch(url, {
+        method: "POST",
+        headers,
+        body: bodyStr,
+        signal: controller.signal,
+        redirect: "error",
+      });
       clearTimeout(t);
       httpStatus = res.status;
       text = await res.text();

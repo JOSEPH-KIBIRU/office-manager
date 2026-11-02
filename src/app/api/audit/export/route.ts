@@ -2,14 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { cx, secret, api } from "@/lib/convex";
+import { csvCell } from "@/lib/csv";
 
 /**
  * GET /api/audit/export - download the audit trail as CSV (admin only).
  */
-function csvCell(value: unknown): string {
-  const s = value == null ? "" : String(value);
-  return `"${s.replace(/"/g, '""')}"`;
-}
 
 export async function GET() {
   try {

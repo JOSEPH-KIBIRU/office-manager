@@ -4,6 +4,7 @@ import { setSessionCookie, verifyTwoFactorChallenge, HttpError } from "@/lib/aut
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { verifyTotp } from "@/lib/totp";
+import { decryptTotpSecret } from "@/lib/twofaSecret";
 import { TERMS_BASELINE_VERSION } from "@/lib/terms";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
 
@@ -36,7 +37,8 @@ export async function POST(req: NextRequest) {
     }
 
     const code = String(body.code).trim();
-    const okTotp = user.twoFactorSecret ? verifyTotp(user.twoFactorSecret, code) : false;
+    const totpSecret = decryptTotpSecret(user.twoFactorSecret);
+    const okTotp = totpSecret ? verifyTotp(totpSecret, code) : false;
     let okRecovery = false;
     let usedHash: string | null = null;
     if (!okTotp) {

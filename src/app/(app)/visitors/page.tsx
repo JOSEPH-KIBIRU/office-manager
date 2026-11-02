@@ -5,6 +5,7 @@ import { PageHeader, Alert, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useSession } from "@/components/SessionProvider";
 import { usePermissions } from "@/components/usePermissions";
+import { csvCell } from "@/lib/csv";
 import type { Role } from "@/lib/types";
 
 interface VisitorRow {
@@ -172,7 +173,7 @@ export default function VisitorsPage() {
       ]),
     ];
     const csv = rows
-      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .map((r) => r.map(csvCell).join(","))
       .join("\r\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

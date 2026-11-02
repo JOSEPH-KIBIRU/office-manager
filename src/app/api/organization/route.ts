@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requirePermission } from "@/lib/permissionGuard";
+import { HttpError } from "@/lib/auth";
 import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -42,6 +43,25 @@ export async function PATCH(req: NextRequest) {
       if (body[k] !== undefined) input[k] = body[k];
     }
     if (body.logoFileId !== undefined) input.logoFileId = body.logoFileId;
+
+    // Validate the eTIMS endpoint at save time too (the request-time guard also
+    // blocks private/reserved addresses and redirects).
+    if (typeof input.etimsBaseUrl === "string" && input.etimsBaseUrl.trim()) {
+      let u: URL;
+      try {
+        u = new URL(String(input.etimsBaseUrl).trim());
+      } catch {
+        throw new HttpError(400, "eTIMS base URL is invalid");
+      }
+      if (u.protocol !== "https:" && u.protocol !== "http:") {
+        throw new HttpError(400, "eTIMS base URL must use http or https");
+      }
+      if (u.username || u.password) {
+        throw new HttpError(400, "eTIMS base URL must not contain credentials");
+      }
+      input.etimsBaseUrl = u.toString().replace(/\/$/, "");
+    }
+
     if (!("name" in input) && !("logoFileId" in input) && !allowed.some((k) => input[k] !== undefined)) {
       return fail(400, "No fields to update");
     }

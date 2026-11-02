@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, FormEvent } from "react";
 import { PageHeader, Alert, Modal, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { csvCell } from "@/lib/csv";
 
 interface AssetRow {
   id: string;
@@ -261,7 +262,7 @@ export default function AssetsPage() {
         m.note ?? "",
       ]),
     ];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const csv = rows.map((r) => r.map(csvCell).join(",")).join("\r\n");
     const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

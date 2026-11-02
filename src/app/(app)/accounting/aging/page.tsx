@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader, Alert, api } from "@/components/ui";
+import { csvCell } from "@/lib/csv";
 
 interface AgingRow {
   contactId: string;
@@ -60,11 +61,11 @@ export default function AgingPage() {
 
   function exportCsv() {
     const header = ["Contact", ...BUCKETS.map((b) => b.label), "Total"];
-    const lines = [header.join(",")];
+    const lines = [header.map(csvCell).join(",")];
     for (const r of rows) {
-      lines.push([r.contactName, ...BUCKETS.map((b) => String(r[b.key] ?? 0)), String(r.total)].join(","));
+      lines.push([r.contactName, ...BUCKETS.map((b) => String(r[b.key] ?? 0)), String(r.total)].map(csvCell).join(","));
     }
-    if (totals) lines.push(["Totals", ...BUCKETS.map((b) => String(totals[b.key] ?? 0)), String(totals.total)].join(","));
+    if (totals) lines.push(["Totals", ...BUCKETS.map((b) => String(totals[b.key] ?? 0)), String(totals.total)].map(csvCell).join(","));
     const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

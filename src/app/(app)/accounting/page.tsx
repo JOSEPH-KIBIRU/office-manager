@@ -3,6 +3,7 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { PageHeader, Alert, ConfirmDialog, api, inputCls } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { toCsv } from "@/lib/csv";
 
 const fmtKsh = (n: number) =>
   "KES " + Math.round(n).toLocaleString("en-KE", { maximumFractionDigits: 0 });
@@ -11,19 +12,6 @@ const today = () => new Date().toISOString().slice(0, 10);
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 /* ----------------------------- CSV export ----------------------------- */
-
-function toCsv(rows: (string | number)[][]): string {
-  return rows
-    .map((r) =>
-      r
-        .map((c) => {
-          const s = String(c ?? "");
-          return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-        })
-        .join(",")
-    )
-    .join("\n");
-}
 
 function downloadCsv(filename: string, rows: (string | number)[][]) {
   const blob = new Blob([toCsv(rows)], { type: "text/csv;charset=utf-8" });

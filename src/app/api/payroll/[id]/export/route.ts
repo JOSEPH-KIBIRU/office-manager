@@ -3,6 +3,7 @@ import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { toCsv } from "@/lib/csv";
 
 /** Export a payroll run for payment: ?format=csv|bank|mpesa */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -25,11 +26,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
     if (!["csv", "bank", "mpesa"].includes(format)) throw new HttpError(400, "Unknown export format");
 
-    const esc = (v: unknown) => {
-      const s = String(v ?? "");
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const toCsv = (rows: unknown[][]) => rows.map((r) => r.map(esc).join(",")).join("\r\n");
     const toIntl = (p: string | null | undefined) => {
       if (!p) return "";
       let d = p.replace(/\D/g, "");

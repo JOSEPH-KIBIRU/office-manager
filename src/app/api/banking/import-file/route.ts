@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import path from "path";
-import * as XLSX from "xlsx";
 import { getDocument, type PdfTextItem } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
@@ -65,17 +64,6 @@ async function pdfToRows(buf: Uint8Array, password?: string | null): Promise<str
   return rows;
 }
 
-function xlsxToRows(buf: Uint8Array): string[][] {
-  const wb = XLSX.read(buf, { type: "array" });
-  const out: string[][] = [];
-  for (const name of wb.SheetNames) {
-    const sheet = wb.Sheets[name];
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false, defval: "" });
-    for (const r of rows) out.push((r as unknown[]).map((c) => (c == null ? "" : String(c).trim())));
-  }
-  return out.filter((r) => r.some((c) => c.length > 0));
-}
-
 /**
  * POST /api/banking/import-file
  * multipart: file=<csv|xlsx|xls|pdf|txt>
@@ -105,7 +93,9 @@ export async function POST(req: NextRequest) {
       if (ext === "csv" || ext === "tsv" || ext === "txt") {
         rows = parseDelimited(new TextDecoder().decode(buf));
       } else if (ext === "xlsx" || ext === "xls" || ext === "xlsm") {
-        rows = xlsxToRows(buf);
+        // The only available parser (SheetJS/xlsx) has unfixed prototype-pollution
+        // and ReDoS advisories, so untrusted Excel parsing is disabled.
+        throw new HttpError(415, "Excel import is temporarily disabled. Export the statement as CSV or PDF and try again.");
       } else if (ext === "pdf") {
         try {
           rows = await pdfToRows(buf, passwordStr);
@@ -118,13 +108,16 @@ export async function POST(req: NextRequest) {
           throw e;
         }
       } else {
-        // Best-effort: try text, then excel.
         const text = new TextDecoder().decode(buf);
-        rows = text.includes("\u0000") ? xlsxToRows(buf) : parseDelimited(text);
+        if (text.includes("\u0000")) {
+          throw new HttpError(415, "Unsupported binary file. Use CSV or PDF.");
+        }
+        rows = parseDelimited(text);
       }
     } catch (e) {
+      if (e instanceof HttpError) throw e;
       console.error("[banking/import-file] parse failed:", e);
-      throw new HttpError(400, "Could not read that file. Supported: CSV, Excel (.xlsx/.xls) and PDF statements.");
+      throw new HttpError(400, "Could not read that file. Supported: CSV and PDF statements.");
     }
 
     const { transactions, detected } = normalizeStatementDetailed(rows);
