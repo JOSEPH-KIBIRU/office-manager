@@ -94,6 +94,7 @@ export const applyReset = mutation({
     await ctx.db.patch(args.userId, {
       passwordHash: args.newPasswordHash,
       mustChangePassword: false,
+      sessionVersion: (user.sessionVersion ?? 0) + 1,
     });
     await ctx.db.patch(args.resetId, { usedAt: tsNow() });
     return { ok: true };

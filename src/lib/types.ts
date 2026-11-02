@@ -21,6 +21,7 @@ export interface ImpersonationMeta {
   originalRole: Role;
   originalName: string;
   originalEmail: string;
+  originalSessionVersion?: number;
   companyName: string;
 }
 
@@ -33,6 +34,7 @@ export interface SessionPayload {
   mustChangePassword: boolean;
   termsAgreedAt?: boolean;
   termsVersion?: string;
+  sessionVersion?: number;
   impersonating?: ImpersonationMeta;
 }
 

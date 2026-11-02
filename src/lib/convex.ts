@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../convex/_generated/api";
-import { HttpError } from "./auth";
+import { HttpError } from "./httpError";
 
 let client: ConvexHttpClient | null = null;
 

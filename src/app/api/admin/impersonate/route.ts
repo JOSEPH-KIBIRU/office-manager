@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
       id: adminUser._id as string,
       name: adminUser.name,
       email: adminUser.email,
+      sessionVersion: (adminUser.sessionVersion as number | undefined) ?? 0,
     });
     return ok({ orgId: body.orgId, name: target.name, adminName: adminUser.name });
   });

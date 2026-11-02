@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { getValidatedSessionUser } from "@/lib/sessionValidation";
 import SuperAdminSidebar from "@/components/SuperAdminSidebar";
 import UserMenu from "@/components/UserMenu";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
@@ -10,8 +11,10 @@ import { ToastProvider } from "@/components/toast";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
+  const user = await getValidatedSessionUser(session);
+  if (!user) redirect("/login");
   // Only superadmins may use the platform console.
-  if (session.role !== "super_admin") redirect("/dashboard");
+  if (user.role !== "super_admin") redirect("/dashboard");
 
   return (
     <ToastProvider>
@@ -22,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur print:hidden">
             <AnnouncementBanner />
             <div className="ml-auto hidden items-center justify-end gap-3 px-8 py-2.5 lg:flex">
-              <UserMenu name={session.name} role={session.role} />
+              <UserMenu name={user.name} role={user.role} />
             </div>
           </header>
           <main className="mx-auto w-full max-w-7xl flex-1 overflow-x-hidden bg-slate-50 px-4 pb-10 pt-6 sm:px-6 lg:px-8">

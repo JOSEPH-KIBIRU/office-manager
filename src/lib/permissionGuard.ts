@@ -1,5 +1,6 @@
 import "server-only";
 import { getSession, HttpError } from "./auth";
+import { getValidatedSessionUser } from "./sessionValidation";
 import type { SessionPayload } from "./types";
 import { cx, secret, api } from "./convex";
 import { resolveRolePermissions, ALL_MODULE_KEYS, ORG_ROLES, type OrgRole } from "./permissions";
@@ -56,28 +57,42 @@ export async function requirePermission(
 ): Promise<SessionPayload> {
   const session = await getSession();
   if (!session || !session.orgId) throw new HttpError(401, "Not authenticated");
-  if (session.role === "super_admin") return session;
 
-  const { enabled, granted } = await resolveAccess(session.orgId, session.role);
-  const isCustom = !BUILTIN_ROLES.has(session.role);
+  // Re-validate against the database so deactivated users and sessions
+  // invalidated by a password/role change are rejected even if the JWT is valid.
+  const user = await getValidatedSessionUser(session);
+  if (!user) throw new HttpError(401, "Your session is no longer valid. Please sign in again.");
+  const role = user.role;
+  const live: SessionPayload = {
+    ...session,
+    role,
+    name: user.name,
+    email: user.email,
+    sessionVersion: user.sessionVersion,
+  };
+
+  if (role === "super_admin") return live;
+
+  const { enabled, granted } = await resolveAccess(session.orgId, role);
+  const isCustom = !BUILTIN_ROLES.has(role);
 
   // Platform cap — the hard ceiling for every role, admin included.
   if (enabled && !enabled.includes(module)) {
     throw new HttpError(403, "This module is not available on your plan");
   }
-  if (session.role === "admin") return session;
+  if (role === "admin") return live;
 
   // Custom roles and configured built-in roles are grant-driven.
   if (isCustom || Array.isArray(granted)) {
     if (!Array.isArray(granted) || !granted.includes(module)) {
       throw new HttpError(403, "You do not have permission to access this module");
     }
-    return session;
+    return live;
   }
 
   // Unconfigured built-in role — legacy coarse role gate.
-  if (!fallbackRoles.includes(session.role)) {
+  if (!fallbackRoles.includes(role)) {
     throw new HttpError(403, "You do not have permission to perform this action");
   }
-  return session;
+  return live;
 }

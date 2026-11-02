@@ -56,3 +56,16 @@ export function clientIp(req: Request): string {
   if (fwd) return fwd.split(",")[0].trim();
   return req.headers.get("x-real-ip")?.trim() || "unknown";
 }
+
+/**
+ * Build the rate-limit identity. Authenticated requests are keyed by
+ * organisation + user so people sharing an office IP never throttle each
+ * other; only unauthenticated requests fall back to the IP.
+ */
+export function rateLimitKey(
+  session: { id?: string; orgId?: string } | null | undefined,
+  ip: string
+): string {
+  if (session?.id) return `org:${session.orgId ?? "none"}:user:${session.id}`;
+  return `ip:${ip}`;
+}

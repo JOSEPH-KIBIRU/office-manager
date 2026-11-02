@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
-import { getSession, HttpError } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { sendSMS, sendEmail } from "@/lib/notify";
+import { cronAuthorized } from "@/lib/cronAuth";
 
 /**
  * Send overdue-invoice payment reminders by SMS (and email when configured).
@@ -10,24 +11,13 @@ import { sendSMS, sendEmail } from "@/lib/notify";
  * ("Send reminders now"). Uses the company's own payment instructions
  * (bank / PesaLink / M-Pesa) rather than a pay link.
  */
-function cronAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") ?? "";
-  if (cronSecret && auth === `Bearer ${cronSecret}`) return true;
-  // Vercel Cron requests carry this header.
-  return req.headers.get("x-vercel-cron") === "1";
-}
-
 export async function POST(req: NextRequest) {
   return handle(async () => {
     const isCron = cronAuthorized(req);
     let orgId: string | undefined;
 
     if (!isCron) {
-      const session = await getSession();
-      if (!session || (session.role !== "admin" && session.role !== "secretary")) {
-        throw new HttpError(401, "Not authorized");
-      }
+      const session = await requireUser(["admin", "secretary"]);
       orgId = session.orgId;
     }
 
@@ -89,4 +79,8 @@ export async function POST(req: NextRequest) {
 
     return ok({ due: due.length, sent, skipped, marked });
   });
+}
+
+export async function GET(req: NextRequest) {
+  return POST(req);
 }

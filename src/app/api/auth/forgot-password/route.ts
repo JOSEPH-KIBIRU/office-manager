@@ -19,8 +19,9 @@ export async function POST(req: NextRequest) {
     const email = String(body.email).toLowerCase().trim();
     const ip = clientIp(req);
 
-    // Cheap per-instance guard first…
-    if (!rateLimit({ key: `forgot:ip:${ip}`, limit: 10, windowMs: 15 * 60_000 })) {
+    // Cheap per-instance guard first (generous per IP so an office sharing an
+    // IP is not throttled; the per-account limit below is the strict one).
+    if (!rateLimit({ key: `forgot:ip:${ip}`, limit: 40, windowMs: 15 * 60_000 })) {
       return fail(429, "Too many requests. Please wait a few minutes and try again.");
     }
 
@@ -43,7 +44,7 @@ export async function POST(req: NextRequest) {
       const ipHit = await cx().mutation(api.rateLimit.hit, {
         secret: secret(),
         key: `forgot:ip:${ip}`,
-        limit: 15,
+        limit: 60,
         windowMs: 15 * 60_000,
       });
       if (!ipHit.allowed && allowed) {

@@ -18,7 +18,9 @@ export async function POST(req: NextRequest) {
     if (newPassword.length < 8) throw new HttpError(400, "New password must be at least 8 characters");
     if (!/^\d{6}$/.test(code)) throw new HttpError(400, "Enter the 6-digit code from the SMS");
 
-    if (!rateLimit({ key: `reset:ip:${clientIp(req)}`, limit: 12, windowMs: 15 * 60_000 })) {
+    // Generous per IP (offices often share one), strict per-account attempt
+    // limits are enforced on the reset record below.
+    if (!rateLimit({ key: `reset:ip:${clientIp(req)}`, limit: 40, windowMs: 15 * 60_000 })) {
       throw new HttpError(429, "Too many attempts. Please try again later.");
     }
 

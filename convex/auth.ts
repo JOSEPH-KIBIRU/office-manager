@@ -32,6 +32,31 @@ export const getUserById = query({
   },
 });
 
+/** Server-side session re-validation: active user, same org, matching version. */
+export const validateSession = query({
+  args: {
+    secret: v.string(),
+    id: v.id("users"),
+    orgId: v.id("organizations"),
+    sessionVersion: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const u = await ctx.db.get(args.id);
+    if (!u || u.orgId !== args.orgId || !u.active) return null;
+    if ((u.sessionVersion ?? 0) !== (args.sessionVersion ?? 0)) return null;
+    return {
+      id: u._id,
+      orgId: u.orgId,
+      role: u.role,
+      name: u.name,
+      email: u.email,
+      active: u.active,
+      sessionVersion: u.sessionVersion ?? 0,
+    };
+  },
+});
+
 export const getActiveAdmins = query({
   args: { secret: v.string(), orgId: v.id("organizations") },
   handler: async (ctx, args) => {

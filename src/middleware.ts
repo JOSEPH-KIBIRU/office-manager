@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-import { rateLimit, clientIp } from "./lib/rateLimit";
+import { rateLimit, clientIp, rateLimitKey } from "./lib/rateLimit";
 import { SESSION_COOKIE_NAMES } from "./lib/sessionCookie";
 import { TERMS_VERSION } from "./lib/terms";
 
@@ -23,6 +23,7 @@ interface MiddlewareSession {
   termsAgreedAt?: boolean;
   termsVersion?: string;
   id?: string;
+  orgId?: string;
 }
 
 function secret(): Uint8Array {
@@ -104,13 +105,15 @@ export async function middleware(req: NextRequest) {
     const isLogin = pathname === "/api/auth" || pathname === "/api/auth/login";
     const address = clientIp(req);
 
-    // Key by authenticated user where possible, otherwise by IP.
-    const key = session?.id ? `u:${session.id}` : `ip:${address}`;
+    // Authenticated requests are keyed by organisation + user, never by IP, so
+    // colleagues sharing an office IP cannot throttle each other. Unauthenticated
+    // requests (login, public forms) fall back to IP.
+    const key = rateLimitKey(session, address);
     const scope = isLogin ? "login" : isWrite ? "w" : "r";
 
     // Login is stricter; authed requests get generous limits.
     const cfg = isLogin
-      ? { limit: 30, windowMs: 60_000 }
+      ? { limit: 120, windowMs: 60_000 }
       : isWrite
       ? { limit: isPublic ? 10 : 120, windowMs: 60_000 }
       : { limit: isPublic ? 60 : 300, windowMs: 60_000 };

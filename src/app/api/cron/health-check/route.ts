@@ -2,19 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api } from "@/lib/convex";
 import { sendEmail } from "@/lib/notify";
+import { cronAuthorized } from "@/lib/cronAuth";
 
 /**
  * Scheduled self-check (Vercel cron). Verifies the Convex backend, records the
  * result for the status page, and emails the platform owners on a status
  * transition (outage or recovery).
  */
-
-function cronAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") ?? "";
-  if (cronSecret && auth === `Bearer ${cronSecret}`) return true;
-  return req.headers.get("x-vercel-cron") === "1";
-}
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -92,4 +86,8 @@ export async function POST(req: NextRequest) {
 
     return ok({ status, latencyMs, alerted: prev !== null && prev !== status });
   });
+}
+
+export async function GET(req: NextRequest) {
+  return POST(req);
 }

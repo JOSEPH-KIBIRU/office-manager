@@ -4,6 +4,10 @@ import { SignJWT, jwtVerify } from "jose";
 import type { Role, SessionPayload } from "./types";
 import { shouldUseSecureCookies, sessionCookieName, SESSION_COOKIE_NAMES } from "./sessionCookie";
 import { TERMS_VERSION } from "./terms";
+import { HttpError } from "./httpError";
+import { getValidatedSessionUser } from "./sessionValidation";
+
+export { HttpError };
 
 const SESSION_DAYS = 7;
 
@@ -68,28 +72,30 @@ export async function clearSessionCookie() {
   }
 }
 
-export class HttpError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
 export async function requireUser(roles?: Role[]): Promise<SessionPayload> {
   const session = await getSession();
   if (!session || !session.orgId) throw new HttpError(401, "Not authenticated");
-  if (roles && roles.length > 0 && !roles.includes(session.role)) {
+  // Re-validate against the database: a deactivated/deleted user or a session
+  // invalidated by a password/role change must not keep working until JWT expiry.
+  const user = await getValidatedSessionUser(session);
+  if (!user) throw new HttpError(401, "Your session is no longer valid. Please sign in again.");
+  if (roles && roles.length > 0 && !roles.includes(user.role)) {
     throw new HttpError(403, "You do not have permission to perform this action");
   }
-  return session;
+  return {
+    ...session,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+    sessionVersion: user.sessionVersion,
+  };
 }
 
 export async function startImpersonation(
   session: SessionPayload,
   targetOrgId: string,
   companyName: string,
-  asUser: { id: string; name: string; email: string }
+  asUser: { id: string; name: string; email: string; sessionVersion?: number }
 ) {
   const payload: SessionPayload = {
     // Act as a real admin of the target company (its user id), so org-scoped
@@ -102,12 +108,14 @@ export async function startImpersonation(
     mustChangePassword: false,
     termsAgreedAt: true,
     termsVersion: TERMS_VERSION,
+    sessionVersion: asUser.sessionVersion ?? 0,
     impersonating: {
       originalId: session.id,
       originalOrgId: session.orgId,
       originalRole: session.role,
       originalName: session.name,
       originalEmail: session.email,
+      originalSessionVersion: session.sessionVersion,
       companyName,
     },
   };
@@ -126,6 +134,7 @@ export async function stopImpersonation(session: SessionPayload): Promise<Sessio
     mustChangePassword: false,
     termsAgreedAt: true,
     termsVersion: TERMS_VERSION,
+    sessionVersion: session.impersonating.originalSessionVersion,
   };
   await setSessionCookie(original);
   return original;

@@ -18,7 +18,7 @@
     "framer-motion": "^13.4.0",
     "jose": "^6.2.10",
     "lucide-react": "^1.47.0",
-    "next": "^15.5.23",
+    "next": "^15.5.28",
     "openai": "^6.49.0",
     "pdfjs-dist": "^4.10.38",
     "qrcode": "^1.5.4",

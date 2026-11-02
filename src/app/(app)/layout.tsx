@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { getValidatedSessionUser } from "@/lib/sessionValidation";
 import Sidebar from "@/components/Sidebar";
 import NotificationBell from "@/components/NotificationBell";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
@@ -13,12 +14,23 @@ import { ToastProvider } from "@/components/toast";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
+  // Validate against the database so deactivated/deleted users and sessions
+  // invalidated by password/role changes cannot view the app.
+  const user = await getValidatedSessionUser(session);
+  if (!user) redirect("/login");
+  const live = {
+    ...session,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+    sessionVersion: user.sessionVersion,
+  };
   // Superadmins use the platform console, not the company dashboard —
   // unless they are impersonating a company admin.
-  if (session.role === "super_admin" && !session.impersonating) redirect("/admin");
+  if (live.role === "super_admin" && !live.impersonating) redirect("/admin");
 
   return (
-    <SessionProvider session={session}>
+    <SessionProvider session={live}>
       <ToastProvider>
       <IdleSessionTimeout />
       <a

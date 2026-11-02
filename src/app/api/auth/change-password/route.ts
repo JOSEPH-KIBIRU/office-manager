@@ -29,19 +29,26 @@ export async function POST(req: NextRequest) {
       throw new HttpError(400, "New password must be different from the current one");
     }
 
+    let result: { sessionVersion?: number };
     try {
-      await cx().mutation(api.users.patchUser, {
+      result = (await cx().mutation(api.users.patchUser, {
         secret: secret(),
         orgId: session.orgId as never,
         id: user._id,
         newPasswordHash: bcrypt.hashSync(String(body.newPassword), 10),
         mustChangePassword: false,
-      });
+      })) as { sessionVersion?: number };
     } catch (e) {
       return mapConvexError(e);
     }
 
-    await setSessionCookie({ ...session, mustChangePassword: false });
+    // The password change bumped the session version, invalidating every other
+    // session. Issue a fresh cookie for this browser with the new version.
+    await setSessionCookie({
+      ...session,
+      mustChangePassword: false,
+      sessionVersion: result.sessionVersion ?? session.sessionVersion,
+    });
     return ok();
   });
 }

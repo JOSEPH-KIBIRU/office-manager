@@ -178,11 +178,19 @@ export const patchUser = mutation({
     }
     if (args.termsVersion !== undefined) patch.termsVersion = args.termsVersion || undefined;
 
+    // Invalidate existing sessions when credentials/access change.
+    const bumpSession =
+      args.newPasswordHash !== undefined || args.active !== undefined || args.role !== undefined;
+    const nextSessionVersion = bumpSession
+      ? (user.sessionVersion ?? 0) + 1
+      : user.sessionVersion ?? 0;
+    if (bumpSession) patch.sessionVersion = nextSessionVersion;
+
     await ctx.db.patch(args.id, patch);
     // Keep checklists in step with the account state.
     if (args.active === false) await seedDefaultsForUser(ctx, args.orgId, args.id, "offboarding");
     else if (args.active === true) await seedDefaultsForUser(ctx, args.orgId, args.id, "onboarding");
-    return true;
+    return { ok: true, sessionVersion: nextSessionVersion };
   },
 });
 
@@ -199,7 +207,10 @@ export const removeUser = mutation({
       .withIndex("by_user", (q) => q.eq("userId", args.id))
       .first();
     if (leaves) {
-      await ctx.db.patch(args.id, { active: false });
+      await ctx.db.patch(args.id, {
+        active: false,
+        sessionVersion: (user.sessionVersion ?? 0) + 1,
+      });
       await seedDefaultsForUser(ctx, args.orgId, args.id, "offboarding");
       return { deactivated: true };
     }

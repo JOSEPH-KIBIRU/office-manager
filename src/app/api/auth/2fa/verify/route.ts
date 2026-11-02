@@ -14,11 +14,16 @@ export async function POST(req: NextRequest) {
     requireFields(body, ["challenge", "code"]);
 
     const ip = clientIp(req);
-    if (!rateLimit({ key: `2fa:ip:${ip}`, limit: 20, windowMs: 5 * 60_000 })) {
+    // The signed challenge carries the account, so we can rate-limit per
+    // organisation + user instead of per shared office IP. Invalid challenges
+    // still fall back to the IP bucket.
+    const challenge = await verifyTwoFactorChallenge(String(body.challenge));
+    const rateKey = challenge
+      ? `2fa:org:${challenge.orgId}:user:${challenge.userId}`
+      : `2fa:ip:${ip}`;
+    if (!rateLimit({ key: rateKey, limit: 20, windowMs: 5 * 60_000 })) {
       throw new HttpError(429, "Too many attempts. Please wait a few minutes and try again.");
     }
-
-    const challenge = await verifyTwoFactorChallenge(String(body.challenge));
     if (!challenge) throw new HttpError(400, "Your login attempt expired. Please sign in again.");
 
     const user = await cx().query(api.auth.getUserById, {
@@ -92,6 +97,7 @@ export async function POST(req: NextRequest) {
       mustChangePassword: !!user.mustChangePassword,
       termsAgreedAt: !!user.termsAgreedAt,
       termsVersion,
+      sessionVersion: user.sessionVersion ?? 0,
     });
 
     try {

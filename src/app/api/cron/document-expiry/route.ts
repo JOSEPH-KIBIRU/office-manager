@@ -1,24 +1,17 @@
 import { NextRequest } from "next/server";
-import { getSession, HttpError } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { notifyAdmins } from "@/lib/notify";
+import { cronAuthorized } from "@/lib/cronAuth";
 
 const NOTICE_DAYS = 30;
-
-function cronAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  const auth = req.headers.get("authorization") ?? "";
-  if (cronSecret && auth === `Bearer ${cronSecret}`) return true;
-  return req.headers.get("x-vercel-cron") === "1";
-}
 
 /** Daily: notify admins about staff/company documents expiring within 30 days. */
 export async function POST(req: NextRequest) {
   return handle(async () => {
     if (!cronAuthorized(req)) {
-      const session = await getSession();
-      if (!session || session.role !== "admin") throw new HttpError(401, "Not authorized");
+      await requireUser(["admin"]);
     }
 
     let rows;
@@ -57,4 +50,8 @@ export async function POST(req: NextRequest) {
 
     return ok({ expiring: rows.length, notified, organizations: byOrg.size });
   });
+}
+
+export async function GET(req: NextRequest) {
+  return POST(req);
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
-import { setSessionCookie, clearSessionCookie, getSession, HttpError, signTwoFactorChallenge } from "@/lib/auth";
+import { setSessionCookie, clearSessionCookie, requireUser, HttpError, signTwoFactorChallenge } from "@/lib/auth";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError, ensureAppInit } from "@/lib/convex";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
@@ -15,9 +15,9 @@ export async function POST(req: NextRequest) {
     const ip = clientIp(req);
     const email = String(body.email).toLowerCase().trim();
 
-    // Brute-force protection: cap attempts per client IP, and slow down
-    // repeated attempts against a single account from the same IP.
-    if (!rateLimit({ key: `login:ip:${ip}`, limit: 20, windowMs: 5 * 60_000 })) {
+    // Brute-force protection: a generous per-IP ceiling (an office may share one
+    // IP) plus a strict per-account throttle from that IP and globally.
+    if (!rateLimit({ key: `login:ip:${ip}`, limit: 120, windowMs: 5 * 60_000 })) {
       throw new HttpError(429, "Too many login attempts. Please wait a few minutes and try again.");
     }
     if (!rateLimit({ key: `login:acct:${email}:${ip}`, limit: 6, windowMs: 5 * 60_000 })) {
@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
       mustChangePassword: !!user.mustChangePassword,
       termsAgreedAt: !!user.termsAgreedAt,
       termsVersion,
+      sessionVersion: user.sessionVersion ?? 0,
     });
 
     // Track last access (per user and per company) — non-fatal if it fails.
@@ -129,8 +130,7 @@ export async function DELETE() {
 
 export async function GET() {
   return handle(async () => {
-    const session = await getSession();
-    if (!session) throw new HttpError(401, "Not authenticated");
+    const session = await requireUser();
     const profile = await cx().query(api.auth.getUserById, {
       secret: secret(),
       id: session.id as never,
