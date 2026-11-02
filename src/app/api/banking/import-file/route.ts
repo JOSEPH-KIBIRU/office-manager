@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { parseDelimited, normalizeStatementDetailed } from "@/lib/bankImport";
 import { allowDistributed } from "@/lib/distributedRateLimit";
+import { xlsxToRows } from "@/lib/bankXlsx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,10 +103,10 @@ export async function POST(req: NextRequest) {
     try {
       if (ext === "csv" || ext === "tsv" || ext === "txt") {
         rows = parseDelimited(new TextDecoder().decode(buf));
-      } else if (ext === "xlsx" || ext === "xls" || ext === "xlsm") {
-        // The only available parser (SheetJS/xlsx) has unfixed prototype-pollution
-        // and ReDoS advisories, so untrusted Excel parsing is disabled.
-        throw new HttpError(415, "Excel import is temporarily disabled. Export the statement as CSV or PDF and try again.");
+      } else if (ext === "xlsx" || ext === "xlsm") {
+        rows = await xlsxToRows(buf);
+      } else if (ext === "xls") {
+        throw new HttpError(415, "Legacy .xls files are not supported. Save as .xlsx or CSV.");
       } else if (ext === "pdf") {
         try {
           rows = await pdfToRows(buf, passwordStr);
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
     } catch (e) {
       if (e instanceof HttpError) throw e;
       console.error("[banking/import-file] parse failed:", e);
-      throw new HttpError(400, "Could not read that file. Supported: CSV and PDF statements.");
+      throw new HttpError(400, "Could not read that file. Supported: CSV, Excel (.xlsx) and PDF statements.");
     }
 
     const { transactions, detected } = normalizeStatementDetailed(rows);

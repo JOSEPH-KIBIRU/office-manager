@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { PageHeader, Alert, api, inputCls } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useSession } from "@/components/SessionProvider";
-import { useUploadThing } from "@/lib/uploadthing";
 
 interface Photo {
   url: string;
@@ -78,12 +77,7 @@ export default function TaskDetailPage() {
   const [doing, setDoing] = useState("");
   const [location, setLocation] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const { startUpload, isUploading } = useUploadThing("taskImage", {
-    onClientUploadComplete: (res) => {
-      setPhotos((prev) => [...prev, ...(res ?? []).map((f) => ({ url: f.ufsUrl, name: f.name }))]);
-    },
-    onUploadError: (e) => toast.error(e.message),
-  });
+  const [uploading, setUploading] = useState(false);
 
   // review / comment
   const [remark, setRemark] = useState("");
@@ -121,10 +115,21 @@ export default function TaskDetailPage() {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
     if (files.length === 0) return;
+    setUploading(true);
     try {
-      await startUpload(files);
-    } catch {
-      /* onUploadError handles messaging */
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await api<{ url: string; name: string }>("/api/tasks/upload", {
+          method: "POST",
+          body: fd,
+        });
+        setPhotos((prev) => [...prev, { url: res.url, name: res.name }]);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -202,7 +207,7 @@ export default function TaskDetailPage() {
             <div>
               <label className="label" htmlFor="tr-photos">Photos (optional)</label>
               <input id="tr-photos" type="file" accept="image/*" multiple onChange={onPickPhotos} className="block w-full cursor-pointer text-sm text-slate-600 file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white" />
-              {isUploading && <p className="mt-1 text-xs text-slate-400">Uploading…</p>}
+              {uploading && <p className="mt-1 text-xs text-slate-400">Uploading…</p>}
               {photos.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {photos.map((p) => (
@@ -228,7 +233,7 @@ export default function TaskDetailPage() {
                   "Report submitted."
                 )
               }
-              disabled={busy || isUploading}
+              disabled={busy || uploading}
               className="btn-primary w-full"
             >
               {busy ? "Submitting…" : "Submit report"}
