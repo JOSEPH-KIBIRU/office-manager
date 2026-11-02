@@ -4,6 +4,7 @@ import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { HttpError } from "@/lib/auth";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { passwordProblem } from "@/lib/passwordPolicy";
 
 /** Verify the SMS code and set a new password. */
 export async function POST(req: NextRequest) {
@@ -15,7 +16,8 @@ export async function POST(req: NextRequest) {
     const code = String(body.code).trim();
     const newPassword = String(body.newPassword);
 
-    if (newPassword.length < 8) throw new HttpError(400, "New password must be at least 8 characters");
+    const problem = passwordProblem(newPassword);
+    if (problem) throw new HttpError(400, problem);
     if (!/^\d{6}$/.test(code)) throw new HttpError(400, "Enter the 6-digit code from the SMS");
 
     // Generous per IP (offices often share one), strict per-account attempt

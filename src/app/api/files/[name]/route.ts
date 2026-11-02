@@ -50,8 +50,16 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ name: stri
   const ext = path.extname(name).toLowerCase();
   const headers = new Headers();
   headers.set("Content-Type", upstream.headers.get("content-type") ?? MIME[ext] ?? "application/octet-stream");
-  const original = _req.nextUrl.searchParams.get("as");
-  headers.set("Content-Disposition", `attachment; filename="${(original || name).replace(/"/g, "")}"`);
+  // Sanitise the caller-supplied display name: strip control chars, quotes,
+  // slashes and backslashes to avoid header injection or odd downloads.
+  const original = _req.nextUrl.searchParams.get("as") ?? "";
+  const safeName =
+    (original || name)
+      .replace(/[\x00-\x1f\x7f"\\/]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 120) || name;
+  headers.set("Content-Disposition", `attachment; filename="${safeName}"`);
 
   return new NextResponse(upstream.body, { status: 200, headers });
 }

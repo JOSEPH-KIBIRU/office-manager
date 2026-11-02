@@ -73,6 +73,40 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // ---- Content-Security-Policy ----
+  // Next.js serves some pages statically, where per-request script nonces are
+  // not available; a nonce + 'strict-dynamic' policy would block those scripts.
+  // We therefore allow same-origin/inline scripts while locking down everything
+  // else (no external scripts, objects or framing). XSS is additionally
+  // mitigated because the app renders untrusted data through React (no HTML
+  // injection sinks).
+  const dev = process.env.NODE_ENV !== "production";
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://*.convex.cloud https://*.convex.site https://*.ufs.sh https://utfs.io",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.convex.cloud https://*.convex.site https://*.uploadthing.com https://*.ufs.sh https://*.ingest.sentry.io https://*.sentry.io",
+    "media-src 'self' blob: https://*.convex.cloud https://*.ufs.sh",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "object-src 'none'",
+    "frame-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+
+  const withCsp = (res: NextResponse) => {
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
+  };
+  const nextRes = () => withCsp(NextResponse.next());
+  const jsonRes = (body: unknown, init?: ResponseInit) => withCsp(NextResponse.json(body, init));
+  const redirectRes = (url: URL) => withCsp(NextResponse.redirect(url));
+
   const token =
     req.cookies.get(SESSION_COOKIE_NAMES[0])?.value ||
     req.cookies.get(SESSION_COOKIE_NAMES[1])?.value;
@@ -96,7 +130,7 @@ export async function middleware(req: NextRequest) {
 
   // ---- Origin guard (CSRF) for state-changing API requests ----
   if (isApi && MUTATING_METHODS.has(req.method) && !originAllowed(req)) {
-    return NextResponse.json({ error: "Cross-origin request blocked" }, { status: 403 });
+    return jsonRes({ error: "Cross-origin request blocked" }, { status: 403 });
   }
 
   // ---- Rate limiting (per-instance, in-memory) ----
@@ -120,7 +154,7 @@ export async function middleware(req: NextRequest) {
 
     if (!rateLimit({ key: `${key}:${scope}`, ...cfg })) {
       const retryAfter = Math.ceil(cfg.windowMs / 1000);
-      return NextResponse.json(
+      return jsonRes(
         { error: "Too many requests. Please slow down and try again.", retryAfterSeconds: retryAfter },
         { status: 429, headers: { "Retry-After": String(retryAfter) } }
       );
@@ -128,19 +162,19 @@ export async function middleware(req: NextRequest) {
   }
 
   if (!session) {
-    if (isPublic || (isApi && isAuthApi)) return NextResponse.next();
-    if (isApi) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    if (isPublic || (isApi && isAuthApi)) return nextRes();
+    if (isApi) return jsonRes({ error: "Not authenticated" }, { status: 401 });
     const url = req.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    return redirectRes(url);
   }
 
   // Force password change until done
   if (session.mustChangePassword && !isChangePassword && !isAuthApi) {
-    if (isApi) return NextResponse.json({ error: "Password change required", code: "MUST_CHANGE_PASSWORD" }, { status: 403 });
+    if (isApi) return jsonRes({ error: "Password change required", code: "MUST_CHANGE_PASSWORD" }, { status: 403 });
     const url = req.nextUrl.clone();
     url.pathname = "/change-password";
-    return NextResponse.redirect(url);
+    return redirectRes(url);
   }
 
   // Force Terms & Conditions acceptance until done (skip platform admins and legal pages).
@@ -162,25 +196,25 @@ export async function middleware(req: NextRequest) {
     !isAuthApi &&
     !isChangePassword
   ) {
-    if (isApi) return NextResponse.json({ error: "Terms acceptance required", code: "TERMS_REQUIRED" }, { status: 403 });
+    if (isApi) return jsonRes({ error: "Terms acceptance required", code: "TERMS_REQUIRED" }, { status: 403 });
     const url = req.nextUrl.clone();
     url.pathname = "/accept-terms";
-    return NextResponse.redirect(url);
+    return redirectRes(url);
   }
 
   // Already logged in, skip login page; land authed users on the dashboard
   if (!isApi && pathname === "/login") {
     const url = req.nextUrl.clone();
     url.pathname = session.role === "super_admin" ? "/admin" : "/dashboard";
-    return NextResponse.redirect(url);
+    return redirectRes(url);
   }
   if (!isApi && pathname === "/" && session) {
     const url = req.nextUrl.clone();
     url.pathname = session.role === "super_admin" ? "/admin" : "/dashboard";
-    return NextResponse.redirect(url);
+    return redirectRes(url);
   }
 
-  return NextResponse.next();
+  return nextRes();
 }
 
 export const config = {

@@ -1,5 +1,5 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
-import { getSession } from "@/lib/auth";
+import { requirePermission } from "@/lib/permissionGuard";
 
 const f = createUploadthing();
 
@@ -11,8 +11,8 @@ const f = createUploadthing();
 export const ourFileRouter = {
   taskImage: f({ image: { maxFileSize: "8MB", maxFileCount: 10 } })
     .middleware(async () => {
-      const session = await getSession();
-      if (!session || !session.orgId) throw new Error("Unauthorized");
+      // Only staff with the tasks module may upload task images.
+      const session = await requirePermission("tasks", ["admin", "secretary", "manager", "employee"]);
       return { orgId: session.orgId as string, userId: session.id as string };
     })
     .onUploadComplete(async ({ metadata, file }) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvCell, toCsv } from "@/lib/csv";
+import { csvCell, htmlCell, toCsv } from "@/lib/csv";
 
 describe("csv sanitizer", () => {
   it("neutralises formula-injection prefixes", () => {
@@ -23,5 +23,11 @@ describe("csv sanitizer", () => {
 
   it("builds a CSV with CRLF rows", () => {
     expect(toCsv([["=x", 1], ["a,b", "c"]])).toBe("'=x,1\r\n\"a,b\",c");
+  });
+
+  it("escapes HTML cells and neutralises formulas", () => {
+    expect(htmlCell("=HYPERLINK(...)")).toBe("'=HYPERLINK(...)");
+    expect(htmlCell("<b>&</b>")).toBe("&lt;b&gt;&amp;&lt;/b&gt;");
+    expect(htmlCell(-5)).toBe("-5");
   });
 });

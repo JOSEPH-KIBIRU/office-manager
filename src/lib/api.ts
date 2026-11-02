@@ -16,7 +16,14 @@ export async function handle(fn: () => Promise<NextResponse>): Promise<NextRespo
   } catch (e) {
     if (e instanceof HttpError) return fail(e.status, e.message);
     console.error("[api] Unexpected error:", e);
-    return fail(500, e instanceof Error ? e.message : "Internal server error");
+    // Never leak internal error details to clients in production.
+    const message =
+      process.env.NODE_ENV === "production"
+        ? "Something went wrong. Please try again."
+        : e instanceof Error
+        ? e.message
+        : "Internal server error";
+    return fail(500, message);
   }
 }
 

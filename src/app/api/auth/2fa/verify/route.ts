@@ -7,6 +7,7 @@ import { verifyTotp } from "@/lib/totp";
 import { decryptTotpSecret } from "@/lib/twofaSecret";
 import { TERMS_BASELINE_VERSION } from "@/lib/terms";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { allowDistributed } from "@/lib/distributedRateLimit";
 
 /** Second login step: verify the authenticator (or a recovery) code. */
 export async function POST(req: NextRequest) {
@@ -24,6 +25,16 @@ export async function POST(req: NextRequest) {
       : `2fa:ip:${ip}`;
     if (!rateLimit({ key: rateKey, limit: 20, windowMs: 5 * 60_000 })) {
       throw new HttpError(429, "Too many attempts. Please wait a few minutes and try again.");
+    }
+    if (challenge) {
+      const gate = await allowDistributed(
+        `2fa:org:${challenge.orgId}:user:${challenge.userId}`,
+        20,
+        5 * 60_000
+      );
+      if (!gate.allowed) {
+        throw new HttpError(429, "Too many attempts. Please wait a few minutes and try again.");
+      }
     }
     if (!challenge) throw new HttpError(400, "Your login attempt expired. Please sign in again.");
 

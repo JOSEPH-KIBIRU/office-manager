@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { getSession, setSessionCookie, HttpError } from "@/lib/auth";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { passwordProblem } from "@/lib/passwordPolicy";
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -12,9 +13,8 @@ export async function POST(req: NextRequest) {
     const session = await getSession();
     if (!session || !session.orgId) throw new HttpError(401, "Not authenticated");
 
-    if (String(body.newPassword).length < 8) {
-      throw new HttpError(400, "New password must be at least 8 characters");
-    }
+    const problem = passwordProblem(String(body.newPassword));
+    if (problem) throw new HttpError(400, problem);
 
     const user = await cx().query(api.auth.getUserById, {
       secret: secret(),

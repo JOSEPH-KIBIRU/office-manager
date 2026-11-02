@@ -5,6 +5,7 @@ import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok } from "@/lib/api";
 import { parseDelimited, normalizeStatementDetailed } from "@/lib/bankImport";
+import { allowDistributed } from "@/lib/distributedRateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -72,7 +73,16 @@ async function pdfToRows(buf: Uint8Array, password?: string | null): Promise<str
  */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    await requirePermission("accounting-post", ["admin", "secretary"]);
+    const session = await requirePermission("accounting-post", ["admin", "secretary"]);
+
+    const gate = await allowDistributed(
+      `bankimport:org:${session.orgId}:user:${session.id}`,
+      30,
+      5 * 60_000
+    );
+    if (!gate.allowed) {
+      throw new HttpError(429, "Too many statement imports. Please wait a few minutes and try again.");
+    }
 
     const cl = Number(req.headers.get("content-length") || 0);
     if (cl && cl > MAX_SIZE + 1024 * 1024) throw new HttpError(413, "File is too large (max 15MB).");

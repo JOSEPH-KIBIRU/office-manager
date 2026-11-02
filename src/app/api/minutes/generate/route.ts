@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { generateMinutes } from "@/lib/ai";
 import { rateLimit } from "@/lib/rateLimit";
+import { allowDistributed } from "@/lib/distributedRateLimit";
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -17,6 +18,14 @@ export async function POST(req: NextRequest) {
         windowMs: 5 * 60_000,
       })
     ) {
+      throw new HttpError(429, "Too many AI generations. Please wait a few minutes and try again.");
+    }
+    const gate = await allowDistributed(
+      `minutes:org:${session.orgId}:user:${session.id}`,
+      12,
+      5 * 60_000
+    );
+    if (!gate.allowed) {
       throw new HttpError(429, "Too many AI generations. Please wait a few minutes and try again.");
     }
     const body = await readJson<{ title: string; meeting_date?: string; attendees?: string; points: string }>(req);
