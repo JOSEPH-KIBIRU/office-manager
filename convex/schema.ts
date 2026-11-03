@@ -292,6 +292,8 @@ export default defineSchema(
     status: v.union(v.literal("trial"), v.literal("active"), v.literal("canceled"), v.literal("past_due")),
     trialEndsAt: v.optional(v.number()),
     currentPeriodEnd: v.optional(v.number()),
+    // When the super admin marked the subscription past due (not the period end).
+    pastDueSince: v.optional(v.number()),
     cancelAtPeriodEnd: v.boolean(),
     userCount: v.number(),
     startedAt: v.number(),

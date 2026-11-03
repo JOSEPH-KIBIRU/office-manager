@@ -3,6 +3,7 @@ export interface SubscriptionLike {
   plan?: string | null;
   trialEndsAt?: number | null;
   currentPeriodEnd?: number | null;
+  pastDueSince?: number | null;
 }
 
 export interface SubscriptionWarning {
@@ -27,12 +28,17 @@ export function subscriptionWarning(
   if (!sub) return null;
 
   if (sub.status === "past_due") {
+    // Prefer the date the status was set. Only fall back to the period end
+    // when that date is actually in the past (never show a future "since").
+    const since =
+      sub.pastDueSince ??
+      (sub.currentPeriodEnd && sub.currentPeriodEnd <= now ? sub.currentPeriodEnd : null);
     return {
       tone: "warning",
       title: "Subscription payment overdue",
-      message: `Your subscription is past due${
-        sub.currentPeriodEnd ? ` since ${fmt(sub.currentPeriodEnd)}` : ""
-      }. Access remains available for now — please contact your provider to update payment and avoid interruption.`,
+      message: `Your subscription payment is overdue${
+        since ? ` since ${fmt(since)}` : ""
+      }. Access is paused — please contact your provider to update payment and restore access.`,
     };
   }
 
@@ -41,7 +47,7 @@ export function subscriptionWarning(
       tone: "danger",
       title: "Subscription canceled",
       message:
-        "Your subscription has been canceled. Access remains available for now — please contact your provider to reactivate it.",
+        "Your subscription has been canceled. Access is paused — please contact your provider to reactivate it.",
     };
   }
 
@@ -51,7 +57,7 @@ export function subscriptionWarning(
         tone: "danger",
         title: "Free trial ended",
         message:
-          "Your free trial has ended. Access remains available for now — please contact your provider to choose a plan.",
+          "Your free trial has ended. Access is paused — please contact your provider to choose a plan.",
       };
     }
     const days = Math.ceil((sub.trialEndsAt - now) / 86_400_000);
@@ -61,7 +67,7 @@ export function subscriptionWarning(
         title: "Trial ending soon",
         message: `Your free trial ends in ${days} day${days === 1 ? "" : "s"} (${fmt(
           sub.trialEndsAt
-        )}). Contact your provider to choose a plan.`,
+        )}). Access remains available until then — contact your provider to choose a plan.`,
       };
     }
   }

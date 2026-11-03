@@ -15,7 +15,16 @@ describe("subscription banner", () => {
     const w = subscriptionWarning({ status: "past_due", currentPeriodEnd: NOW - 86_400_000 }, NOW);
     expect(w?.tone).toBe("warning");
     expect(w?.title).toMatch(/overdue/i);
-    expect(w?.message).toMatch(/access remains available/i);
+    expect(w?.message).toMatch(/access is paused/i);
+    expect(w?.message).toMatch(/since/);
+  });
+
+  it("never shows a future 'since' date", () => {
+    const futurePeriod = { status: "past_due", currentPeriodEnd: NOW + 30 * 86_400_000 };
+    expect(subscriptionWarning(futurePeriod, NOW)?.message).not.toMatch(/since/);
+    expect(
+      subscriptionWarning({ ...futurePeriod, pastDueSince: NOW }, NOW)?.message
+    ).toMatch(/since/);
   });
 
   it("flags a canceled subscription", () => {

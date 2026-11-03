@@ -62,6 +62,7 @@ export const validateSession = query({
             status: sub.status,
             trialEndsAt: sub.trialEndsAt ?? null,
             currentPeriodEnd: sub.currentPeriodEnd ?? null,
+            pastDueSince: sub.pastDueSince ?? null,
           }
         : null,
     };

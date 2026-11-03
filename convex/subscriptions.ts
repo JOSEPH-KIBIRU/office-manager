@@ -62,6 +62,7 @@ export const getSubscription = query({
       status: sub.status,
       trialEndsAt: sub.trialEndsAt ?? null,
       currentPeriodEnd: sub.currentPeriodEnd ?? null,
+      pastDueSince: sub.pastDueSince ?? null,
       cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
     };
   },
@@ -115,6 +116,7 @@ export const startTrial = mutation({
         billingCycle: args.billingCycle,
         status: "trial",
         trialEndsAt,
+        pastDueSince: undefined,
         currentPeriodEnd: trialEndsAt,
         cancelAtPeriodEnd: false,
       });
@@ -153,11 +155,20 @@ export const setSubscriptionPlan = mutation({
     const now = Date.now();
     const existing = await findForOrg(ctx, args.orgId);
     const status = args.status ?? existing?.status ?? "active";
+    // "Past due since" is when the status was set, not the paid-period end
+    // (which can legitimately be in the future).
+    const pastDueSince =
+      status === "past_due"
+        ? existing?.status === "past_due" && existing.pastDueSince
+          ? existing.pastDueSince
+          : now
+        : undefined;
     if (existing) {
       await ctx.db.patch(existing._id, {
         plan: args.plan,
         billingCycle: args.billingCycle,
         status,
+        pastDueSince,
         currentPeriodEnd: existing.currentPeriodEnd ?? nextPeriodEnd(args.billingCycle, now),
       });
       return { orgId: args.orgId, plan: args.plan, billingCycle: args.billingCycle, status };
@@ -167,6 +178,7 @@ export const setSubscriptionPlan = mutation({
       plan: args.plan,
       billingCycle: args.billingCycle,
       status,
+      pastDueSince,
       currentPeriodEnd: nextPeriodEnd(args.billingCycle, now),
       cancelAtPeriodEnd: false,
       userCount: 0,
@@ -189,6 +201,7 @@ export const markPaid = mutation({
     await ctx.db.patch(sub._id, {
       status: "active",
       trialEndsAt: undefined,
+      pastDueSince: undefined,
       currentPeriodEnd: nextPeriodEnd(sub.billingCycle, from),
       cancelAtPeriodEnd: false,
     });
@@ -204,7 +217,7 @@ export const cancelSubscription = mutation({
     await assertSuperAdmin(ctx, args.superAdminId);
     const sub = await findForOrg(ctx, args.orgId);
     if (!sub) throw new Error("Subscription not found");
-    await ctx.db.patch(sub._id, { status: "canceled", cancelAtPeriodEnd: true });
+    await ctx.db.patch(sub._id, { status: "canceled", cancelAtPeriodEnd: true, pastDueSince: undefined });
     return { orgId: args.orgId };
   },
 });
@@ -224,7 +237,11 @@ export const processSubscriptionRenewals = internalMutation({
       const periodEnded = s.currentPeriodEnd !== undefined && s.currentPeriodEnd <= now;
       const trialExpired = s.status === "trial" && s.trialEndsAt !== undefined && s.trialEndsAt <= now;
       if (periodEnded || trialExpired || s.cancelAtPeriodEnd) {
-        await ctx.db.patch(s._id, { status: "canceled", cancelAtPeriodEnd: true });
+        await ctx.db.patch(s._id, {
+          status: "canceled",
+          cancelAtPeriodEnd: true,
+          pastDueSince: undefined,
+        });
         canceled++;
       }
     }
