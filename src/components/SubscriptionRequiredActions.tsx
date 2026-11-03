@@ -22,10 +22,18 @@ export default function SubscriptionRequiredActions() {
 
   return (
     <>
-      <button className="btn-secondary" onClick={() => router.refresh()} disabled={busy}>
+      <button
+        className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
+        onClick={() => router.refresh()}
+        disabled={busy}
+      >
         Check again
       </button>
-      <button className="btn-primary" onClick={signOut} disabled={busy}>
+      <button
+        className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100 disabled:opacity-60"
+        onClick={signOut}
+        disabled={busy}
+      >
         {busy ? "Signing out…" : "Sign out"}
       </button>
     </>

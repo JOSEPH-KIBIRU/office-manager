@@ -333,3 +333,37 @@ body {
     padding: 0 !important;
   }
 }
+
+/* Subscription blocked screen — padlock repeatedly closing/locking */
+@keyframes padlock-close {
+  0%,
+  40% {
+    transform: translateY(-5px) rotate(-9deg);
+  }
+  55%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+@keyframes padlock-keyhole {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.padlock-shackle {
+  animation: padlock-close 2.4s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+.padlock-keyhole {
+  animation: padlock-keyhole 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .padlock-shackle,
+  .padlock-keyhole {
+    animation: none;
+  }
+}
