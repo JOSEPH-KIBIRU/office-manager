@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getValidatedSessionUser } from "@/lib/sessionValidation";
+import { subscriptionWarning, subscriptionBlocked } from "@/lib/subscription";
+import SubscriptionBanner from "@/components/SubscriptionBanner";
 import Sidebar from "@/components/Sidebar";
 import NotificationBell from "@/components/NotificationBell";
 import AnnouncementBanner from "@/components/AnnouncementBanner";
@@ -29,6 +31,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // unless they are impersonating a company admin.
   if (live.role === "super_admin" && !live.impersonating) redirect("/admin");
 
+  // Block past-due/canceled/expired-trial companies (superadmins impersonating
+  // for support are exempt). The blocking page shows the banner + status.
+  if (!live.impersonating && subscriptionBlocked(user.subscription)) {
+    redirect("/subscription-required");
+  }
+  const subscriptionNotice = subscriptionWarning(user.subscription);
+
   return (
     <SessionProvider session={live}>
       <ToastProvider>
@@ -47,6 +56,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           )}
           <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur print:hidden">
             <AnnouncementBanner />
+            <SubscriptionBanner warning={subscriptionNotice} />
             <div className="ml-auto hidden items-center justify-end gap-3 px-8 py-2.5 lg:flex">
               <NotificationBell />
               <UserMenu

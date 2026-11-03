@@ -1,6 +1,7 @@
 import "server-only";
 import { cx, secret, api } from "./convex";
 import type { SessionPayload } from "./types";
+import type { SubscriptionLike } from "./subscription";
 
 export interface ValidatedSessionUser {
   id: string;
@@ -10,6 +11,7 @@ export interface ValidatedSessionUser {
   email: string;
   active: boolean;
   sessionVersion: number;
+  subscription: SubscriptionLike | null;
 }
 
 /**

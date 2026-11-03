@@ -45,6 +45,10 @@ export const validateSession = query({
     const u = await ctx.db.get(args.id);
     if (!u || u.orgId !== args.orgId || !u.active) return null;
     if ((u.sessionVersion ?? 0) !== (args.sessionVersion ?? 0)) return null;
+    const sub = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .unique();
     return {
       id: u._id,
       orgId: u.orgId,
@@ -53,6 +57,13 @@ export const validateSession = query({
       email: u.email,
       active: u.active,
       sessionVersion: u.sessionVersion ?? 0,
+      subscription: sub
+        ? {
+            status: sub.status,
+            trialEndsAt: sub.trialEndsAt ?? null,
+            currentPeriodEnd: sub.currentPeriodEnd ?? null,
+          }
+        : null,
     };
   },
 });
