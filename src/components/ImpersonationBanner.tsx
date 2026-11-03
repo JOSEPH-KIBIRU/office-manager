@@ -3,17 +3,25 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Spinner from "@/components/Spinner";
+import { useToast } from "@/components/toast";
 
 export default function ImpersonationBanner({ companyName }: { companyName: string }) {
   const router = useRouter();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
 
   async function exit() {
     setBusy(true);
     try {
-      await fetch("/api/admin/impersonate", { method: "DELETE" });
+      const res = await fetch("/api/admin/impersonate", { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error || "Could not exit this view");
+      }
       router.replace("/admin");
       router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not exit this view");
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { HttpError, requireUser, startImpersonation, stopImpersonation } from "@/lib/auth";
+import { HttpError, getSession, requireUser, startImpersonation, stopImpersonation } from "@/lib/auth";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
@@ -52,7 +52,11 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE() {
   return handle(async () => {
-    const session = await requireUser();
+    // Do not depend on the impersonated company's state (it may be past due,
+    // suspended, or the admin may have changed) — always allow the original
+    // super-admin to exit the view.
+    const session = await getSession();
+    if (!session?.impersonating) throw new HttpError(400, "Not currently impersonating");
     const restored = await stopImpersonation(session);
     if (!restored) throw new HttpError(400, "Not currently impersonating");
     return ok({ restored: true });

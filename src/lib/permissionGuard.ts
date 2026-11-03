@@ -63,7 +63,11 @@ export async function requirePermission(
   // invalidated by a password/role change are rejected even if the JWT is valid.
   const user = await getValidatedSessionUser(session);
   if (!user) throw new HttpError(401, "Your session is no longer valid. Please sign in again.");
-  if (user.role !== "super_admin" && subscriptionBlocked(user.subscription)) {
+  if (
+    !session.impersonating &&
+    user.role !== "super_admin" &&
+    subscriptionBlocked(user.subscription)
+  ) {
     throw new HttpError(402, "Your company's subscription is inactive. Please contact your provider.");
   }
   const role = user.role;

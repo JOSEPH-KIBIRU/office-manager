@@ -80,7 +80,11 @@ export async function requireUser(roles?: Role[]): Promise<SessionPayload> {
   // invalidated by a password/role change must not keep working until JWT expiry.
   const user = await getValidatedSessionUser(session);
   if (!user) throw new HttpError(401, "Your session is no longer valid. Please sign in again.");
-  if (user.role !== "super_admin" && subscriptionBlocked(user.subscription)) {
+  if (
+    !session.impersonating &&
+    user.role !== "super_admin" &&
+    subscriptionBlocked(user.subscription)
+  ) {
     throw new HttpError(402, "Your company's subscription is inactive. Please contact your provider.");
   }
   if (roles && roles.length > 0 && !roles.includes(user.role)) {
