@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { getValidatedSessionUser } from "@/lib/sessionValidation";
+import { subscriptionBlocked } from "@/lib/subscription";
 import PrintButton from "@/components/PrintButton";
 import ShareButton from "@/components/ShareButton";
 import { RequisitionBrand } from "@/components/RequisitionBrand";
@@ -11,14 +13,17 @@ function money(n: number) {
 
 export default async function PettyCashRequisition({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !session.orgId) redirect("/login");
+  if (!session) redirect("/login");
+  const user = await getValidatedSessionUser(session);
+  if (!user) redirect("/login");
+  if (subscriptionBlocked(user.subscription)) redirect("/subscription-required");
 
   const { id } = await params;
   let row;
   try {
     row = await cx().query(api.pettyCash.getPettyCash, {
       secret: secret(),
-      orgId: session.orgId as never,
+      orgId: user.orgId as never,
       id: id as never,
     });
   } catch {
@@ -26,7 +31,7 @@ export default async function PettyCashRequisition({ params }: { params: Promise
   }
 
   if (!row) redirect("/petty-cash");
-  if (session.role !== "admin" && session.role !== "manager" && row.requested_by !== session.id) {
+  if (user.role !== "admin" && user.role !== "manager" && row.requested_by !== user.id) {
     redirect("/petty-cash");
   }
 
@@ -34,7 +39,7 @@ export default async function PettyCashRequisition({ params }: { params: Promise
   try {
     org = (await cx().query(api.organizations.getOrganization, {
       secret: secret(),
-      orgId: session.orgId as never,
+      orgId: user.orgId as never,
     })) as typeof org;
   } catch {
     org = null;

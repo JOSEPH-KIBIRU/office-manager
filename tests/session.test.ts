@@ -90,4 +90,41 @@ describe("session validity", () => {
     });
     expect(user).toBeNull();
   });
+
+  it("only accepts super_admin inside the platform org", async () => {
+    const { t, orgId, userId } = await setup();
+    await t.run((ctx) => ctx.db.patch(userId, { role: "super_admin" }));
+    const companySuper = await t.query(api.auth.validateSession, {
+      secret: SECRET,
+      id: userId,
+      orgId,
+      sessionVersion: 0,
+    });
+    expect(companySuper).toBeNull();
+
+    const now = Date.now();
+    const platformOrg = await t.run((ctx) =>
+      ctx.db.insert("organizations", { name: "Platform", slug: "__platform", active: true, createdAt: now })
+    );
+    const platformUser = await t.run((ctx) =>
+      ctx.db.insert("users", {
+        orgId: platformOrg,
+        name: "Owner",
+        email: "owner@platform.test",
+        passwordHash: "x",
+        role: "super_admin",
+        leaveBalance: 21,
+        mustChangePassword: false,
+        active: true,
+        createdAt: now,
+      })
+    );
+    const platformOk = await t.query(api.auth.validateSession, {
+      secret: SECRET,
+      id: platformUser,
+      orgId: platformOrg,
+      sessionVersion: 0,
+    });
+    expect(platformOk?.id).toBe(platformUser);
+  });
 });

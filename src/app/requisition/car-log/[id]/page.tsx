@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { getValidatedSessionUser } from "@/lib/sessionValidation";
+import { subscriptionBlocked } from "@/lib/subscription";
 import PrintButton from "@/components/PrintButton";
 import ShareButton from "@/components/ShareButton";
 import { RequisitionBrand } from "@/components/RequisitionBrand";
@@ -11,15 +13,18 @@ function money(n: number) {
 
 export default async function CarLogRequisition({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!session || !session.orgId) redirect("/login");
-  if (!["admin", "manager"].includes(session.role)) redirect("/dashboard");
+  if (!session) redirect("/login");
+  const user = await getValidatedSessionUser(session);
+  if (!user) redirect("/login");
+  if (subscriptionBlocked(user.subscription)) redirect("/subscription-required");
+  if (!["admin", "manager"].includes(user.role)) redirect("/dashboard");
 
   const { id } = await params;
   let row;
   try {
     row = await cx().query(api.carLogs.getCarLog, {
       secret: secret(),
-      orgId: session.orgId as never,
+      orgId: user.orgId as never,
       id: id as never,
     });
   } catch {
@@ -31,7 +36,7 @@ export default async function CarLogRequisition({ params }: { params: Promise<{ 
   try {
     org = (await cx().query(api.organizations.getOrganization, {
       secret: secret(),
-      orgId: session.orgId as never,
+      orgId: user.orgId as never,
     })) as typeof org;
   } catch {
     org = null;

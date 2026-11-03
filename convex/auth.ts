@@ -45,6 +45,13 @@ export const validateSession = query({
     const u = await ctx.db.get(args.id);
     if (!u || u.orgId !== args.orgId || !u.active) return null;
     if ((u.sessionVersion ?? 0) !== (args.sessionVersion ?? 0)) return null;
+    // The platform-owner role is only valid inside the platform organisation.
+    // This also neutralises any legacy company user who was given the role
+    // before role assignment was locked down.
+    if (u.role === "super_admin") {
+      const org = await ctx.db.get(args.orgId);
+      if (!org || org.slug !== "__platform") return null;
+    }
     const sub = await ctx.db
       .query("subscriptions")
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))

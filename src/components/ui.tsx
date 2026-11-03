@@ -247,6 +247,15 @@ export async function api<T = Record<string, unknown>>(
       typeof data.retryAfterSeconds === "number"
         ? ` Please try again in about ${data.retryAfterSeconds}s.`
         : "";
+    // Blocked subscription: send the browser to the blocking screen (covers
+    // print/share pages outside the app layout).
+    if (
+      res.status === 402 &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/subscription-required"
+    ) {
+      window.location.replace("/subscription-required");
+    }
     throw new Error((data.error || `Request failed (${res.status})`) + wait);
   }
   return data as T;
