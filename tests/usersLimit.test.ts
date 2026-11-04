@@ -88,4 +88,22 @@ describe("plan user limits", () => {
     const id = await createUser(t, orgId, 99);
     expect(id).toBeTruthy();
   });
+
+  it("reports seat usage and over-limit state", async () => {
+    const { t, orgId, addUser } = await setup("starter");
+    for (let i = 1; i <= 11; i++) await addUser(i);
+    const usage = await t.query(api.subscriptions.getUsage, { secret: SECRET, orgId });
+    expect(usage.limit).toBe(10);
+    expect(usage.userCount).toBe(11);
+    expect(usage.atLimit).toBe(true);
+    expect(usage.overLimit).toBe(true);
+  });
+
+  it("reports no limit for a grandfathered company", async () => {
+    const { t, orgId, addUser } = await setup();
+    for (let i = 1; i <= 3; i++) await addUser(i);
+    const usage = await t.query(api.subscriptions.getUsage, { secret: SECRET, orgId });
+    expect(usage.limit).toBeNull();
+    expect(usage.overLimit).toBe(false);
+  });
 });

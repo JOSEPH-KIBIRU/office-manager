@@ -2,6 +2,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { assertSecret } from "./lib";
 import { assertSuperAdmin } from "./superadmin";
+import { PLAN_USER_LIMITS } from "./plans";
 
 /**
  * Subscription billing.
@@ -64,6 +65,30 @@ export const getSubscription = query({
       currentPeriodEnd: sub.currentPeriodEnd ?? null,
       pastDueSince: sub.pastDueSince ?? null,
       cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+    };
+  },
+});
+
+/** Seat usage for the calling company (plan limit + current user count). */
+export const getUsage = query({
+  args: { secret: v.string(), orgId: v.id("organizations") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const sub = await findForOrg(ctx, args.orgId);
+    const users = await ctx.db
+      .query("users")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const plan = sub?.plan as keyof typeof PLAN_USER_LIMITS | undefined;
+    const limit = plan ? PLAN_USER_LIMITS[plan] ?? null : null;
+    const userCount = users.length;
+    return {
+      plan: sub?.plan ?? null,
+      status: sub?.status ?? null,
+      limit,
+      userCount,
+      atLimit: limit !== null && userCount >= limit,
+      overLimit: limit !== null && userCount > limit,
     };
   },
 });

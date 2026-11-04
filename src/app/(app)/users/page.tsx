@@ -27,6 +27,15 @@ interface UserRow {
   active: number;
 }
 
+interface SeatUsage {
+  plan: string | null;
+  status: string | null;
+  limit: number | null;
+  userCount: number;
+  atLimit: boolean;
+  overLimit: boolean;
+}
+
 const EMPLOYMENT_TYPES = ["permanent", "permanent_pensionable"] as const;
 const EMPLOYMENT_LABELS: Record<string, string> = {
   permanent: "Permanent",
@@ -72,6 +81,7 @@ export default function UsersPage() {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
+  const [seatUsage, setSeatUsage] = useState<SeatUsage | null>(null);
 
   function clearError(field: string) {
     setErrors((p) => ({ ...p, [field]: undefined }));
@@ -82,6 +92,12 @@ export default function UsersPage() {
     try {
       const data = await api<{ users: UserRow[] }>("/api/users?full=1");
       setUsers(data.users);
+      try {
+        const sub = await api<{ usage: SeatUsage }>("/api/subscription");
+        setSeatUsage(sub.usage);
+      } catch {
+        setSeatUsage(null);
+      }
       const reqs = await api<{ requests: ProfileChangeRequestRow[] }>("/api/profile/requests");
       setChangeRequests(reqs.requests);
       const depts = await api<{ departments: { id: string; name: string }[]; employees: unknown[] }>(
@@ -217,10 +233,42 @@ export default function UsersPage() {
       <PageHeader
         title="Team"
         subtitle="Create accounts, assign roles and manage access. New logins are emailed/SMS'd automatically."
-        action={<button className="btn-primary" onClick={() => setShowNew(true)}>+ Create user</button>}
+        action={
+          <button
+            className="btn-primary"
+            onClick={() => setShowNew(true)}
+            disabled={!!seatUsage?.atLimit}
+            title={seatUsage?.atLimit ? "Plan limit reached — upgrade to add more users" : undefined}
+          >
+            + Create user
+          </button>
+        }
       />
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
+
+      {seatUsage?.limit != null && (
+        <div
+          className={`mb-4 rounded-lg border px-4 py-2.5 text-sm ${
+            seatUsage.overLimit
+              ? "border-red-200 bg-red-50 text-red-800"
+              : seatUsage.atLimit
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-slate-200 bg-white text-slate-600"
+          }`}
+        >
+          <strong>
+            {seatUsage.userCount} / {seatUsage.limit}
+          </strong>{" "}
+          seats used on the{" "}
+          <span className="font-semibold capitalize">{seatUsage.plan ?? "current"}</span> plan.
+          {seatUsage.overLimit
+            ? " You are over the plan limit — adding users is blocked. Contact Pigiecore Solutions to upgrade."
+            : seatUsage.atLimit
+            ? " Plan limit reached — contact Pigiecore Solutions to upgrade before adding more users."
+            : ""}
+        </div>
+      )}
 
       {changeRequests.filter((r) => r.status === "pending").length > 0 && (
         <section className="card mb-6 overflow-hidden">
