@@ -2,6 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { assertSecret, tsNow } from "./lib";
 import { seedDefaultsForUser } from "./checklists";
+import { PLAN_USER_LIMITS } from "./plans";
 
 const roleValidator = v.string();
 
@@ -85,6 +86,27 @@ export const createUser = mutation({
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
     if (existing) throw new ConvexError("A user with this email already exists");
+
+    // Plan seat limit — applies to trials and paid plans. Companies without a
+    // subscription record are grandfathered.
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .unique();
+    if (subscription) {
+      const limit = PLAN_USER_LIMITS[subscription.plan] ?? null;
+      if (limit !== null) {
+        const members = await ctx.db
+          .query("users")
+          .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+          .collect();
+        if (members.length >= limit) {
+          throw new ConvexError(
+            `Your ${subscription.plan} plan allows up to ${limit} users (including the admin). Please upgrade your plan to add more.`
+          );
+        }
+      }
+    }
 
     const id = await ctx.db.insert("users", {
       orgId: args.orgId,

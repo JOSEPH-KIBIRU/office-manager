@@ -58,6 +58,7 @@ import type * as passwordReset from "../passwordReset.js";
 import type * as payroll from "../payroll.js";
 import type * as permissions from "../permissions.js";
 import type * as pettyCash from "../pettyCash.js";
+import type * as plans from "../plans.js";
 import type * as profiles from "../profiles.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as recurring from "../recurring.js";
@@ -131,6 +132,7 @@ declare const fullApi: ApiFromModules<{
   payroll: typeof payroll;
   permissions: typeof permissions;
   pettyCash: typeof pettyCash;
+  plans: typeof plans;
   profiles: typeof profiles;
   rateLimit: typeof rateLimit;
   recurring: typeof recurring;
