@@ -147,18 +147,22 @@ export async function notifyLeaveDecision(
   );
 }
 
-export async function sendNewUserCredentials(user: NotifyUser, tempPassword: string) {
+export async function sendNewUserCredentials(
+  user: NotifyUser,
+  tempPassword: string
+): Promise<{ emailSent: boolean; smsSent: boolean }> {
   const loginUrl = `${siteUrl()}/login`;
   const title = "Your Office Account Has Been Created";
   const body = `<p>Hello <strong>${user.name}</strong>,</p>
   <p>An account has been created for you on the Office Management System.</p>
   <p><strong>Email:</strong> ${user.email}<br/><strong>Temporary password:</strong> ${tempPassword}</p>
   <p>Log in at <a href="${loginUrl}">${loginUrl}</a>. You will be required to change your password immediately after logging in.</p>`;
-  await sendEmail(user.email, title, emailShell(title, body));
-  await sendSMS(
+  const emailSent = await sendEmail(user.email, title, emailShell(title, body));
+  const smsSent = await sendSMS(
     user.phone,
     `Welcome ${user.name}. Your office account was created. Login: ${user.email}, Temp password: ${tempPassword}. You must change it after first login.`
   );
+  return { emailSent, smsSent };
 }
 
 export async function notifyAdmins(

@@ -3,7 +3,7 @@
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, FieldError, inputCls, PageHeader, api } from "@/components/ui";
-import { validate, required, email as emailRule, type Errors } from "@/lib/validation";
+import { validate, required, email as emailRule, phone as phoneRule, type Errors } from "@/lib/validation";
 
 export default function CreateCompanyPage() {
   const router = useRouter();
@@ -14,6 +14,7 @@ export default function CreateCompanyPage() {
   const [name, setName] = useState("");
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
+  const [adminPhone, setAdminPhone] = useState("");
   const [errors, setErrors] = useState<Errors>({});
   const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [customRoles, setCustomRoles] = useState<string[]>([]);
@@ -47,10 +48,11 @@ export default function CreateCompanyPage() {
     setBusy(true);
     setError(null);
     setNotice(null);
-    const errs = validate({ name, adminName, adminEmail }, {
+    const errs = validate({ name, adminName, adminEmail, adminPhone }, {
       name: [required("Company name")],
       adminName: [required("Admin name")],
       adminEmail: [required("Admin email"), emailRule("Admin email")],
+      adminPhone: [required("Admin phone"), phoneRule("Admin phone", false)],
     });
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
@@ -59,16 +61,29 @@ export default function CreateCompanyPage() {
     }
     setErrors({});
     try {
-      const res = await api<{ orgId: string; adminEmail: string; tempPassword: string }>(
-        "/api/admin/companies",
-        { method: "POST", json: { name, adminName, adminEmail, workingDays, customRoles } }
-      );
+      const res = await api<{
+        orgId: string;
+        adminEmail: string;
+        adminPhone?: string;
+        tempPassword: string;
+        delivery?: { emailSent: boolean; smsSent: boolean };
+      }>("/api/admin/companies", {
+        method: "POST",
+        json: { name, adminName, adminEmail, adminPhone, workingDays, customRoles },
+      });
+      const sentBy: string[] = [];
+      if (res.delivery?.smsSent) sentBy.push(`SMS to ${res.adminPhone ?? adminPhone}`);
+      if (res.delivery?.emailSent) sentBy.push(`email to ${res.adminEmail}`);
+      const how = sentBy.length
+        ? `Login details sent by ${sentBy.join(" and ")}.`
+        : "Automatic delivery is not configured — copy the login below and share it with the admin.";
       setNotice(
-        `Company created. Admin account: ${res.adminEmail} with temporary password ${res.tempPassword} — save this now (shown only once). They must change it at first login.`
+        `Company created. ${how} Admin account: ${res.adminEmail} with temporary password ${res.tempPassword} — save this now (shown only once). They must change it at first login.`
       );
       setName("");
       setAdminName("");
       setAdminEmail("");
+      setAdminPhone("");
       setCustomRoles([]);
       setRoleInput("");
     } catch (err) {
@@ -82,7 +97,7 @@ export default function CreateCompanyPage() {
     <>
       <PageHeader
         title="Create company & admin"
-        subtitle="Register a new company and its first admin account. The temp password is shown once — email/SMS delivery requires credentials to be configured."
+        subtitle="Register a new company and its first admin account. The login is sent to the admin's phone by SMS (and email when configured)."
         action={
           <button onClick={() => router.push("/admin")} className="btn-secondary">Back to companies</button>
         }
@@ -111,9 +126,16 @@ export default function CreateCompanyPage() {
               onChange={(e) => { setAdminEmail(e.target.value); clearError("adminEmail"); }} required />
             <FieldError msg={errors.adminEmail} />
           </div>
+          <div>
+            <label className="label" htmlFor="co-phone">Admin phone (for SMS login)</label>
+            <input id="co-phone" type="tel" className={inputCls(errors.adminPhone)} value={adminPhone}
+              onChange={(e) => { setAdminPhone(e.target.value); clearError("adminPhone"); }}
+              placeholder="+2547…" required />
+            <FieldError msg={errors.adminPhone} />
+          </div>
           <p className="text-xs text-slate-500">
-            Creates the organization and a temporary password for its first admin. The password is shown
-            once below — email/SMS delivery only works if messaging is configured.
+            The admin&apos;s phone receives the login details by SMS (email is also sent when configured). The
+            temporary password is still shown once below so you can share it manually if needed.
           </p>
           <div>
             <label className="label">Working days</label>

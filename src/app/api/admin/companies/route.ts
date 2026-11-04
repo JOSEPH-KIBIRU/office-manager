@@ -5,6 +5,8 @@ import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { generateTempPassword } from "@/lib/passwords";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { recordAudit } from "@/lib/audit";
+import { PHONE_RE } from "@/lib/validation";
+import { sendNewUserCredentials } from "@/lib/notify";
 
 export async function GET() {
   return handle(async () => {
@@ -29,15 +31,20 @@ export async function POST(req: NextRequest) {
       name: string;
       adminName: string;
       adminEmail: string;
+      adminPhone: string;
       workingDays?: number[];
       customRoles?: string[];
     }>(req);
-    requireFields(body, ["name", "adminName", "adminEmail"]);
+    requireFields(body, ["name", "adminName", "adminEmail", "adminPhone"]);
 
     const name = String(body.name).trim();
+    const adminName = String(body.adminName).trim();
     const email = String(body.adminEmail).toLowerCase().trim();
+    const adminPhone = String(body.adminPhone).trim();
     if (!name) throw new HttpError(400, "Company name is required");
+    if (!adminName) throw new HttpError(400, "Admin name is required");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "Invalid admin email");
+    if (!PHONE_RE.test(adminPhone)) throw new HttpError(400, "Invalid admin phone number");
 
     const tempPassword = generateTempPassword();
 
@@ -46,8 +53,9 @@ export async function POST(req: NextRequest) {
         secret: secret(),
         superAdminId: session.id as never,
         name,
-        adminName: String(body.adminName).trim(),
+        adminName,
         adminEmail: email,
+        adminPhone,
         adminPasswordHash: bcrypt.hashSync(tempPassword, 10),
         workingDays: Array.isArray(body.workingDays)
           ? body.workingDays.map(Number).filter((d) => d >= 0 && d <= 6)
@@ -62,7 +70,12 @@ export async function POST(req: NextRequest) {
         null,
         result.orgId
       );
-      return ok({ ...result, tempPassword });
+      // Share the login with the company admin by SMS (and email if configured).
+      const delivery = await sendNewUserCredentials(
+        { name: adminName, email, phone: adminPhone },
+        tempPassword
+      );
+      return ok({ ...result, tempPassword, adminPhone, delivery });
     } catch (e) {
       return mapConvexError(e);
     }
