@@ -141,10 +141,26 @@ export default function CrmEmailPage() {
                 <div className="mt-3 space-y-2 text-sm text-slate-600">
                   <p>Connected as <strong>{conn.email ?? "unknown mailbox"}</strong></p>
                   <p className="text-xs text-slate-500">Last synced: {fmt(conn.lastSyncedAt)}</p>
-                  {conn.lastError && <p className="text-xs text-red-600">{conn.lastError}</p>}
-                  <button className="btn-danger px-3 py-1.5 text-sm" onClick={() => disconnect(id)} disabled={busy === id}>
-                    {busy === id ? "Working…" : "Disconnect"}
-                  </button>
+                  {conn.status === "error" && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      <p className="font-semibold">Access expired or was revoked.</p>
+                      <p>{conn.lastError ?? "Reconnect to re-authorise this mailbox."}</p>
+                    </div>
+                  )}
+                  {conn.status !== "error" && conn.lastError && (
+                    <p className="text-xs text-red-600">{conn.lastError}</p>
+                  )}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <a
+                      className="btn-primary px-3 py-1.5 text-sm"
+                      href={`/api/crm/integrations/${id}/connect`}
+                    >
+                      Reconnect {cfg?.label ?? id}
+                    </a>
+                    <button className="btn-danger px-3 py-1.5 text-sm" onClick={() => disconnect(id)} disabled={busy === id}>
+                      {busy === id ? "Working…" : "Disconnect"}
+                    </button>
+                  </div>
                 </div>
               ) : cfg && !cfg.configured ? (
                 <p className="mt-3 text-sm text-slate-500">Not configured by your provider yet.</p>

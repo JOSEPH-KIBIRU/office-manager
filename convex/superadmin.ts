@@ -14,6 +14,132 @@ export async function assertSuperAdmin(ctx: any, superAdminId: string) {
   return sa;
 }
 
+/**
+ * Owner-only actions (deleting companies, managing other superadmins).
+ * Legacy platform accounts with no `platformRole` are treated as owners.
+ */
+export async function assertPlatformOwner(ctx: any, superAdminId: string) {
+  const sa = await assertSuperAdmin(ctx, superAdminId);
+  if (sa.platformRole && sa.platformRole !== "platform_owner") {
+    throw new Error("Only the platform owner can perform this action");
+  }
+  return sa;
+}
+
+async function platformOrg(ctx: any) {
+  const org = await ctx.db
+    .query("organizations")
+    .withIndex("by_slug", (q: any) => q.eq("slug", "__platform"))
+    .unique();
+  if (!org) throw new Error("Platform organization not found");
+  return org;
+}
+
+function isOwnerDoc(u: any): boolean {
+  return !u.platformRole || u.platformRole === "platform_owner";
+}
+
+export const isPlatformOwner = query({
+  args: { secret: v.string(), superAdminId: v.id("users") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const sa = await assertSuperAdmin(ctx, args.superAdminId);
+    return { isOwner: isOwnerDoc(sa) };
+  },
+});
+
+/** Platform team: the owner plus any delegated superadmins. */
+export const listPlatformAdmins = query({
+  args: { secret: v.string(), superAdminId: v.id("users") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const sa = await assertSuperAdmin(ctx, args.superAdminId);
+    const org = await platformOrg(ctx);
+    const users = await ctx.db
+      .query("users")
+      .withIndex("by_org", (q) => q.eq("orgId", org._id))
+      .collect();
+    const fmt = (ms: number) => new Date(ms).toISOString().replace("T", " ").slice(0, 19);
+    const admins = users
+      .filter((u) => u.role === "super_admin")
+      .sort((a, b) => {
+        const ao = isOwnerDoc(a) ? 0 : 1;
+        const bo = isOwnerDoc(b) ? 0 : 1;
+        return ao - bo || a.name.localeCompare(b.name);
+      })
+      .map((u) => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        phone: u.phone ?? null,
+        is_owner: isOwnerDoc(u),
+        active: u.active,
+        created_at: fmt(u.createdAt),
+      }));
+    return { me: { id: sa._id, isOwner: isOwnerDoc(sa) }, admins };
+  },
+});
+
+/** Owner-only: add a delegated superadmin (cannot delete companies/manage owners). */
+export const createPlatformAdmin = mutation({
+  args: {
+    secret: v.string(),
+    superAdminId: v.id("users"),
+    name: v.string(),
+    email: v.string(),
+    phone: v.optional(v.string()),
+    passwordHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await assertPlatformOwner(ctx, args.superAdminId);
+    const org = await platformOrg(ctx);
+    const name = args.name.trim();
+    const email = args.email.toLowerCase().trim();
+    if (!name) throw new Error("Name is required");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Invalid email");
+    const existing = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .unique();
+    if (existing) throw new Error("A user with this email already exists");
+    const id = await ctx.db.insert("users", {
+      orgId: org._id,
+      name,
+      email,
+      phone: args.phone?.trim() || undefined,
+      role: "super_admin",
+      platformRole: "superadmin",
+      passwordHash: args.passwordHash,
+      leaveBalance: 21,
+      mustChangePassword: true,
+      active: true,
+      createdAt: tsNow(),
+    });
+    return { id, email };
+  },
+});
+
+/** Owner-only: permanently remove a delegated superadmin. Owners are protected. */
+export const deletePlatformAdmin = mutation({
+  args: { secret: v.string(), superAdminId: v.id("users"), id: v.id("users") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await assertPlatformOwner(ctx, args.superAdminId);
+    if (args.id === args.superAdminId) throw new Error("You cannot delete your own account");
+    const target = await ctx.db.get(args.id);
+    if (!target) throw new Error("Superadmin not found");
+    if (target.role !== "super_admin") throw new Error("That account is not a superadmin");
+    if (isOwnerDoc(target)) throw new Error("The platform owner account cannot be deleted");
+    const org = await platformOrg(ctx);
+    if (target.orgId !== org._id) throw new Error("That account is not a platform admin");
+    await ctx.db.delete(args.id);
+    return { id: args.id };
+  },
+});
+
+/** Platform owner creates a new company org and its first admin account. */
+
 export const listAllOrganizations = query({
   args: { secret: v.string(), superAdminId: v.id("users") },
   handler: async (ctx, args) => {
@@ -196,7 +322,7 @@ export const softDeleteCompany = mutation({
   args: { secret: v.string(), superAdminId: v.id("users"), orgId: v.id("organizations") },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    await assertSuperAdmin(ctx, args.superAdminId);
+    await assertPlatformOwner(ctx, args.superAdminId);
     const org = await ctx.db.get(args.orgId);
     if (!org) throw new Error("Company not found");
     if (org.slug === "__platform") throw new Error("The platform workspace cannot be archived");
@@ -232,7 +358,7 @@ export const purgeCompanyBatch = mutation({
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    await assertSuperAdmin(ctx, args.superAdminId);
+    await assertPlatformOwner(ctx, args.superAdminId);
     const org = await ctx.db.get(args.orgId);
     if (!org) throw new Error("Company not found");
     if (org.slug === "__platform") throw new Error("The platform workspace cannot be deleted");

@@ -8,6 +8,7 @@ import UserMenu from "@/components/UserMenu";
 const NAV = [
   { href: "/admin", label: "Companies", icon: "🏢" },
   { href: "/admin/new", label: "Create company & admin", icon: "➕" },
+  { href: "/admin/superadmins", label: "Platform team", icon: "🛡️" },
   { href: "/admin/features", label: "Modules & features", icon: "🧩" },
   { href: "/admin/subscriptions", label: "Subscriptions", icon: "💰" },
   { href: "/admin/audit", label: "Audit trail", icon: "🕵️" },

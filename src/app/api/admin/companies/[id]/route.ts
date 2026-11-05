@@ -4,6 +4,16 @@ import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { recordAudit } from "@/lib/audit";
 
+async function assertOwner(session: { id: string }) {
+  const { isOwner } = (await cx().query(api.superadmin.isPlatformOwner, {
+    secret: secret(),
+    superAdminId: session.id as never,
+  })) as { isOwner: boolean };
+  if (!isOwner) {
+    throw new HttpError(403, "Only the platform owner can archive or delete a company");
+  }
+}
+
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const session = await requireUser(["super_admin"]);
@@ -19,6 +29,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     if (body.archived !== undefined && typeof body.archived !== "boolean") {
       throw new HttpError(400, "archived must be a boolean");
     }
+    // Archiving is a delete-style action: owner only. Restoring/suspending is allowed.
+    if (body.archived === true) await assertOwner(session);
 
     try {
       if (body.archived !== undefined) {
@@ -69,6 +81,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   return handle(async () => {
     const session = await requireUser(["super_admin"]);
     const { id } = await ctx.params;
+    await assertOwner(session);
     const wantSnapshot = new URL(req.url).searchParams.get("snapshot") !== "0";
 
     let snapshotId: string | null = null;

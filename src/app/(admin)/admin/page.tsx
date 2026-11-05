@@ -163,6 +163,7 @@ export default function CompaniesPage() {
   const [orgs, setOrgs] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
 
   const [pendingOrg, setPendingOrg] = useState<Company | null>(null);
   const [toggleBusy, setToggleBusy] = useState(false);
@@ -214,6 +215,9 @@ export default function CompaniesPage() {
 
   useEffect(() => {
     load();
+    api<{ me: { isOwner: boolean } }>("/api/admin/superadmins")
+      .then((d) => setIsOwner(!!d.me?.isOwner))
+      .catch(() => setIsOwner(false));
     // Keep "last access" fresh in near real time, without replacing the list
     // (which would reset the scroll position while the user is reading).
     const id = setInterval(() => { load(true); }, 30000);
@@ -446,18 +450,24 @@ export default function CompaniesPage() {
                       <MenuItem href={`/admin/audit?orgId=${o.id}`}>Audit trail</MenuItem>
                       <MenuItem href={`/api/admin/companies/${o.id}/backup`}>Download JSON backup</MenuItem>
                       <div className="my-1 border-t border-slate-100" />
-                      <MenuItem onClick={() => setPendingArchive({ ...o, archived: !o.archived })}>
-                        {o.archived ? "Restore company" : "Archive company"}
-                      </MenuItem>
+                      {(isOwner || o.archived) && (
+                        <MenuItem onClick={() => setPendingArchive({ ...o, archived: !o.archived })}>
+                          {o.archived ? "Restore company" : "Archive company"}
+                        </MenuItem>
+                      )}
                       {!o.archived && (
                         <MenuItem onClick={() => setPendingOrg({ ...o, active: !o.active })}>
                           {o.active ? "Suspend logins" : "Reactivate logins"}
                         </MenuItem>
                       )}
-                      <div className="my-1 border-t border-slate-100" />
-                      <MenuItem danger onClick={() => { setPendingDelete(o); setDeleteText(""); }}>
-                        Delete permanently
-                      </MenuItem>
+                      {isOwner && (
+                        <>
+                          <div className="my-1 border-t border-slate-100" />
+                          <MenuItem danger onClick={() => { setPendingDelete(o); setDeleteText(""); }}>
+                            Delete permanently
+                          </MenuItem>
+                        </>
+                      )}
                     </RowMenu>
                   )}
                 </div>
