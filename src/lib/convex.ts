@@ -31,7 +31,10 @@ export function mapConvexError(e: unknown): never {
   } else {
     msg = String(e);
   }
-  msg = msg.replace(/^Uncaught Error: /, "").replace(/^Error: /, "");
+  // Expose only the first line (domain errors are single-line) and cap the
+  // length so stack traces / internal details never reach the client.
+  msg = msg.replace(/^Uncaught Error: /, "").replace(/^Error: /, "").split("\n")[0].trim().slice(0, 300);
+  if (!msg) msg = "Request failed";
   let status = 400;
   if (/not found/i.test(msg)) status = 404;
   else if (/already exists|in use by another account|already have a pending/i.test(msg)) status = 409;

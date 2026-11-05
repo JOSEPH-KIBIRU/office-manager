@@ -12,11 +12,14 @@ Sentry.init({
     if (event.request) {
       delete event.request.cookies;
       delete event.request.data;
+      delete event.request.query_string;
       if (event.request.headers) {
         delete event.request.headers["authorization"];
         delete event.request.headers["cookie"];
       }
     }
+    delete event.user;
+    delete event.extra;
     return event;
   },
 });

@@ -85,10 +85,11 @@ export async function middleware(req: NextRequest) {
   const csp = [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+    "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.convex.cloud https://*.convex.site https://*.ufs.sh https://utfs.io",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.convex.cloud https://*.convex.site https://*.ufs.sh https://*.ingest.sentry.io https://*.sentry.io",
+    "connect-src 'self' https://*.convex.cloud https://*.convex.site https://*.uploadthing.com https://*.ufs.sh https://*.ingest.sentry.io https://*.sentry.io",
     "media-src 'self' blob: https://*.convex.cloud https://*.ufs.sh",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
