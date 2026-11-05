@@ -71,8 +71,8 @@ export const getFileByKey = query({
       .withIndex("by_key", (q) => q.eq("key", args.key))
       .first();
     if (row) {
-      if (row.orgId !== args.orgId || !row.url) return null;
-      return { url: row.url, name: row.name ?? null, type: row.type ?? null };
+      if (row.orgId !== args.orgId) return null;
+      return { url: row.url ?? "", name: row.name ?? null, type: row.type ?? null };
     }
 
     // Files uploaded before the registry was added are still resolvable from

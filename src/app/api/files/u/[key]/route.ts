@@ -5,12 +5,45 @@ import { privateUploadThingAclEnabled, signedUploadThingUrl } from "@/lib/upload
 
 const ALLOWED_HOSTS = /(^|\.)(ufs\.sh|utfs\.io|uploadthing\.com)$/i;
 
+const MIME: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".txt": "text/plain",
+  ".md": "text/plain",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+};
+const INLINE_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/svg+xml",
+  "text/plain",
+]);
+
 function safeFileName(name: string | null | undefined): string {
   return (name || "file")
     .replace(/[\x00-\x1f\x7f"\\/]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 140);
+}
+
+/** Derive a safe content type from the file name; never trust upstream HTML. */
+function safeContentType(name: string | null | undefined, upstream: string | null): string {
+  const dot = (name ?? "").lastIndexOf(".");
+  const ext = dot >= 0 ? (name as string).slice(dot).toLowerCase() : "";
+  if (MIME[ext]) return MIME[ext];
+  const up = (upstream ?? "").split(";")[0].trim().toLowerCase();
+  if (INLINE_TYPES.has(up) || up === "application/octet-stream") return up;
+  return "application/octet-stream";
 }
 
 /**
@@ -41,7 +74,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ key: string
   } catch {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
-  if (!file?.url) {
+  if (!file) {
+    return NextResponse.json({ error: "File not found" }, { status: 404 });
+  }
+  if (!file.url && !privateUploadThingAclEnabled()) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
 
@@ -68,17 +104,19 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ key: string
   }
 
   const headers = new Headers();
-  headers.set(
-    "Content-Type",
-    upstream.headers.get("content-type") ?? file.type ?? "application/octet-stream"
-  );
+  const contentType = safeContentType(file.name, upstream.headers.get("content-type"));
+  headers.set("Content-Type", contentType);
   headers.set("Cache-Control", "private, no-store");
   headers.set("X-Content-Type-Options", "nosniff");
   const download = req.nextUrl.searchParams.get("download") === "1";
+  const inline = !download && INLINE_TYPES.has(contentType);
   headers.set(
     "Content-Disposition",
-    `${download ? "attachment" : "inline"}; filename="${safeFileName(file.name)}"`
+    `${inline ? "inline" : "attachment"}; filename="${safeFileName(file.name)}"`
   );
+  if (contentType === "image/svg+xml") {
+    headers.set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'");
+  }
 
   return new NextResponse(upstream.body, { status: 200, headers });
 }
