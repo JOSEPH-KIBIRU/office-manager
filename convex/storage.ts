@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { assertSecret, tsNow } from "./lib";
 
@@ -55,6 +55,52 @@ export const registerFile = mutation({
       createdAt: tsNow(),
     });
     return true;
+  },
+});
+
+/**
+ * Resolve an UploadThing file key for the authenticated organization. Returns
+ * the CDN URL only to server-side callers (the file proxy), never to clients.
+ */
+export const getFileByKey = query({
+  args: { secret: v.string(), orgId: v.id("organizations"), key: v.string() },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const row = await ctx.db
+      .query("storedFiles")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .first();
+    if (row) {
+      if (row.orgId !== args.orgId || !row.url) return null;
+      return { url: row.url, name: row.name ?? null, type: row.type ?? null };
+    }
+
+    // Files uploaded before the registry was added are still resolvable from
+    // their owning record (documents, minutes, company logo).
+    const doc = await ctx.db
+      .query("documents")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .filter((q) => q.eq(q.field("fileKey"), args.key))
+      .first();
+    if (doc?.fileUrl && /^https:\/\//i.test(doc.fileUrl)) {
+      return { url: doc.fileUrl, name: doc.fileName ?? null, type: null };
+    }
+
+    const minute = await ctx.db
+      .query("minutes")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .filter((q) => q.eq(q.field("fileKey"), args.key))
+      .first();
+    if (minute?.fileUrl && /^https:\/\//i.test(minute.fileUrl)) {
+      return { url: minute.fileUrl, name: minute.fileName ?? null, type: null };
+    }
+
+    const org = await ctx.db.get(args.orgId);
+    if (org?.logoKey === args.key && org.logoUrl && /^https:\/\//i.test(org.logoUrl)) {
+      return { url: org.logoUrl, name: "logo", type: null };
+    }
+
+    return null;
   },
 });
 

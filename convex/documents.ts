@@ -1,13 +1,15 @@
 import { query, mutation, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
-import { assertSecret, requireMember, tsNow } from "./lib";
+import { assertSecret, requireMember, tsNow, uploadThingProxyPath } from "./lib";
 
 const DAY = 86_400_000;
 
 async function enrich(ctx: QueryCtx, d: Doc<"documents">) {
   const user = d.userId ? await ctx.db.get(d.userId) : null;
-  const fileUrl = d.fileUrl ?? (d.fileId ? await ctx.storage.getUrl(d.fileId) : null);
+  const fileUrl = d.fileKey
+    ? uploadThingProxyPath(d.fileKey)
+    : d.fileUrl ?? (d.fileId ? await ctx.storage.getUrl(d.fileId) : null);
   return {
     id: d._id,
     userId: d.userId ?? null,

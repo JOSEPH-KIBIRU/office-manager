@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { assertSecret } from "./lib";
+import { assertSecret, uploadThingProxyPath } from "./lib";
 
 export const getOrganization = query({
   args: { secret: v.string(), orgId: v.id("organizations") },
@@ -8,7 +8,9 @@ export const getOrganization = query({
     assertSecret(args.secret);
     const org = await ctx.db.get(args.orgId);
     if (!org) throw new Error("Organization not found");
-    let logoUrl: string | null = org.logoUrl ?? null;
+    let logoUrl: string | null = org.logoKey
+      ? uploadThingProxyPath(org.logoKey)
+      : org.logoUrl ?? null;
     if (!logoUrl && org.logoFileId) {
       logoUrl = await ctx.storage.getUrl(org.logoFileId);
     }

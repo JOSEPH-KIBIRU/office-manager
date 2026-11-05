@@ -17,7 +17,8 @@ function utapi(): UTApi {
 
 /** Upload a file to UploadThing. The bytes live in UploadThing, not Convex. */
 export async function uploadToUploadThing(file: File): Promise<UploadedFileInfo> {
-  const result = await utapi().uploadFiles(file);
+  const opts = privateUploadThingAclEnabled() ? ({ acl: "private" } as const) : undefined;
+  const result = await utapi().uploadFiles(file, opts);
   if (result.error) throw new Error(result.error.message || "UploadThing upload failed");
   const data = result.data;
   return {
@@ -27,6 +28,17 @@ export async function uploadToUploadThing(file: File): Promise<UploadedFileInfo>
     size: data.size,
     type: data.type,
   };
+}
+
+/** True once the UploadThing app is upgraded and private ACL is enabled. */
+export function privateUploadThingAclEnabled(): boolean {
+  return process.env.UPLOADTHING_PRIVATE === "true";
+}
+
+/** Short-lived signed URL for a private UploadThing file. */
+export async function signedUploadThingUrl(key: string): Promise<string> {
+  const res = await utapi().generateSignedURL(key, { expiresIn: "5m" });
+  return res.ufsUrl;
 }
 
 /** Best-effort delete of one or more UploadThing files. */

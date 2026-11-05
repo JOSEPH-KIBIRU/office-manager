@@ -7,6 +7,7 @@ import type { ApiOrg } from "@/components/OrgBranding";
 import OrgSectionNav from "@/components/org/OrgSectionNav";
 import { useOrgSettings, OrgField, OrgSaveBar } from "@/components/org/useOrgSettings";
 import { useUploadThing } from "@/lib/uploadthing";
+import { uploadThingProxyPath } from "@/lib/fileUrls";
 
 const BRANDING_FIELDS = ["name", "address", "city", "phone", "email", "taxNumber", "website"] as const;
 
@@ -37,7 +38,7 @@ export default function OrganizationPage() {
       if (!result) throw new Error("Upload failed");
       const updated = await api<ApiOrg>("/api/organization", {
         method: "PATCH",
-        json: { logoUrl: result.ufsUrl, logoKey: result.key },
+        json: { logoUrl: uploadThingProxyPath(result.key), logoKey: result.key },
       });
       setLogoUrl(updated.logoUrl || null);
       toast.success("Logo uploaded");

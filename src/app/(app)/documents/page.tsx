@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from "react";
 import { PageHeader, Alert, Modal, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useUploadThing } from "@/lib/uploadthing";
+import { uploadThingProxyPath } from "@/lib/fileUrls";
 
 interface DocRow {
   id: string;
@@ -87,7 +88,7 @@ export default function DocumentsPage() {
       const uploaded = await startUpload([f]);
       const file = uploaded?.[0];
       if (!file) throw new Error("Upload failed");
-      setFile({ name: file.name, url: file.ufsUrl, key: file.key });
+      setFile({ name: file.name, url: uploadThingProxyPath(file.key), key: file.key });
       toast.success("File attached");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");

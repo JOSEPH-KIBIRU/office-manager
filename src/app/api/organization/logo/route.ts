@@ -2,15 +2,17 @@ import { NextRequest } from "next/server";
 import path from "path";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, fail } from "@/lib/api";
+import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { uploadToUploadThing } from "@/lib/uploadthingServer";
+import { uploadThingProxyPath } from "@/lib/fileUrls";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED = [".png", ".jpg", ".jpeg", ".svg", ".webp"];
 
-/** Upload a company logo to UploadThing. Returns { url, key } to persist via PATCH /api/organization. */
+/** Server-side fallback upload (the UI uploads directly via UploadThing). */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    await requirePermission("organization", ["admin", "secretary"]);
+    const session = await requirePermission("organization", ["admin", "secretary"]);
 
     const cl = Number(req.headers.get("content-length") || 0);
     if (cl && cl > MAX_SIZE + 1024 * 1024) return fail(413, "Request body too large");
@@ -26,6 +28,21 @@ export async function POST(req: NextRequest) {
     }
 
     const uploaded = await uploadToUploadThing(file);
-    return ok({ url: uploaded.url, key: uploaded.key });
+    try {
+      await cx().mutation(api.storage.registerFile, {
+        secret: secret(),
+        orgId: session.orgId as never,
+        url: uploaded.url,
+        key: uploaded.key,
+        name: uploaded.name,
+        size: uploaded.size,
+        type: uploaded.type,
+        kind: "logo",
+      });
+    } catch (e) {
+      return mapConvexError(e);
+    }
+
+    return ok({ url: uploadThingProxyPath(uploaded.key), key: uploaded.key });
   });
 }

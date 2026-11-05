@@ -5,6 +5,7 @@ import { PageHeader, StatusBadge, Alert, FieldError, inputCls, api } from "@/com
 import { validate, required, pastOrToday, type Errors } from "@/lib/validation";
 import type { MinuteRow } from "@/lib/types";
 import { useUploadThing } from "@/lib/uploadthing";
+import { uploadThingProxyPath } from "@/lib/fileUrls";
 
 export default function MinutesEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -99,11 +100,20 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
       if (!result) throw new Error("Upload failed");
       await api(`/api/minutes/${id}`, {
         method: "PATCH",
-        json: { file_name: result.name, file_url: result.ufsUrl, file_key: result.key },
+        json: {
+          file_name: result.name,
+          file_url: uploadThingProxyPath(result.key),
+          file_key: result.key,
+        },
       });
       setM((prev) =>
         prev
-          ? { ...prev, file_name: result.name, file_url: result.ufsUrl, file_key: result.key }
+          ? {
+              ...prev,
+              file_name: result.name,
+              file_url: uploadThingProxyPath(result.key),
+              file_key: result.key,
+            }
           : prev
       );
       setNotice("File attached to these minutes.");

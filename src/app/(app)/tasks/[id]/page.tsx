@@ -6,6 +6,7 @@ import { PageHeader, Alert, api, inputCls } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useSession } from "@/components/SessionProvider";
 import { useUploadThing } from "@/lib/uploadthing";
+import { uploadThingProxyPath } from "@/lib/fileUrls";
 
 interface Photo {
   url: string;
@@ -121,7 +122,10 @@ export default function TaskDetailPage() {
     try {
       const uploaded = await startUpload(files);
       if (!uploaded || uploaded.length === 0) throw new Error("Upload failed");
-      setPhotos((prev) => [...prev, ...uploaded.map((f) => ({ url: f.ufsUrl, name: f.name }))]);
+      setPhotos((prev) => [
+        ...prev,
+        ...uploaded.map((f) => ({ url: uploadThingProxyPath(f.key), name: f.name })),
+      ]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {

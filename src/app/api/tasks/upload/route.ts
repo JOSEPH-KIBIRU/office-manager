@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { uploadToUploadThing } from "@/lib/uploadthingServer";
+import { uploadThingProxyPath } from "@/lib/fileUrls";
 
 const MAX_SIZE = 8 * 1024 * 1024; // 8MB
 const ALLOWED = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
@@ -46,6 +47,6 @@ export async function POST(req: NextRequest) {
       return mapConvexError(e);
     }
 
-    return ok({ url: uploaded.url, key: uploaded.key, name: uploaded.name });
+    return ok({ url: uploadThingProxyPath(uploaded.key), key: uploaded.key, name: uploaded.name });
   });
 }

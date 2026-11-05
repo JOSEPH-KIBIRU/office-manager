@@ -11,6 +11,11 @@ export function tsNow(): number {
   return Date.now();
 }
 
+/** Stable same-origin proxy URL for an UploadThing file key. */
+export function uploadThingProxyPath(key: string): string {
+  return `/api/files/u/${encodeURIComponent(key)}`;
+}
+
 export function tsString(ms?: number | null): string {
   return new Date(ms ?? Date.now())
     .toISOString()
@@ -59,7 +64,9 @@ export function fmtCreated(ms: number): string {
 export async function orgBranding(ctx: OrgCtx, orgId: Id<"organizations">) {
   const org = await ctx.db.get(orgId);
   if (!org || !org.active) return null;
-  let logoUrl: string | null = org.logoUrl ?? null;
+  let logoUrl: string | null = org.logoKey
+    ? uploadThingProxyPath(org.logoKey)
+    : org.logoUrl ?? null;
   if (!logoUrl && org.logoFileId) {
     logoUrl = (await ctx.storage.getUrl(org.logoFileId)) ?? null;
   }

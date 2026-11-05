@@ -2,7 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, fmtCreated, requireMember } from "./lib";
+import { assertSecret, tsNow, fmtCreated, requireMember, uploadThingProxyPath } from "./lib";
 
 type MinuteDoc = Doc<"minutes">;
 
@@ -18,7 +18,9 @@ async function assertMeetingInOrg(
 
 async function enrich(ctx: QueryCtx, m: MinuteDoc) {
   const author = await ctx.db.get(m.writtenBy);
-  const fileUrl = m.fileUrl ?? (m.fileId ? await ctx.storage.getUrl(m.fileId) : null);
+  const fileUrl = m.fileKey
+    ? uploadThingProxyPath(m.fileKey)
+    : m.fileUrl ?? (m.fileId ? await ctx.storage.getUrl(m.fileId) : null);
   return {
     id: m._id,
     meeting_id: m.meetingId ?? null,
