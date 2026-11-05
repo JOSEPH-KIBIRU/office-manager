@@ -112,8 +112,8 @@ export default function MinutesPage() {
                 <td>{m.meeting_date ?? "—"}</td>
                 <td><StatusBadge status={m.status} /></td>
                 <td>
-                  {m.file_name && m.file_path ? (
-                    <a href={`/api/files/${m.file_path}`} className="text-blue-700 hover:underline">📎 {m.file_name}</a>
+                  {m.file_name && (m.file_url || m.file_path) ? (
+                    <a href={m.file_url || `/api/files/${m.file_path}`} className="text-blue-700 hover:underline">📎 {m.file_name}</a>
                   ) : (
                     <span className="text-slate-400">{m.ai_generated ? "AI-assisted" : "Typed"}</span>
                   )}

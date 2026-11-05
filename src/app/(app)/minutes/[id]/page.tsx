@@ -4,10 +4,12 @@ import { use, useEffect, useRef, useState } from "react";
 import { PageHeader, StatusBadge, Alert, FieldError, inputCls, api } from "@/components/ui";
 import { validate, required, pastOrToday, type Errors } from "@/lib/validation";
 import type { MinuteRow } from "@/lib/types";
+import { useUploadThing } from "@/lib/uploadthing";
 
 export default function MinutesEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { startUpload } = useUploadThing("minutesFile");
 
   const [m, setM] = useState<MinuteRow | null>(null);
   const [title, setTitle] = useState("");
@@ -92,16 +94,18 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
     setBusy(true);
     setError(null);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/minutes/upload", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload failed");
+      const uploaded = await startUpload([file]);
+      const result = uploaded?.[0];
+      if (!result) throw new Error("Upload failed");
       await api(`/api/minutes/${id}`, {
         method: "PATCH",
-        json: { file_name: data.file_name, file_path: data.file_path },
+        json: { file_name: result.name, file_url: result.ufsUrl, file_key: result.key },
       });
-      setM((prev) => (prev ? { ...prev, file_name: data.file_name, file_path: data.file_path } : prev));
+      setM((prev) =>
+        prev
+          ? { ...prev, file_name: result.name, file_url: result.ufsUrl, file_key: result.key }
+          : prev
+      );
       setNotice("File attached to these minutes.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -144,8 +148,8 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
               <label className="label" htmlFor="md-attach">Attachment</label>
               <input id="md-attach" ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg" className="input py-1.5"
                 onChange={(e) => e.target.files?.[0] && uploadFile(e.target.files[0])} />
-              {m?.file_path && (
-                <a href={`/api/files/${m.file_path}`} className="mt-1 inline-block text-xs text-blue-700 hover:underline">
+              {(m?.file_url || m?.file_path) && (
+                <a href={m.file_url || `/api/files/${m.file_path}`} className="mt-1 inline-block text-xs text-blue-700 hover:underline">
                   📎 Download current: {m.file_name}
                 </a>
               )}
@@ -190,8 +194,8 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
             <button onClick={() => save("draft")} className="btn-secondary" disabled={busy}>Save draft</button>
             <button onClick={() => save("final")} className="btn-success" disabled={busy}>Mark final</button>
             <a href={`/minutes/${id}/print`} target="_blank" className="btn-secondary ml-auto">Download / print as PDF</a>
-            {m?.file_path && (
-              <a href={`/api/files/${m.file_path}`} className="btn-secondary">Download attachment</a>
+            {(m?.file_url || m?.file_path) && (
+              <a href={m.file_url || `/api/files/${m.file_path}`} className="btn-secondary">Download attachment</a>
             )}
           </div>
         </section>

@@ -19,19 +19,38 @@ export const registerFile = mutation({
   args: {
     secret: v.string(),
     orgId: v.id("organizations"),
-    storageId: v.id("_storage"),
+    storageId: v.optional(v.id("_storage")),
+    url: v.optional(v.string()),
+    key: v.optional(v.string()),
+    name: v.optional(v.string()),
+    size: v.optional(v.number()),
+    type: v.optional(v.string()),
     kind: v.union(v.literal("logo"), v.literal("minutes"), v.literal("task"), v.literal("other")),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    const existing = await ctx.db
-      .query("storedFiles")
-      .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
-      .first();
-    if (existing) return true;
+    if (args.storageId) {
+      const existing = await ctx.db
+        .query("storedFiles")
+        .withIndex("by_storage", (q) => q.eq("storageId", args.storageId))
+        .first();
+      if (existing) return true;
+    }
+    if (args.key) {
+      const existing = await ctx.db
+        .query("storedFiles")
+        .withIndex("by_key", (q) => q.eq("key", args.key))
+        .first();
+      if (existing) return true;
+    }
     await ctx.db.insert("storedFiles", {
       orgId: args.orgId,
       storageId: args.storageId,
+      url: args.url,
+      key: args.key,
+      name: args.name,
+      size: args.size,
+      type: args.type,
       kind: args.kind,
       createdAt: tsNow(),
     });
@@ -53,7 +72,11 @@ export const getFileUrl = mutation({
       .query("storedFiles")
       .withIndex("by_storage", (q) => q.eq("storageId", args.id))
       .first();
-    if (row) return row.orgId === args.orgId ? await ctx.storage.getUrl(args.id) : null;
+    if (row) {
+      if (row.orgId !== args.orgId) return null;
+      if (row.url) return row.url;
+      return row.storageId ? await ctx.storage.getUrl(row.storageId) : null;
+    }
 
     // Legacy fallback: not yet registered to any org, but referenced by this org.
     const org = await ctx.db.get(args.orgId);

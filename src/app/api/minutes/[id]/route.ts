@@ -3,6 +3,7 @@ import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { deleteUploadThingFiles } from "@/lib/uploadthingServer";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
@@ -40,6 +41,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       meeting_id?: string | number | null;
       file_name?: string | null;
       file_path?: string | null;
+      file_url?: string | null;
+      file_key?: string | null;
       ai_generated?: boolean;
     }>(req);
 
@@ -62,8 +65,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         meetingId: (body.meeting_id ? String(body.meeting_id) : undefined) as never,
         fileName: body.file_name ?? undefined,
         fileId: (body.file_path || undefined) as never,
+        fileUrl: body.file_url === undefined ? undefined : body.file_url,
+        fileKey: body.file_key === undefined ? undefined : body.file_key,
         aiGenerated: body.ai_generated ? true : undefined,
       });
+      if (existing.file_key && body.file_key !== undefined && existing.file_key !== body.file_key) {
+        await deleteUploadThingFiles(existing.file_key);
+      }
     } catch (e) {
       return mapConvexError(e);
     }
@@ -82,11 +90,14 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
     const session = await requirePermission("minutes", ["admin", "secretary"]);
     const { id } = await ctx.params;
     try {
-      await cx().mutation(api.minutes.deleteMinute, {
+      const res = await cx().mutation(api.minutes.deleteMinute, {
         secret: secret(),
         orgId: session.orgId as never,
         id: id as never,
       });
+      if (res && typeof res === "object" && "fileKey" in res && res.fileKey) {
+        await deleteUploadThingFiles(res.fileKey as string);
+      }
       return ok();
     } catch (e) {
       return mapConvexError(e);

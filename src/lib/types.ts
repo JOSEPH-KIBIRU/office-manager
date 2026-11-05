@@ -190,6 +190,8 @@ export interface MinuteRow {
   content: string;
   file_name: string | null;
   file_path: string | null;
+  file_url?: string | null;
+  file_key?: string | null;
   ai_generated: number;
   status: "draft" | "final";
   written_by: string;

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { deleteUploadThingFiles } from "@/lib/uploadthingServer";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   return handle(async () => {
@@ -13,6 +14,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       category?: "contract" | "license" | "insurance" | "certificate" | "other";
       issuedDate?: string | null;
       expiryDate?: string | null;
+      fileName?: string | null;
+      fileUrl?: string | null;
+      fileKey?: string | null;
       notes?: string | null;
     }>(req);
 
@@ -26,6 +30,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         category: body.category,
         issuedDate: body.issuedDate,
         expiryDate: body.expiryDate,
+        fileName: body.fileName,
+        fileUrl: body.fileUrl,
+        fileKey: body.fileKey,
         notes: body.notes,
       });
       return ok(res);
@@ -45,6 +52,9 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
         orgId: session.orgId as never,
         id: id as never,
       });
+      if (res && typeof res === "object" && "fileKey" in res && res.fileKey) {
+        await deleteUploadThingFiles(res.fileKey as string);
+      }
       return ok(res);
     } catch (e) {
       return mapConvexError(e);

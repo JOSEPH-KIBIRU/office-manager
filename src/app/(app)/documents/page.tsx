@@ -3,6 +3,7 @@
 import { useEffect, useState, FormEvent } from "react";
 import { PageHeader, Alert, Modal, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
+import { useUploadThing } from "@/lib/uploadthing";
 
 interface DocRow {
   id: string;
@@ -35,6 +36,7 @@ function statusOf(expiry: string | null) {
 
 export default function DocumentsPage() {
   const toast = useToast();
+  const { startUpload } = useUploadThing("document");
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [staff, setStaff] = useState<StaffOption[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export default function DocumentsPage() {
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<DocRow | null>(null);
-  const [file, setFile] = useState<{ name: string; path: string } | null>(null);
+  const [file, setFile] = useState<{ name: string; url: string; key: string } | null>(null);
   const [fileBusy, setFileBusy] = useState(false);
 
   async function load() {
@@ -82,13 +84,10 @@ export default function DocumentsPage() {
   async function uploadFile(f: File) {
     setFileBusy(true);
     try {
-      const fd = new FormData();
-      fd.append("file", f);
-      const res = await api<{ file_name: string; file_path: string }>("/api/documents/upload", {
-        method: "POST",
-        body: fd,
-      });
-      setFile({ name: res.file_name, path: res.file_path });
+      const uploaded = await startUpload([f]);
+      const file = uploaded?.[0];
+      if (!file) throw new Error("Upload failed");
+      setFile({ name: file.name, url: file.ufsUrl, key: file.key });
       toast.success("File attached");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -112,7 +111,8 @@ export default function DocumentsPage() {
             expiryDate: form.expiryDate || undefined,
             notes: form.notes || undefined,
             fileName: file?.name,
-            fileId: file?.path,
+            fileUrl: file?.url,
+            fileKey: file?.key,
           },
         });
         toast.success("Document added");

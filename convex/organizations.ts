@@ -8,8 +8,8 @@ export const getOrganization = query({
     assertSecret(args.secret);
     const org = await ctx.db.get(args.orgId);
     if (!org) throw new Error("Organization not found");
-    let logoUrl: string | null = null;
-    if (org.logoFileId) {
+    let logoUrl: string | null = org.logoUrl ?? null;
+    if (!logoUrl && org.logoFileId) {
       logoUrl = await ctx.storage.getUrl(org.logoFileId);
     }
     return {
@@ -20,6 +20,7 @@ export const getOrganization = query({
       deletedAt: org.deletedAt ?? null,
       logoFileId: org.logoFileId ?? null,
       logoUrl,
+      logoKey: org.logoKey ?? null,
       address: org.address ?? "",
       city: org.city ?? "",
       phone: org.phone ?? "",
@@ -77,6 +78,8 @@ export const updateOrganization = mutation({
     orgId: v.id("organizations"),
     name: v.optional(v.string()),
     logoFileId: v.optional(v.union(v.id("_storage"), v.null())),
+    logoUrl: v.optional(v.union(v.string(), v.null())),
+    logoKey: v.optional(v.union(v.string(), v.null())),
     address: v.optional(v.union(v.string(), v.null())),
     city: v.optional(v.union(v.string(), v.null())),
     phone: v.optional(v.union(v.string(), v.null())),
@@ -116,6 +119,12 @@ export const updateOrganization = mutation({
       patch.name = args.name.trim();
     }
     if (args.logoFileId !== undefined) patch.logoFileId = args.logoFileId;
+    if (args.logoUrl !== undefined) {
+      patch.logoUrl = args.logoUrl ?? undefined;
+      // A new UploadThing logo replaces any legacy Convex logo.
+      patch.logoFileId = undefined;
+    }
+    if (args.logoKey !== undefined) patch.logoKey = args.logoKey ?? undefined;
     if (args.address !== undefined) patch.address = (args.address ?? "").trim() || undefined;
     if (args.city !== undefined) patch.city = (args.city ?? "").trim() || undefined;
     if (args.phone !== undefined) patch.phone = (args.phone ?? "").trim() || undefined;

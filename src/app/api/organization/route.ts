@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/permissionGuard";
 import { HttpError } from "@/lib/auth";
 import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
+import { deleteUploadThingFiles } from "@/lib/uploadthingServer";
 
 /**
  * Organization branding.
@@ -43,6 +44,8 @@ export async function PATCH(req: NextRequest) {
       if (body[k] !== undefined) input[k] = body[k];
     }
     if (body.logoFileId !== undefined) input.logoFileId = body.logoFileId;
+    if (body.logoUrl !== undefined) input.logoUrl = body.logoUrl === null ? null : String(body.logoUrl);
+    if (body.logoKey !== undefined) input.logoKey = body.logoKey === null ? null : String(body.logoKey);
 
     // Validate the eTIMS endpoint at save time too (the request-time guard also
     // blocks private/reserved addresses and redirects).
@@ -62,12 +65,21 @@ export async function PATCH(req: NextRequest) {
       input.etimsBaseUrl = u.toString().replace(/\/$/, "");
     }
 
-    if (!("name" in input) && !("logoFileId" in input) && !allowed.some((k) => input[k] !== undefined)) {
+    if (!("name" in input) && !("logoFileId" in input) && !("logoUrl" in input) && !("logoKey" in input) && !allowed.some((k) => input[k] !== undefined)) {
       return fail(400, "No fields to update");
     }
 
     try {
+      const before = await cx().query(api.organizations.getOrganization, {
+        secret: secret(),
+        orgId: session.orgId as never,
+      });
       await cx().mutation(api.organizations.updateOrganization, input as never);
+      // Replacing/removing a logo leaves the old UploadThing file orphaned.
+      const clearsLogo = body.logoUrl !== undefined || body.logoFileId !== undefined;
+      if (clearsLogo && before.logoKey && before.logoKey !== input.logoKey) {
+        await deleteUploadThingFiles(before.logoKey);
+      }
     } catch (e) {
       return mapConvexError(e);
     }

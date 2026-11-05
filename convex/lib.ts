@@ -59,8 +59,8 @@ export function fmtCreated(ms: number): string {
 export async function orgBranding(ctx: OrgCtx, orgId: Id<"organizations">) {
   const org = await ctx.db.get(orgId);
   if (!org || !org.active) return null;
-  let logoUrl: string | null = null;
-  if (org.logoFileId) {
+  let logoUrl: string | null = org.logoUrl ?? null;
+  if (!logoUrl && org.logoFileId) {
     logoUrl = (await ctx.storage.getUrl(org.logoFileId)) ?? null;
   }
   return {

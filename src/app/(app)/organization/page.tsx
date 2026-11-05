@@ -6,6 +6,7 @@ import { useToast } from "@/components/toast";
 import type { ApiOrg } from "@/components/OrgBranding";
 import OrgSectionNav from "@/components/org/OrgSectionNav";
 import { useOrgSettings, OrgField, OrgSaveBar } from "@/components/org/useOrgSettings";
+import { useUploadThing } from "@/lib/uploadthing";
 
 const BRANDING_FIELDS = ["name", "address", "city", "phone", "email", "taxNumber", "website"] as const;
 
@@ -16,6 +17,7 @@ export default function OrganizationPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const toast = useToast();
+  const { startUpload } = useUploadThing("logo");
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
@@ -30,15 +32,12 @@ export default function OrganizationPage() {
   async function uploadLogo(file: File) {
     setLogoBusy(true);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const res = await api<{ storageId: string }>("/api/organization/logo", {
-        method: "POST",
-        body: form,
-      });
+      const uploaded = await startUpload([file]);
+      const result = uploaded?.[0];
+      if (!result) throw new Error("Upload failed");
       const updated = await api<ApiOrg>("/api/organization", {
         method: "PATCH",
-        json: { logoFileId: res.storageId },
+        json: { logoUrl: result.ufsUrl, logoKey: result.key },
       });
       setLogoUrl(updated.logoUrl || null);
       toast.success("Logo uploaded");
@@ -54,7 +53,7 @@ export default function OrganizationPage() {
     try {
       const updated = await api<ApiOrg>("/api/organization", {
         method: "PATCH",
-        json: { logoFileId: null },
+        json: { logoUrl: null, logoKey: null, logoFileId: null },
       });
       setLogoUrl(updated.logoUrl || null);
       toast.success("Logo removed");

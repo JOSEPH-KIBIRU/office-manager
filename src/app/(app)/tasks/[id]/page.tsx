@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { PageHeader, Alert, api, inputCls } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useSession } from "@/components/SessionProvider";
+import { useUploadThing } from "@/lib/uploadthing";
 
 interface Photo {
   url: string;
@@ -78,6 +79,7 @@ export default function TaskDetailPage() {
   const [location, setLocation] = useState("");
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [uploading, setUploading] = useState(false);
+  const { startUpload } = useUploadThing("taskImage");
 
   // review / comment
   const [remark, setRemark] = useState("");
@@ -117,15 +119,9 @@ export default function TaskDetailPage() {
     if (files.length === 0) return;
     setUploading(true);
     try {
-      for (const file of files) {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await api<{ url: string; name: string }>("/api/tasks/upload", {
-          method: "POST",
-          body: fd,
-        });
-        setPhotos((prev) => [...prev, { url: res.url, name: res.name }]);
-      }
+      const uploaded = await startUpload(files);
+      if (!uploaded || uploaded.length === 0) throw new Error("Upload failed");
+      setPhotos((prev) => [...prev, ...uploaded.map((f) => ({ url: f.ufsUrl, name: f.name }))]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
     } finally {

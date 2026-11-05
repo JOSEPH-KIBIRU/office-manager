@@ -7,7 +7,7 @@ const DAY = 86_400_000;
 
 async function enrich(ctx: QueryCtx, d: Doc<"documents">) {
   const user = d.userId ? await ctx.db.get(d.userId) : null;
-  const fileUrl = d.fileId ? await ctx.storage.getUrl(d.fileId) : null;
+  const fileUrl = d.fileUrl ?? (d.fileId ? await ctx.storage.getUrl(d.fileId) : null);
   return {
     id: d._id,
     userId: d.userId ?? null,
@@ -60,6 +60,8 @@ export const createDocument = mutation({
     expiryDate: v.optional(v.string()),
     fileName: v.optional(v.string()),
     fileId: v.optional(v.id("_storage")),
+    fileUrl: v.optional(v.string()),
+    fileKey: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -74,6 +76,8 @@ export const createDocument = mutation({
       expiryDate: args.expiryDate || undefined,
       fileName: args.fileName?.trim() || undefined,
       fileId: args.fileId,
+      fileUrl: args.fileUrl,
+      fileKey: args.fileKey,
       notes: args.notes?.trim() || undefined,
       createdAt: tsNow(),
       updatedAt: tsNow(),
@@ -99,6 +103,9 @@ export const updateDocument = mutation({
     ),
     issuedDate: v.optional(v.union(v.string(), v.null())),
     expiryDate: v.optional(v.union(v.string(), v.null())),
+    fileName: v.optional(v.union(v.string(), v.null())),
+    fileUrl: v.optional(v.union(v.string(), v.null())),
+    fileKey: v.optional(v.union(v.string(), v.null())),
     notes: v.optional(v.union(v.string(), v.null())),
   },
   handler: async (ctx, args) => {
@@ -111,6 +118,9 @@ export const updateDocument = mutation({
     if (args.category !== undefined) patch.category = args.category;
     if (args.issuedDate !== undefined) patch.issuedDate = (args.issuedDate ?? "") || undefined;
     if (args.expiryDate !== undefined) patch.expiryDate = (args.expiryDate ?? "") || undefined;
+    if (args.fileName !== undefined) patch.fileName = (args.fileName ?? "").trim() || undefined;
+    if (args.fileUrl !== undefined) patch.fileUrl = args.fileUrl ?? undefined;
+    if (args.fileKey !== undefined) patch.fileKey = args.fileKey ?? undefined;
     if (args.notes !== undefined) patch.notes = (args.notes ?? "").trim() || undefined;
     await ctx.db.patch(args.id, patch);
     return true;
@@ -131,7 +141,7 @@ export const deleteDocument = mutation({
       }
     }
     await ctx.db.delete(args.id);
-    return true;
+    return { ok: true, fileKey: doc.fileKey ?? null };
   },
 });
 

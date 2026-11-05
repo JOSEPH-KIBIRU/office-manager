@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
       expiryDate?: string;
       fileName?: string;
       fileId?: string;
+      fileUrl?: string;
+      fileKey?: string;
       notes?: string;
     }>(req);
     requireFields(body, ["title", "category"]);
@@ -47,6 +49,8 @@ export async function POST(req: NextRequest) {
         expiryDate: body.expiryDate,
         fileName: body.fileName,
         fileId: (body.fileId || undefined) as never,
+        fileUrl: body.fileUrl,
+        fileKey: body.fileKey,
         notes: body.notes,
       });
       return ok({ id });

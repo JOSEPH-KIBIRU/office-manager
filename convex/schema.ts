@@ -9,6 +9,8 @@ export default defineSchema(
     active: v.boolean(),
     createdAt: v.number(),
     logoFileId: v.optional(v.union(v.id("_storage"), v.null())),
+    logoUrl: v.optional(v.union(v.string(), v.null())),
+    logoKey: v.optional(v.union(v.string(), v.null())),
     address: v.optional(v.string()),
     city: v.optional(v.string()),
     phone: v.optional(v.string()),
@@ -171,6 +173,8 @@ export default defineSchema(
     expiryDate: v.optional(v.string()),
     fileName: v.optional(v.string()),
     fileId: v.optional(v.id("_storage")),
+    fileUrl: v.optional(v.string()),
+    fileKey: v.optional(v.string()),
     notes: v.optional(v.string()),
     remLastAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -257,6 +261,8 @@ export default defineSchema(
     content: v.string(),
     fileName: v.optional(v.string()),
     fileId: v.optional(v.id("_storage")),
+    fileUrl: v.optional(v.string()),
+    fileKey: v.optional(v.string()),
     aiGenerated: v.boolean(),
     status: v.union(v.literal("draft"), v.literal("final")),
     writtenBy: v.id("users"),
@@ -635,12 +641,18 @@ export default defineSchema(
 
   storedFiles: defineTable({
     orgId: v.id("organizations"),
-    storageId: v.id("_storage"),
+    storageId: v.optional(v.id("_storage")),
+    url: v.optional(v.string()),
+    key: v.optional(v.string()),
+    name: v.optional(v.string()),
+    size: v.optional(v.number()),
+    type: v.optional(v.string()),
     kind: v.union(v.literal("logo"), v.literal("minutes"), v.literal("task"), v.literal("other")),
     createdAt: v.number(),
   })
     .index("by_org", ["orgId"])
-    .index("by_storage", ["storageId"]),
+    .index("by_storage", ["storageId"])
+    .index("by_key", ["key"]),
 
   tasks: defineTable({
     orgId: v.id("organizations"),

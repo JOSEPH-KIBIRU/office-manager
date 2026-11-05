@@ -18,6 +18,7 @@ async function assertMeetingInOrg(
 
 async function enrich(ctx: QueryCtx, m: MinuteDoc) {
   const author = await ctx.db.get(m.writtenBy);
+  const fileUrl = m.fileUrl ?? (m.fileId ? await ctx.storage.getUrl(m.fileId) : null);
   return {
     id: m._id,
     meeting_id: m.meetingId ?? null,
@@ -28,6 +29,8 @@ async function enrich(ctx: QueryCtx, m: MinuteDoc) {
     content: m.content,
     file_name: m.fileName ?? null,
     file_path: m.fileId ?? null,
+    file_url: fileUrl,
+    file_key: m.fileKey ?? null,
     ai_generated: m.aiGenerated ? 1 : 0,
     status: m.status,
     written_by: m.writtenBy,
@@ -73,6 +76,8 @@ export const createMinute = mutation({
     meetingId: v.optional(v.id("meetings")),
     fileName: v.optional(v.string()),
     fileId: v.optional(v.id("_storage")),
+    fileUrl: v.optional(v.string()),
+    fileKey: v.optional(v.string()),
     aiGenerated: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -89,6 +94,8 @@ export const createMinute = mutation({
       meetingId: args.meetingId,
       fileName: args.fileName,
       fileId: args.fileId,
+      fileUrl: args.fileUrl,
+      fileKey: args.fileKey,
       aiGenerated: args.aiGenerated,
       status: "draft",
       writtenBy: args.writtenBy,
@@ -112,8 +119,10 @@ export const updateMinute = mutation({
     status: v.optional(v.union(v.literal("draft"), v.literal("final"))),
     meetingIdSet: v.boolean(),
     meetingId: v.optional(v.union(v.id("meetings"), v.null())),
-    fileName: v.optional(v.string()),
-    fileId: v.optional(v.id("_storage")),
+    fileName: v.optional(v.union(v.string(), v.null())),
+    fileId: v.optional(v.union(v.id("_storage"), v.null())),
+    fileUrl: v.optional(v.union(v.string(), v.null())),
+    fileKey: v.optional(v.union(v.string(), v.null())),
     aiGenerated: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -133,8 +142,10 @@ export const updateMinute = mutation({
     if (args.content !== undefined) patch.content = args.content;
     if (args.status !== undefined) patch.status = args.status;
     if (args.meetingIdSet) patch.meetingId = args.meetingId ?? undefined;
-    if (args.fileName !== undefined) patch.fileName = args.fileName;
-    if (args.fileId !== undefined) patch.fileId = args.fileId;
+    if (args.fileName !== undefined) patch.fileName = args.fileName ?? undefined;
+    if (args.fileId !== undefined) patch.fileId = args.fileId ?? undefined;
+    if (args.fileUrl !== undefined) patch.fileUrl = args.fileUrl ?? undefined;
+    if (args.fileKey !== undefined) patch.fileKey = args.fileKey ?? undefined;
     if (args.aiGenerated) patch.aiGenerated = true;
 
     await ctx.db.patch(row._id, patch);
@@ -150,6 +161,6 @@ export const deleteMinute = mutation({
     if (!row || row.orgId !== args.orgId) return true;
     if (row.fileId) await ctx.storage.delete(row.fileId);
     await ctx.db.delete(args.id);
-    return true;
+    return { ok: true, fileKey: row.fileKey ?? null };
   },
 });

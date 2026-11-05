@@ -30,6 +30,8 @@ export async function POST(req: NextRequest) {
       meeting_id?: string | null;
       file_name?: string | null;
       file_path?: string | null;
+      file_url?: string | null;
+      file_key?: string | null;
     }>(req);
     requireFields(body, ["title"]);
 
@@ -47,6 +49,8 @@ export async function POST(req: NextRequest) {
         meetingId: (body.meeting_id ? String(body.meeting_id) : undefined) as never,
         fileName: body.file_name || undefined,
         fileId: (body.file_path || undefined) as never,
+        fileUrl: body.file_url || undefined,
+        fileKey: body.file_key || undefined,
         aiGenerated: false,
       });
     } catch (e) {

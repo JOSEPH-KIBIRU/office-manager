@@ -106,23 +106,23 @@ export async function buildOrgExport(ctx: any, orgId: any) {
   // Attach resolvable URLs for stored binaries (best-effort).
   const files = (data["storedFiles"] as any[]) ?? [];
   for (const f of files) {
+    if (f.url) continue;
     try {
-      f.url = await ctx.storage.getUrl(f.storageId);
+      f.url = f.storageId ? await ctx.storage.getUrl(f.storageId) : null;
     } catch {
       f.url = null;
     }
   }
   const minutes = (data["minutes"] as any[]) ?? [];
   for (const m of minutes) {
-    if (m.fileId) {
-      try {
-        m.fileUrl = await ctx.storage.getUrl(m.fileId);
-      } catch {
-        m.fileUrl = null;
-      }
+    if (m.fileUrl || !m.fileId) continue;
+    try {
+      m.fileUrl = await ctx.storage.getUrl(m.fileId);
+    } catch {
+      m.fileUrl = null;
     }
   }
-  if (org?.logoFileId) {
+  if (org && !org.logoUrl && org.logoFileId) {
     try {
       (org as any).logoUrl = await ctx.storage.getUrl(org.logoFileId);
     } catch {

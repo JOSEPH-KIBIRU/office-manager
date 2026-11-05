@@ -19,7 +19,7 @@ export const status = query({
     const invoices = await ctx.db.query("invoices").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
 
     return {
-      branding: !!(org.logoFileId || (org.address && org.address.trim()) || (org.phone && org.phone.trim())),
+      branding: !!(org.logoUrl || org.logoFileId || (org.address && org.address.trim()) || (org.phone && org.phone.trim())),
       team: users.filter((u) => u.role !== "super_admin").length,
       departments: departments.length,
       payrolls: payrolls.length,
