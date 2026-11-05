@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Spinner from "@/components/Spinner";
+import { postLoginPath } from "@/lib/postLogin";
 
 interface LoginResult {
   role?: string;
@@ -39,9 +40,7 @@ export default function LoginForm() {
     } catch {
       /* ignore */
     }
-    router.replace(
-      data.mustChangePassword ? "/change-password" : data.termsAgreedAt ? "/dashboard" : "/accept-terms"
-    );
+    router.replace(postLoginPath(data));
     router.refresh();
   }
 

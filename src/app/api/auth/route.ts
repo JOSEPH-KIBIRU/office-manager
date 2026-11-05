@@ -4,7 +4,7 @@ import { setSessionCookie, clearSessionCookie, requireUser, HttpError, signTwoFa
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError, ensureAppInit } from "@/lib/convex";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
-import { TERMS_BASELINE_VERSION } from "@/lib/terms";
+import { TERMS_BASELINE_VERSION, TERMS_VERSION } from "@/lib/terms";
 import { recordAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const termsAgreedAt = user.role === "super_admin" ? true : !!user.termsAgreedAt;
     await setSessionCookie({
       id: user._id,
       orgId: user.orgId,
@@ -95,8 +96,8 @@ export async function POST(req: NextRequest) {
       email: user.email,
       role: user.role,
       mustChangePassword: !!user.mustChangePassword,
-      termsAgreedAt: !!user.termsAgreedAt,
-      termsVersion,
+      termsAgreedAt,
+      termsVersion: user.role === "super_admin" ? TERMS_VERSION : termsVersion,
       sessionVersion: user.sessionVersion ?? 0,
     });
 
@@ -117,7 +118,7 @@ export async function POST(req: NextRequest) {
       ip
     );
 
-    return ok({ role: user.role, mustChangePassword: !!user.mustChangePassword, termsAgreedAt: !!user.termsAgreedAt });
+    return ok({ role: user.role, mustChangePassword: !!user.mustChangePassword, termsAgreedAt });
   });
 }
 
