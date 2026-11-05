@@ -4,10 +4,16 @@ import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { notifySuperAdminOfEnquiry } from "@/lib/notify";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { allowDistributed } from "@/lib/distributedRateLimit";
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    if (!rateLimit({ key: `enquiry:${clientIp(req)}`, limit: 5, windowMs: 5 * 60_000 })) {
+    const ip = clientIp(req);
+    if (!rateLimit({ key: `enquiry:${ip}`, limit: 5, windowMs: 5 * 60_000 })) {
+      throw new HttpError(429, "Too many messages. Please try again in a few minutes.");
+    }
+    const gate = await allowDistributed(`enquiry:${ip}`, 10, 5 * 60_000);
+    if (!gate.allowed) {
       throw new HttpError(429, "Too many messages. Please try again in a few minutes.");
     }
     const body = await readJson<{

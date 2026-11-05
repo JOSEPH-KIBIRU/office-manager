@@ -4,7 +4,8 @@ import { setSessionCookie, verifyTwoFactorChallenge, HttpError } from "@/lib/aut
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { verifyTotp } from "@/lib/totp";
-import { decryptTotpSecret } from "@/lib/twofaSecret";
+import { decryptTotpSecret, encryptTotpSecret } from "@/lib/twofaSecret";
+import { decryptToken } from "@/lib/email/crypto";
 import { TERMS_BASELINE_VERSION, TERMS_VERSION } from "@/lib/terms";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
 import { allowDistributed } from "@/lib/distributedRateLimit";
@@ -62,6 +63,28 @@ export async function POST(req: NextRequest) {
       }
     }
     if (!okTotp && !okRecovery) throw new HttpError(400, "Invalid code. Try again or use a recovery code.");
+
+    // Migrate legacy plaintext TOTP secrets to encrypted-at-rest on success.
+    if (okTotp && user.twoFactorSecret && totpSecret) {
+      let legacyPlaintext = false;
+      try {
+        decryptToken(user.twoFactorSecret);
+      } catch {
+        legacyPlaintext = true;
+      }
+      if (legacyPlaintext) {
+        try {
+          await cx().mutation(api.twofa.setPendingSecret, {
+            secret: secret(),
+            orgId: challenge.orgId as never,
+            userId: challenge.userId as never,
+            twoFactorSecret: encryptTotpSecret(totpSecret),
+          });
+        } catch {
+          /* non-fatal: 2FA still succeeds */
+        }
+      }
+    }
 
     if (okRecovery && usedHash) {
       const remaining = (user.twoFactorRecoveryHashes ?? []).filter((h) => h !== usedHash);

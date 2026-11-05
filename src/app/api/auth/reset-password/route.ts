@@ -4,6 +4,7 @@ import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { HttpError } from "@/lib/auth";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { allowDistributed } from "@/lib/distributedRateLimit";
 import { passwordProblem } from "@/lib/passwordPolicy";
 
 /** Verify the SMS code and set a new password. */
@@ -22,7 +23,12 @@ export async function POST(req: NextRequest) {
 
     // Generous per IP (offices often share one), strict per-account attempt
     // limits are enforced on the reset record below.
-    if (!rateLimit({ key: `reset:ip:${clientIp(req)}`, limit: 40, windowMs: 15 * 60_000 })) {
+    const ip = clientIp(req);
+    if (!rateLimit({ key: `reset:ip:${ip}`, limit: 40, windowMs: 15 * 60_000 })) {
+      throw new HttpError(429, "Too many attempts. Please try again later.");
+    }
+    const gate = await allowDistributed(`reset:ip:${ip}`, 60, 15 * 60_000);
+    if (!gate.allowed) {
       throw new HttpError(429, "Too many attempts. Please try again later.");
     }
 

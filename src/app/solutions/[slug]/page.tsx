@@ -16,7 +16,7 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
     <main className="min-h-screen bg-white text-slate-800">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(getSolutionPageJsonLd(solution)) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(getSolutionPageJsonLd(solution)).replace(/</g, "\\u003c") }}
       />
 
       {/* Top nav */}

@@ -2,15 +2,12 @@ import "server-only";
 import { decryptToken, encryptToken } from "@/lib/email/crypto";
 
 /**
- * Encrypt TOTP secrets at rest. If the encryption key is not configured, we
- * store the value unchanged (legacy behaviour) rather than breaking 2FA.
+ * Encrypt TOTP secrets at rest. Fails closed: if the encryption key is not
+ * configured we refuse to store the secret rather than silently writing it in
+ * plaintext. Legacy plaintext values are still readable (see decrypt).
  */
 export function encryptTotpSecret(plain: string): string {
-  try {
-    return encryptToken(plain);
-  } catch {
-    return plain;
-  }
+  return encryptToken(plain);
 }
 
 /**

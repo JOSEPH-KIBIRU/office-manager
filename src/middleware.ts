@@ -88,7 +88,7 @@ export async function middleware(req: NextRequest) {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.convex.cloud https://*.convex.site https://*.ufs.sh https://utfs.io",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.convex.cloud https://*.convex.site https://*.uploadthing.com https://*.ufs.sh https://*.ingest.sentry.io https://*.sentry.io",
+    "connect-src 'self' https://*.convex.cloud https://*.convex.site https://*.ufs.sh https://*.ingest.sentry.io https://*.sentry.io",
     "media-src 'self' blob: https://*.convex.cloud https://*.ufs.sh",
     "worker-src 'self' blob:",
     "manifest-src 'self'",

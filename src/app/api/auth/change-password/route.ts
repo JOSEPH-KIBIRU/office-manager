@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import bcrypt from "bcryptjs";
 import { getSession, setSessionCookie, HttpError } from "@/lib/auth";
+import { getValidatedSessionUser } from "@/lib/sessionValidation";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { passwordProblem } from "@/lib/passwordPolicy";
@@ -12,6 +13,10 @@ export async function POST(req: NextRequest) {
 
     const session = await getSession();
     if (!session || !session.orgId) throw new HttpError(401, "Not authenticated");
+    const validated = await getValidatedSessionUser(session);
+    if (!validated) {
+      throw new HttpError(401, "Your session is no longer valid. Please sign in again.");
+    }
 
     const problem = passwordProblem(String(body.newPassword));
     if (problem) throw new HttpError(400, problem);
@@ -46,6 +51,9 @@ export async function POST(req: NextRequest) {
     // session. Issue a fresh cookie for this browser with the new version.
     await setSessionCookie({
       ...session,
+      role: validated.role,
+      name: validated.name,
+      email: validated.email,
       mustChangePassword: false,
       sessionVersion: result.sessionVersion ?? session.sessionVersion,
     });

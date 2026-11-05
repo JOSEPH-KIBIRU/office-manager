@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateTempPassword } from "@/lib/passwords";
+import { generateTempPassword, generateResetCode } from "@/lib/passwords";
 import { passwordProblem } from "@/lib/passwordPolicy";
 
 describe("temporary passwords", () => {
@@ -12,6 +12,14 @@ describe("temporary passwords", () => {
 
     const many = new Set(Array.from({ length: 25 }, () => generateTempPassword()));
     expect(many.size).toBe(25);
+  });
+});
+
+describe("password reset codes", () => {
+  it("are six digits from a cryptographically secure generator", () => {
+    for (let i = 0; i < 50; i++) {
+      expect(generateResetCode()).toMatch(/^\d{6}$/);
+    }
   });
 });
 

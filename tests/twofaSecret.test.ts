@@ -25,9 +25,9 @@ describe("2FA secret storage", () => {
     expect(decryptTotpSecret(SECRET)).toBe(SECRET);
   });
 
-  it("falls back to plaintext when no encryption key is configured", () => {
+  it("fails closed when no encryption key is configured, but still reads legacy plaintext", () => {
     delete process.env.TOKEN_ENCRYPTION_KEY;
-    expect(encryptTotpSecret(SECRET)).toBe(SECRET);
+    expect(() => encryptTotpSecret(SECRET)).toThrow(/TOKEN_ENCRYPTION_KEY/);
     expect(decryptTotpSecret(SECRET)).toBe(SECRET);
   });
 });

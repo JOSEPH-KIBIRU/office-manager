@@ -20,3 +20,8 @@ export function generateTempPassword(): string {
   }
   return chars.join("");
 }
+
+/** Six-digit password-reset code from a cryptographically secure RNG. */
+export function generateResetCode(): string {
+  return String(crypto.randomInt(100_000, 1_000_000));
+}

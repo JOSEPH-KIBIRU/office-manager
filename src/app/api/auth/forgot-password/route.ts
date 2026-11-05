@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { handle, ok, fail, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api } from "@/lib/convex";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { generateResetCode } from "@/lib/passwords";
 import { sendSMS } from "@/lib/notify";
 
 const CODE_TTL_MS = 10 * 60_000;
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     // Only send when the account exists, is active and has a phone number.
     if (user && user.active && user.phone) {
-      const code = String(Math.floor(100000 + Math.random() * 900000));
+      const code = generateResetCode();
       try {
         await cx().mutation(api.passwordReset.createReset, {
           secret: secret(),

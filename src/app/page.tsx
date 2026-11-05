@@ -114,7 +114,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
 
   return (
     <main id="top" className="min-h-screen bg-zinc-950 text-zinc-300">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <LandingHeader />
 
