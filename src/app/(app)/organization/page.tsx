@@ -38,7 +38,7 @@ export default function OrganizationPage() {
       if (!result) throw new Error("Upload failed");
       const updated = await api<ApiOrg>("/api/organization", {
         method: "PATCH",
-        json: { logoUrl: uploadThingProxyPath(result.key), logoKey: result.key },
+        json: { logoUrl: uploadThingProxyPath(result.key), logoKey: result.key, logoName: result.name },
       });
       setLogoUrl(updated.logoUrl || null);
       toast.success("Logo uploaded");

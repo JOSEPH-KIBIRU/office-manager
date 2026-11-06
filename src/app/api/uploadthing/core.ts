@@ -53,8 +53,8 @@ async function register(metadata: UploadMeta, file: UploadedFile) {
       kind: metadata.kind,
       scanStatus: "pending",
     });
-  } catch {
-    /* registry is best-effort; the record itself still stores the key */
+  } catch (e) {
+    console.error("[uploadthing] register failed:", e);
   }
 }
 

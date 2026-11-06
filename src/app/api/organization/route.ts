@@ -5,6 +5,7 @@ import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { deleteUploadThingFiles } from "@/lib/uploadthingServer";
 import { scanStoredFile } from "@/lib/scanStoredFile";
+import { ensureUploadFileRegistered } from "@/lib/ensureUploadFile";
 export const maxDuration = 60;
 
 /**
@@ -75,6 +76,15 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (typeof input.logoKey === "string" && input.logoKey) {
+      const ensured = await ensureUploadFileRegistered({
+        key: input.logoKey,
+        orgId: session.orgId as string,
+        kind: "logo",
+        name: typeof body.logoName === "string" ? body.logoName : undefined,
+      });
+      if (!ensured) {
+        throw new HttpError(404, "Uploaded logo was not found. Please try the upload again.");
+      }
       const scan = await scanStoredFile(input.logoKey, session.orgId as string);
       if (!scan.clean) {
         throw new HttpError(scan.error ? 503 : 422, scan.reason || "Logo rejected by the scanner");

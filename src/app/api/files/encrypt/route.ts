@@ -6,6 +6,7 @@ import { encryptToken } from "@/lib/email/crypto";
 import { mimeForName } from "@/lib/mime";
 import { fetchUploadCipherByKey, scanEncryptedBytes, type FileRow } from "@/lib/scanStoredFile";
 import { deleteUploadThingFiles } from "@/lib/uploadthingServer";
+import { ensureUploadFileRegistered } from "@/lib/ensureUploadFile";
 
 export const maxDuration = 60;
 
@@ -41,12 +42,14 @@ export async function POST(req: NextRequest) {
     const type = mimeForName(name);
     if (!type) throw new HttpError(400, "Unsupported file type");
 
-    const row = (await cx().query(api.storage.getFileByKey, {
-      secret: secret(),
-      orgId: session.orgId as never,
+    const row = (await ensureUploadFileRegistered({
       key,
+      orgId: session.orgId as string,
+      kind: "other",
+      name,
+      type,
     })) as FileRow | null;
-    if (!row) throw new HttpError(404, "File not found");
+    if (!row) throw new HttpError(404, "Uploaded file not found. Please try the upload again.");
     if (row.scanStatus === "infected") {
       throw new HttpError(422, row.scanReason || "This file was blocked by the scanner");
     }

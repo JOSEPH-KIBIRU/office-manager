@@ -41,6 +41,17 @@ export async function signedUploadThingUrl(key: string): Promise<string> {
   return res.ufsUrl;
 }
 
+/** Resolve an uploaded key to its CDN URL via the UploadThing API. */
+export async function getUploadThingFileUrl(key: string): Promise<string | null> {
+  try {
+    const res = await utapi().getFileUrls(key);
+    const row = res.data.find((file) => file.key === key) ?? res.data[0];
+    return row?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Best-effort delete of one or more UploadThing files. */
 export async function deleteUploadThingFiles(
   keys: string | string[] | null | undefined
