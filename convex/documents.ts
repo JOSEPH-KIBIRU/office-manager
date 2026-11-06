@@ -20,6 +20,7 @@ async function enrich(ctx: QueryCtx, d: Doc<"documents">) {
     expiryDate: d.expiryDate ?? null,
     fileName: d.fileName ?? null,
     fileUrl,
+    fileKey: d.fileKey ?? null,
     notes: d.notes ?? null,
     createdAt: d.createdAt,
   };

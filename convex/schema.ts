@@ -647,6 +647,9 @@ export default defineSchema(
     name: v.optional(v.string()),
     size: v.optional(v.number()),
     type: v.optional(v.string()),
+    encrypted: v.optional(v.boolean()),
+    encKeyEnc: v.optional(v.string()),
+    encIv: v.optional(v.string()),
     kind: v.union(v.literal("logo"), v.literal("minutes"), v.literal("task"), v.literal("other")),
     createdAt: v.number(),
   })
@@ -688,7 +691,7 @@ export default defineSchema(
     description: v.optional(v.string()),
     doing: v.optional(v.string()),
     location: v.optional(v.string()),
-    photos: v.array(v.object({ url: v.string(), name: v.string() })),
+    photos: v.array(v.object({ url: v.string(), name: v.string(), key: v.optional(v.string()) })),
     createdAt: v.number(),
   })
     .index("by_org", ["orgId"])

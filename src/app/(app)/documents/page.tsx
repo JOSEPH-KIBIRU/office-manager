@@ -5,6 +5,8 @@ import { PageHeader, Alert, Modal, ConfirmDialog, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useUploadThing } from "@/lib/uploadthing";
 import { uploadThingProxyPath } from "@/lib/fileUrls";
+import { encryptFile } from "@/lib/clientEncryption";
+import SecureFileLink from "@/components/SecureFileLink";
 
 interface DocRow {
   id: string;
@@ -16,6 +18,7 @@ interface DocRow {
   expiryDate: string | null;
   fileName: string | null;
   fileUrl: string | null;
+  fileKey: string | null;
   notes: string | null;
 }
 interface StaffOption {
@@ -85,10 +88,19 @@ export default function DocumentsPage() {
   async function uploadFile(f: File) {
     setFileBusy(true);
     try {
-      const uploaded = await startUpload([f]);
+      const encrypted = await encryptFile(f);
+      const uploaded = await startUpload([encrypted.file]);
       const file = uploaded?.[0];
       if (!file) throw new Error("Upload failed");
-      setFile({ name: file.name, url: uploadThingProxyPath(file.key), key: file.key });
+      await api("/api/files/encrypt", {
+        method: "POST",
+        json: { key: file.key, encKey: encrypted.key, iv: encrypted.iv, name: encrypted.name },
+      });
+      setFile({
+        name: encrypted.name,
+        url: uploadThingProxyPath(file.key),
+        key: file.key,
+      });
       toast.success("File attached");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -186,9 +198,14 @@ export default function DocumentsPage() {
                   <td className="font-medium">
                     {d.title}
                     {d.fileUrl && (
-                      <a href={d.fileUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-xs font-medium text-indigo-600 hover:underline">
+                      <SecureFileLink
+                        fileKey={d.fileKey}
+                        href={d.fileUrl}
+                        name={d.fileName}
+                        className="ml-2 text-xs font-medium text-indigo-600 hover:underline"
+                      >
                         file
-                      </a>
+                      </SecureFileLink>
                     )}
                   </td>
                   <td className="capitalize text-slate-600">{d.category}</td>

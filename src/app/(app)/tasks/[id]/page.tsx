@@ -7,10 +7,13 @@ import { useToast } from "@/components/toast";
 import { useSession } from "@/components/SessionProvider";
 import { useUploadThing } from "@/lib/uploadthing";
 import { uploadThingProxyPath } from "@/lib/fileUrls";
+import { encryptFile } from "@/lib/clientEncryption";
+import SecureImage from "@/components/SecureImage";
 
 interface Photo {
   url: string;
   name: string;
+  key?: string | null;
 }
 interface UpdateItem {
   id: string;
@@ -120,11 +123,29 @@ export default function TaskDetailPage() {
     if (files.length === 0) return;
     setUploading(true);
     try {
-      const uploaded = await startUpload(files);
+      const encrypted = await Promise.all(files.map(encryptFile));
+      const uploaded = await startUpload(encrypted.map((e) => e.file));
       if (!uploaded || uploaded.length === 0) throw new Error("Upload failed");
+      await Promise.all(
+        uploaded.map((file, i) =>
+          api("/api/files/encrypt", {
+            method: "POST",
+            json: {
+              key: file.key,
+              encKey: encrypted[i].key,
+              iv: encrypted[i].iv,
+              name: encrypted[i].name,
+            },
+          })
+        )
+      );
       setPhotos((prev) => [
         ...prev,
-        ...uploaded.map((f) => ({ url: uploadThingProxyPath(f.key), name: f.name })),
+        ...uploaded.map((file, i) => ({
+          url: uploadThingProxyPath(file.key),
+          name: encrypted[i].name,
+          key: file.key,
+        })),
       ]);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -212,9 +233,13 @@ export default function TaskDetailPage() {
                 <div className="mt-2 flex flex-wrap gap-2">
                   {photos.map((p) => (
                     <span key={p.url} className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.url} alt={p.name} className="h-16 w-16 rounded-lg object-cover ring-1 ring-slate-200" />
-                      <button type="button" onClick={() => setPhotos((prev) => prev.filter((x) => x.url !== p.url))} className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-red-600 text-[10px] font-bold text-white">✕</button>
+                      <SecureImage
+                        fileKey={p.key}
+                        src={p.url}
+                        alt={p.name}
+                        className="h-16 w-16 rounded-lg object-cover ring-1 ring-slate-200"
+                      />
+                      <button type="button" onClick={() => setPhotos((prev) => prev.filter((x) => x.url !== p.url))} className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-red-600 text-[10px] font-bold text-white">?</button>
                     </span>
                   ))}
                 </div>
@@ -280,8 +305,13 @@ export default function TaskDetailPage() {
                 {u.photos.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {u.photos.map((p) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={p.url} src={p.url} alt={p.name} className="h-20 w-20 rounded-lg object-cover ring-1 ring-slate-200" />
+                      <SecureImage
+                        key={p.url}
+                        fileKey={p.key}
+                        src={p.url}
+                        alt={p.name}
+                        className="h-20 w-20 rounded-lg object-cover ring-1 ring-slate-200"
+                      />
                     ))}
                   </div>
                 )}

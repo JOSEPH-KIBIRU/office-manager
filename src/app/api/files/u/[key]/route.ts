@@ -2,31 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { cx, secret, api } from "@/lib/convex";
 import { privateUploadThingAclEnabled, signedUploadThingUrl } from "@/lib/uploadthingServer";
+import { INLINE_MIME, safeMime } from "@/lib/mime";
 
 const ALLOWED_HOSTS = /(^|\.)(ufs\.sh|utfs\.io|uploadthing\.com)$/i;
-
-const MIME: Record<string, string> = {
-  ".pdf": "application/pdf",
-  ".doc": "application/msword",
-  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ".txt": "text/plain",
-  ".md": "text/plain",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-  ".svg": "image/svg+xml",
-};
-const INLINE_TYPES = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-  "image/svg+xml",
-  "text/plain",
-]);
 
 function safeFileName(name: string | null | undefined): string {
   return (name || "file")
@@ -34,16 +12,6 @@ function safeFileName(name: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 140);
-}
-
-/** Derive a safe content type from the file name; never trust upstream HTML. */
-function safeContentType(name: string | null | undefined, upstream: string | null): string {
-  const dot = (name ?? "").lastIndexOf(".");
-  const ext = dot >= 0 ? (name as string).slice(dot).toLowerCase() : "";
-  if (MIME[ext]) return MIME[ext];
-  const up = (upstream ?? "").split(";")[0].trim().toLowerCase();
-  if (INLINE_TYPES.has(up) || up === "application/octet-stream") return up;
-  return "application/octet-stream";
 }
 
 /**
@@ -64,13 +32,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ key: string
     return NextResponse.json({ error: "Invalid file key" }, { status: 400 });
   }
 
-  let file: { url: string; name: string | null; type: string | null } | null;
+  let file: { url: string; name: string | null; type: string | null; encrypted: boolean } | null;
   try {
     file = (await cx().query(api.storage.getFileByKey, {
       secret: secret(),
       orgId: session.orgId as never,
       key,
-    })) as { url: string; name: string | null; type: string | null } | null;
+    })) as { url: string; name: string | null; type: string | null; encrypted: boolean } | null;
   } catch {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
@@ -104,12 +72,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ key: string
   }
 
   const headers = new Headers();
-  const contentType = safeContentType(file.name, upstream.headers.get("content-type"));
+  const contentType = safeMime(file.name, upstream.headers.get("content-type"));
   headers.set("Content-Type", contentType);
   headers.set("Cache-Control", "private, no-store");
   headers.set("X-Content-Type-Options", "nosniff");
   const download = req.nextUrl.searchParams.get("download") === "1";
-  const inline = !download && INLINE_TYPES.has(contentType);
+  const inline = !download && !file.encrypted && INLINE_MIME.has(contentType);
   headers.set(
     "Content-Disposition",
     `${inline ? "inline" : "attachment"}; filename="${safeFileName(file.name)}"`

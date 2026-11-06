@@ -6,6 +6,8 @@ import { validate, required, pastOrToday, type Errors } from "@/lib/validation";
 import type { MinuteRow } from "@/lib/types";
 import { useUploadThing } from "@/lib/uploadthing";
 import { uploadThingProxyPath } from "@/lib/fileUrls";
+import { encryptFile } from "@/lib/clientEncryption";
+import SecureFileLink from "@/components/SecureFileLink";
 
 export default function MinutesEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -95,13 +97,18 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
     setBusy(true);
     setError(null);
     try {
-      const uploaded = await startUpload([file]);
+      const encrypted = await encryptFile(file);
+      const uploaded = await startUpload([encrypted.file]);
       const result = uploaded?.[0];
       if (!result) throw new Error("Upload failed");
+      await api("/api/files/encrypt", {
+        method: "POST",
+        json: { key: result.key, encKey: encrypted.key, iv: encrypted.iv, name: encrypted.name },
+      });
       await api(`/api/minutes/${id}`, {
         method: "PATCH",
         json: {
-          file_name: result.name,
+          file_name: encrypted.name,
           file_url: uploadThingProxyPath(result.key),
           file_key: result.key,
         },
@@ -110,7 +117,7 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
         prev
           ? {
               ...prev,
-              file_name: result.name,
+              file_name: encrypted.name,
               file_url: uploadThingProxyPath(result.key),
               file_key: result.key,
             }
@@ -159,9 +166,14 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
               <input id="md-attach" ref={fileRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg" className="input py-1.5"
                 onChange={(e) => e.target.files?.[0] && uploadFile(e.target.files[0])} />
               {(m?.file_url || m?.file_path) && (
-                <a href={m.file_url || `/api/files/${m.file_path}`} className="mt-1 inline-block text-xs text-blue-700 hover:underline">
+                <SecureFileLink
+                  fileKey={m.file_key}
+                  href={m.file_url || `/api/files/${m.file_path}`}
+                  name={m.file_name}
+                  className="mt-1 inline-block text-xs text-blue-700 hover:underline"
+                >
                   📎 Download current: {m.file_name}
-                </a>
+                </SecureFileLink>
               )}
             </div>
           </div>
@@ -205,7 +217,14 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
             <button onClick={() => save("final")} className="btn-success" disabled={busy}>Mark final</button>
             <a href={`/minutes/${id}/print`} target="_blank" className="btn-secondary ml-auto">Download / print as PDF</a>
             {(m?.file_url || m?.file_path) && (
-              <a href={m.file_url || `/api/files/${m.file_path}`} className="btn-secondary">Download attachment</a>
+              <SecureFileLink
+                fileKey={m.file_key}
+                href={m.file_url || `/api/files/${m.file_path}`}
+                name={m.file_name}
+                className="btn-secondary"
+              >
+                Download attachment
+              </SecureFileLink>
             )}
           </div>
         </section>

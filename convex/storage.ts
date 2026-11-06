@@ -72,7 +72,14 @@ export const getFileByKey = query({
       .first();
     if (row) {
       if (row.orgId !== args.orgId) return null;
-      return { url: row.url ?? "", name: row.name ?? null, type: row.type ?? null };
+      return {
+        url: row.url ?? "",
+        name: row.name ?? null,
+        type: row.type ?? null,
+        encrypted: !!row.encrypted,
+        encKeyEnc: row.encKeyEnc ?? null,
+        encIv: row.encIv ?? null,
+      };
     }
 
     // Files uploaded before the registry was added are still resolvable from
@@ -83,7 +90,14 @@ export const getFileByKey = query({
       .filter((q) => q.eq(q.field("fileKey"), args.key))
       .first();
     if (doc?.fileUrl && /^https:\/\//i.test(doc.fileUrl)) {
-      return { url: doc.fileUrl, name: doc.fileName ?? null, type: null };
+      return {
+        url: doc.fileUrl,
+        name: doc.fileName ?? null,
+        type: null,
+        encrypted: false,
+        encKeyEnc: null,
+        encIv: null,
+      };
     }
 
     const minute = await ctx.db
@@ -92,15 +106,61 @@ export const getFileByKey = query({
       .filter((q) => q.eq(q.field("fileKey"), args.key))
       .first();
     if (minute?.fileUrl && /^https:\/\//i.test(minute.fileUrl)) {
-      return { url: minute.fileUrl, name: minute.fileName ?? null, type: null };
+      return {
+        url: minute.fileUrl,
+        name: minute.fileName ?? null,
+        type: null,
+        encrypted: false,
+        encKeyEnc: null,
+        encIv: null,
+      };
     }
 
     const org = await ctx.db.get(args.orgId);
     if (org?.logoKey === args.key && org.logoUrl && /^https:\/\//i.test(org.logoUrl)) {
-      return { url: org.logoUrl, name: "logo", type: null };
+      return {
+        url: org.logoUrl,
+        name: "logo",
+        type: null,
+        encrypted: false,
+        encKeyEnc: null,
+        encIv: null,
+      };
     }
 
     return null;
+  },
+});
+
+/**
+ * Attach client-side encryption metadata to a freshly uploaded file. The AES
+ * key is encrypted with TOKEN_ENCRYPTION_KEY before it reaches Convex.
+ */
+export const setFileEncryption = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    key: v.string(),
+    encKeyEnc: v.string(),
+    encIv: v.string(),
+    name: v.optional(v.string()),
+    type: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const row = await ctx.db
+      .query("storedFiles")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .first();
+    if (!row || row.orgId !== args.orgId) throw new Error("File not found");
+    await ctx.db.patch(row._id, {
+      encrypted: true,
+      encKeyEnc: args.encKeyEnc,
+      encIv: args.encIv,
+      name: args.name ?? row.name,
+      type: args.type ?? row.type,
+    });
+    return true;
   },
 });
 

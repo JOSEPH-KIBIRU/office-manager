@@ -128,7 +128,7 @@ export const getTask = query({
         description: u.description ?? null,
         doing: u.doing ?? null,
         location: u.location ?? null,
-        photos: u.photos.map((p) => ({ url: p.url, name: p.name })),
+        photos: u.photos.map((p) => ({ url: p.url, name: p.name, key: p.key ?? null })),
         created_at: fmtCreated(u.createdAt),
       }))
     );
@@ -222,7 +222,7 @@ export const submitReport = mutation({
     description: v.optional(v.string()),
     doing: v.optional(v.string()),
     location: v.optional(v.string()),
-    photos: v.array(v.object({ url: v.string(), name: v.string() })),
+    photos: v.array(v.object({ url: v.string(), name: v.string(), key: v.optional(v.string()) })),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);

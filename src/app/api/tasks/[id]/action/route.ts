@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       description?: string;
       doing?: string;
       location?: string;
-      photos?: Array<{ url?: string; name: string }>;
+      photos?: Array<{ url?: string; name: string; key?: string }>;
       text?: string;
       remark?: string;
     }>(req);
@@ -34,7 +34,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         case "report": {
           const photos = (body.photos ?? [])
             .slice(0, 10)
-            .map((p) => ({ url: String(p.url ?? ""), name: String(p.name).slice(0, 200) }))
+            .map((p) => ({
+              url: String(p.url ?? ""),
+              name: String(p.name).slice(0, 200),
+              key: p.key ? String(p.key).slice(0, 512) : undefined,
+            }))
             .filter((p) => p.url);
           if (body.description !== undefined) maxLen(body.description, "Description", 4000);
           if (body.doing !== undefined) maxLen(body.doing, "What you were doing", 1000);

@@ -6,6 +6,7 @@ import { PageHeader, StatusBadge, Modal, Alert, FieldError, inputCls, ConfirmDia
 import { useToast } from "@/components/toast";
 import { validate, required, pastOrToday, type Errors } from "@/lib/validation";
 import type { MinuteRow } from "@/lib/types";
+import SecureFileLink from "@/components/SecureFileLink";
 
 export default function MinutesPage() {
   const router = useRouter();
@@ -113,7 +114,14 @@ export default function MinutesPage() {
                 <td><StatusBadge status={m.status} /></td>
                 <td>
                   {m.file_name && (m.file_url || m.file_path) ? (
-                    <a href={m.file_url || `/api/files/${m.file_path}`} className="text-blue-700 hover:underline">📎 {m.file_name}</a>
+                    <SecureFileLink
+                      fileKey={m.file_key}
+                      href={m.file_url || `/api/files/${m.file_path}`}
+                      name={m.file_name}
+                      className="text-blue-700 hover:underline"
+                    >
+                      📎 {m.file_name}
+                    </SecureFileLink>
                   ) : (
                     <span className="text-slate-400">{m.ai_generated ? "AI-assisted" : "Typed"}</span>
                   )}
