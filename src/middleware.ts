@@ -94,7 +94,7 @@ export async function middleware(req: NextRequest) {
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",
-    "frame-src 'none'",
+    "frame-src 'self' blob: https://*.convex.cloud",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",

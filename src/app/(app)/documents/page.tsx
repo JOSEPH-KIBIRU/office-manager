@@ -7,6 +7,7 @@ import { useUploadThing } from "@/lib/uploadthing";
 import { uploadThingProxyPath } from "@/lib/fileUrls";
 import { encryptFile } from "@/lib/clientEncryption";
 import SecureFileLink from "@/components/SecureFileLink";
+import DocumentViewer from "@/components/DocumentViewer";
 
 interface DocRow {
   id: string;
@@ -48,6 +49,7 @@ export default function DocumentsPage() {
   const [form, setForm] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState<DocRow | null>(null);
+  const [viewing, setViewing] = useState<DocRow | null>(null);
   const [file, setFile] = useState<{ name: string; url: string; key: string } | null>(null);
   const [fileBusy, setFileBusy] = useState(false);
 
@@ -214,6 +216,11 @@ export default function DocumentsPage() {
                   <td>{d.expiryDate ?? "—"}</td>
                   <td><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.tone}`}>{st.label}</span></td>
                   <td className="whitespace-nowrap text-right">
+                    {d.fileUrl && (
+                      <button onClick={() => setViewing(d)} className="btn-secondary btn-xs mr-1">
+                        View
+                      </button>
+                    )}
                     <button onClick={() => openEdit(d)} className="btn-secondary btn-xs">Edit</button>
                     <button onClick={() => setDeleting(d)} className="btn-danger ml-1 btn-xs">Delete</button>
                   </td>
@@ -290,6 +297,16 @@ export default function DocumentsPage() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleting(null)}
       />
+
+      {viewing && (
+        <DocumentViewer
+          title={viewing.title}
+          fileKey={viewing.fileKey}
+          href={viewing.fileUrl}
+          fileName={viewing.fileName}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </>
   );
 }
