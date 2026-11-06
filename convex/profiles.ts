@@ -2,16 +2,18 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, tsString, fmtCreated } from "./lib";
+import { assertSecret, tsNow, tsString, fmtCreated, userNamesForOrg } from "./lib";
 
 type ReqDoc = Doc<"profileRequests">;
 
-async function enrich(ctx: QueryCtx, r: ReqDoc) {
-  const requester = await ctx.db.get(r.userId);
+async function enrich(ctx: QueryCtx, r: ReqDoc, names?: Map<string, string>) {
+  const requesterName = names
+    ? names.get(r.userId as string) ?? "Unknown"
+    : (await ctx.db.get(r.userId))?.name ?? "Unknown";
   return {
     id: r._id,
     user_id: r.userId,
-    requester_name: requester?.name ?? "Unknown",
+    requester_name: requesterName,
     field: r.field,
     current_value: r.currentValue ?? null,
     requested_value: r.requestedValue,
@@ -41,7 +43,8 @@ export const listProfileRequests = query({
       const rank = (r: ReqDoc) => (r.status === "pending" ? 0 : 1);
       docs = [...docs].sort((a, b) => rank(a) - rank(b) || b.createdAt - a.createdAt);
     }
-    return Promise.all(docs.map((d) => enrich(ctx, d)));
+    const names = await userNamesForOrg(ctx, args.orgId);
+    return Promise.all(docs.map((d) => enrich(ctx, d, names)));
   },
 });
 

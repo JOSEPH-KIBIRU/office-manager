@@ -60,22 +60,25 @@ export const listChannels = query({
       reads.filter((r) => r.orgId === args.orgId).map((r) => [r.channelId as string, r.lastReadAt] as const)
     );
 
-    const messages = await ctx.db
-      .query("chatMessages")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .collect();
-    const unread = new Map<string, number>();
-    for (const m of messages) {
-      if (m.deletedAt || m.authorId === args.actorId) continue;
-      const last = readMap.get(m.channelId as string) ?? 0;
-      if (m.createdAt > last) {
-        unread.set(m.channelId as string, (unread.get(m.channelId as string) ?? 0) + 1);
-      }
-    }
+    const visible = rows.filter(
+      (c) => c.kind !== "dm" || (c.dmUserIds ?? []).includes(args.actorId)
+    );
+    // Count only recent unread messages per channel (capped at 100) instead of
+    // loading the whole message history on every poll.
+    const channels = await Promise.all(
+      visible.map(async (c) => {
+        const last = readMap.get(c._id as string) ?? 0;
+        const recent = await ctx.db
+          .query("chatMessages")
+          .withIndex("by_org_channel_created", (q) =>
+            q.eq("orgId", args.orgId).eq("channelId", c._id).gt("createdAt", last)
+          )
+          .order("desc")
+          .take(100);
+        const unreadCount = recent.filter(
+          (m) => !m.deletedAt && m.authorId !== args.actorId
+        ).length;
 
-    return rows
-      .filter((c) => c.kind !== "dm" || (c.dmUserIds ?? []).includes(args.actorId))
-      .map((c) => {
         let name = c.name;
         let dmUserId: string | null = null;
         if (c.kind === "dm") {
@@ -90,17 +93,19 @@ export const listChannels = query({
           isDefault: c.isDefault,
           kind: c.kind ?? "channel",
           dmUserId,
-          unreadCount: unread.get(c._id as string) ?? 0,
+          unreadCount,
           createdAt: c.createdAt,
         };
       })
-      .sort((a, b) => {
-        const ad = a.kind === "dm" ? 1 : 0;
-        const bd = b.kind === "dm" ? 1 : 0;
-        if (ad !== bd) return ad - bd;
-        if (a.kind === "channel" && a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
-        return a.name.localeCompare(b.name);
-      });
+    );
+
+    return channels.sort((a, b) => {
+      const ad = a.kind === "dm" ? 1 : 0;
+      const bd = b.kind === "dm" ? 1 : 0;
+      if (ad !== bd) return ad - bd;
+      if (a.kind === "channel" && a.isDefault !== b.isDefault) return a.isDefault ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
   },
 });
 

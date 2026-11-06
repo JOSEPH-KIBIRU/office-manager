@@ -2,15 +2,19 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, tsString, fmtCreated } from "./lib";
+import { assertSecret, tsNow, tsString, fmtCreated, userNamesForOrg } from "./lib";
 import { tryPostJournalForSource } from "./accounting";
 import { notifyStaff, pushNotification } from "./notifications";
 
 type CarLogDoc = Doc<"carLogs">;
 
-async function enrich(ctx: QueryCtx, c: CarLogDoc) {
-  const requester = await ctx.db.get(c.requestedBy);
-  const approver = c.approvedBy ? await ctx.db.get(c.approvedBy) : null;
+async function enrich(ctx: QueryCtx, c: CarLogDoc, names?: Map<string, string>) {
+  const requesterName = names ? names.get(c.requestedBy as string) ?? null : (await ctx.db.get(c.requestedBy))?.name ?? null;
+  const approverName = c.approvedBy
+    ? names
+      ? names.get(c.approvedBy as string) ?? null
+      : (await ctx.db.get(c.approvedBy))?.name ?? null
+    : null;
   return {
     id: c._id,
     requested_by: c.requestedBy,
@@ -22,8 +26,8 @@ async function enrich(ctx: QueryCtx, c: CarLogDoc) {
     amount: c.amount,
     log_date: c.logDate,
     status: c.status,
-    requested_by_name: requester?.name ?? null,
-    approved_by_name: approver?.name ?? null,
+    requested_by_name: requesterName,
+    approved_by_name: approverName,
     approved_at: c.approvedAt ?? null,
     note: c.note ?? null,
     created_at: fmtCreated(c.createdAt),
@@ -39,7 +43,8 @@ export const listCarLogs = query({
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .collect();
     const sorted = [...docs].sort((a, b) => b.logDate.localeCompare(a.logDate));
-    return Promise.all(sorted.map((d) => enrich(ctx, d)));
+    const names = await userNamesForOrg(ctx, args.orgId);
+    return Promise.all(sorted.map((d) => enrich(ctx, d, names)));
   },
 });
 

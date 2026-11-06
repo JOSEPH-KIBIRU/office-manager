@@ -2,13 +2,13 @@ import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
-import { assertSecret, tsNow, fmtCreated } from "./lib";
+import { assertSecret, tsNow, fmtCreated, contactsForOrg } from "./lib";
 import { tryPostJournalForSource, reverseJournalInternal, nextSeq } from "./accounting";
 
 type BillDoc = Doc<"bills">;
 
-async function enrichBill(ctx: QueryCtx, b: BillDoc) {
-  const contact = await ctx.db.get(b.contactId);
+async function enrichBill(ctx: QueryCtx, b: BillDoc, contacts?: Map<string, any>) {
+  const contact = contacts ? contacts.get(b.contactId as string) : await ctx.db.get(b.contactId);
   const rate = b.vatRate ?? 0;
   const vat = rate > 0 ? Math.round((b.amount - b.amount / (1 + rate / 100)) * 100) / 100 : 0;
   const net = Math.round((b.amount - vat) * 100) / 100;
@@ -50,7 +50,8 @@ export const listBills = query({
     assertSecret(args.secret);
     const all = await ctx.db.query("bills").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
     const sorted = [...all].sort((a, b) => b.createdAt - a.createdAt);
-    return Promise.all(sorted.map((d) => enrichBill(ctx, d)));
+    const contacts = await contactsForOrg(ctx, args.orgId);
+    return Promise.all(sorted.map((d) => enrichBill(ctx, d, contacts)));
   },
 });
 

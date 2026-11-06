@@ -146,6 +146,14 @@ export const listAllOrganizations = query({
     assertSecret(args.secret);
     await assertSuperAdmin(ctx, args.superAdminId);
     const orgs = await ctx.db.query("organizations").collect();
+    const allUsers = await ctx.db.query("users").collect();
+    const usersByOrg = new Map<string, typeof allUsers>();
+    for (const u of allUsers) {
+      const key = u.orgId as string;
+      const list = usersByOrg.get(key);
+      if (list) list.push(u);
+      else usersByOrg.set(key, [u]);
+    }
     const fmt = (ms: number) => new Date(ms).toISOString().replace("T", " ").slice(0, 19);
     const result = [] as Array<{
       id: string;
@@ -171,10 +179,7 @@ export const listAllOrganizations = query({
       created_ms: number;
     }>;
     for (const o of [...orgs].sort((a, b) => a.createdAt - b.createdAt)) {
-      const users = await ctx.db
-        .query("users")
-        .withIndex("by_org", (q) => q.eq("orgId", o._id))
-        .collect();
+      const users = usersByOrg.get(o._id as string) ?? [];
       const admins = users.filter((u) => u.role === "admin");
       result.push({
         id: o._id,

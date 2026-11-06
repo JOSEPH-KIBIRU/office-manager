@@ -2,14 +2,18 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, fmtCreated } from "./lib";
+import { assertSecret, tsNow, fmtCreated, userNamesForOrg } from "./lib";
 import { pushNotification } from "./notifications";
 
 type MeetingDoc = Doc<"meetings">;
 
-async function enrich(ctx: QueryCtx, m: MeetingDoc) {
-  const creator = await ctx.db.get(m.createdBy);
-  const director = m.directorId ? await ctx.db.get(m.directorId) : null;
+async function enrich(ctx: QueryCtx, m: MeetingDoc, names?: Map<string, string>) {
+  const creatorName = names ? names.get(m.createdBy as string) ?? "Unknown" : (await ctx.db.get(m.createdBy))?.name ?? "Unknown";
+  const directorName = m.directorId
+    ? names
+      ? names.get(m.directorId as string) ?? null
+      : (await ctx.db.get(m.directorId))?.name ?? null
+    : null;
   return {
     id: m._id,
     title: m.title,
@@ -18,9 +22,9 @@ async function enrich(ctx: QueryCtx, m: MeetingDoc) {
     scheduled_at: m.scheduledAt,
     attendees: JSON.stringify(m.attendeeIds),
     director_id: m.directorId ?? null,
-    director_name: director?.name ?? null,
+    director_name: directorName,
     status: m.status,
-    created_by_name: creator?.name ?? "Unknown",
+    created_by_name: creatorName,
     created_at: fmtCreated(m.createdAt),
   };
 }
@@ -34,7 +38,8 @@ export const listMeetings = query({
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .collect();
     const sorted = [...docs].sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt));
-    return Promise.all(sorted.map((d) => enrich(ctx, d)));
+    const names = await userNamesForOrg(ctx, args.orgId);
+    return Promise.all(sorted.map((d) => enrich(ctx, d, names)));
   },
 });
 

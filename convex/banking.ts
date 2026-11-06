@@ -72,8 +72,20 @@ export const listBankAccounts = query({
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     const rows = await ctx.db.query("bankAccounts").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    // One journals pass for every bank account instead of one pass per account.
+    const journals = await ctx.db.query("journals").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
+    const balances = new Map<string, { debit: number; credit: number }>();
+    for (const j of journals) {
+      for (const line of j.lines) {
+        const cur = balances.get(line.accountCode) ?? { debit: 0, credit: 0 };
+        cur.debit += line.debit;
+        cur.credit += line.credit;
+        balances.set(line.accountCode, cur);
+      }
+    }
     const out = [];
     for (const a of rows.sort((x, y) => x.name.localeCompare(y.name))) {
+      const bal = balances.get(a.accountCode);
       out.push({
         id: a._id,
         kind: a.kind,
@@ -87,7 +99,7 @@ export const listBankAccounts = query({
         till: a.till ?? null,
         businessNumber: a.businessNumber ?? null,
         active: a.active,
-        currentBalance: await ledgerBalance(ctx, args.orgId, a.accountCode),
+        currentBalance: roundKes((bal?.debit ?? 0) - (bal?.credit ?? 0)),
       });
     }
     return out;
@@ -215,8 +227,7 @@ export const updateBankAccount = mutation({
  * Transactions
  * ------------------------------------------------------------------ */
 
-async function enrichLine(ctx: QueryCtx, orgId: Id<"organizations">, line: any) {
-  const matched = await lineMatched(ctx, line._id);
+function enrichLine(line: any, matched: number) {
   const target = Math.abs(line.amount);
   return {
     id: line._id,
@@ -244,7 +255,17 @@ export const listTransactions = query({
       .filter((l) => (!args.accountCode || l.accountCode === args.accountCode))
       .filter((l) => (!args.onlyUnreconciled || (l.status !== "reconciled" && l.status !== "ignored")))
       .sort((a, b) => (a.date === b.date ? b.createdAt - a.createdAt : b.date.localeCompare(a.date)));
-    return Promise.all(filtered.map((l) => enrichLine(ctx, args.orgId, l)));
+    // One matches query for all lines instead of one per transaction.
+    const matches = await ctx.db
+      .query("bankLineMatches")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const matchedByLine = new Map<string, number>();
+    for (const m of matches) {
+      const key = m.bankLineId as string;
+      matchedByLine.set(key, round2((matchedByLine.get(key) ?? 0) + m.amount));
+    }
+    return filtered.map((l) => enrichLine(l, matchedByLine.get(l._id as string) ?? 0));
   },
 });
 

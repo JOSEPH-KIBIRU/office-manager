@@ -2,7 +2,7 @@ import { query, mutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, tsString, fmtCreated, orgBranding } from "./lib";
+import { assertSecret, tsNow, tsString, fmtCreated, orgBranding, contactsForOrg } from "./lib";
 import { tryPostJournalForSource, reverseJournalInternal, nextSeq } from "./accounting";
 
 type ContactDoc = Doc<"contacts">;
@@ -30,9 +30,14 @@ function computeTotals(items: Array<{ description: string; qty: number; unitPric
   };
 }
 
-async function enrichInvoice(ctx: QueryCtx, inv: InvoiceDoc) {
-  const contact = await ctx.db.get(inv.contactId);
-  const org = await orgBranding(ctx, inv.orgId);
+async function enrichInvoice(
+  ctx: QueryCtx,
+  inv: InvoiceDoc,
+  contacts?: Map<string, any>,
+  cachedOrg?: Awaited<ReturnType<typeof orgBranding>>
+) {
+  const contact = contacts ? contacts.get(inv.contactId as string) : await ctx.db.get(inv.contactId);
+  const org = cachedOrg ?? (await orgBranding(ctx, inv.orgId));
   return {
     id: inv._id,
     org,
@@ -235,7 +240,8 @@ export const listInvoices = query({
     assertSecret(args.secret);
     const all = await ctx.db.query("invoices").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
     const sorted = [...all].sort((a, b) => b.createdAt - a.createdAt);
-    return Promise.all(sorted.map((d) => enrichInvoice(ctx, d)));
+    const [contacts, org] = await Promise.all([contactsForOrg(ctx, args.orgId), orgBranding(ctx, args.orgId)]);
+    return Promise.all(sorted.map((d) => enrichInvoice(ctx, d, contacts, org)));
   },
 });
 

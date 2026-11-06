@@ -2,19 +2,23 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx } from "./_generated/server";
-import { assertSecret, tsNow, tsString, fmtCreated, requireMember } from "./lib";
+import { assertSecret, tsNow, tsString, fmtCreated, requireMember, userNamesForOrg } from "./lib";
 import { notifyStaff, pushNotification } from "./notifications";
 
 type LeaveDoc = Doc<"leaves">;
 
-async function enrich(ctx: QueryCtx, l: LeaveDoc) {
-  const requester = await ctx.db.get(l.userId);
-  const approver = l.approvedBy ? await ctx.db.get(l.approvedBy) : null;
+async function enrich(ctx: QueryCtx, l: LeaveDoc, names?: Map<string, string>) {
+  const requesterName = names ? names.get(l.userId as string) ?? "Unknown" : (await ctx.db.get(l.userId))?.name ?? "Unknown";
+  const approverName = l.approvedBy
+    ? names
+      ? names.get(l.approvedBy as string) ?? null
+      : (await ctx.db.get(l.approvedBy))?.name ?? null
+    : null;
   return {
     id: l._id,
     user_id: l.userId,
-    requester_name: requester?.name ?? "Unknown",
-    approver_name: approver?.name ?? null,
+    requester_name: requesterName,
+    approver_name: approverName,
     start_date: l.startDate,
     end_date: l.endDate,
     days: l.days,
@@ -81,7 +85,8 @@ export const listLeaves = query({
         .collect();
       docs = [...docs].sort((a, b) => b.createdAt - a.createdAt);
     }
-    return Promise.all(docs.map((d) => enrich(ctx, d)));
+    const names = await userNamesForOrg(ctx, args.orgId);
+    return Promise.all(docs.map((d) => enrich(ctx, d, names)));
   },
 });
 

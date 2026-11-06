@@ -111,7 +111,7 @@ export default function ChatPage() {
 
   // Keep channel unread counts reasonably fresh.
   useEffect(() => {
-    const timer = setInterval(() => loadChannels(), 15000);
+    const timer = setInterval(() => loadChannels(), 30000);
     return () => clearInterval(timer);
   }, [loadChannels]);
 
@@ -346,7 +346,7 @@ export default function ChatPage() {
       <span className="ml-1 flex items-center gap-1">
         {c.id !== activeId && c.unreadCount > 0 && (
           <span className="rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-            {c.unreadCount}
+            {c.unreadCount > 99 ? "99+" : c.unreadCount}
           </span>
         )}
         {c.kind !== "dm" && c.isDefault && <span className="text-[10px] uppercase text-slate-400">default</span>}

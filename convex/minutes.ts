@@ -16,8 +16,7 @@ async function assertMeetingInOrg(
   if (!m || m.orgId !== orgId) throw new Error("Meeting does not belong to your organization");
 }
 
-async function enrich(ctx: QueryCtx, m: MinuteDoc) {
-  const author = await ctx.db.get(m.writtenBy);
+async function enrich(ctx: QueryCtx, m: MinuteDoc, authorName: string) {
   const fileUrl = m.fileKey
     ? uploadThingProxyPath(m.fileKey)
     : m.fileUrl ?? (m.fileId ? await ctx.storage.getUrl(m.fileId) : null);
@@ -36,7 +35,7 @@ async function enrich(ctx: QueryCtx, m: MinuteDoc) {
     ai_generated: m.aiGenerated ? 1 : 0,
     status: m.status,
     written_by: m.writtenBy,
-    author_name: author?.name ?? "Unknown",
+    author_name: authorName,
     created_at: fmtCreated(m.createdAt),
   };
 }
@@ -51,7 +50,15 @@ export const listMinutes = query({
       .collect();
     const key = (m: MinuteDoc) => m.meetingDate ?? new Date(m.createdAt).toISOString();
     const sorted = [...docs].sort((a, b) => key(b).localeCompare(key(a)));
-    return Promise.all(sorted.map((d) => enrich(ctx, d)));
+    // Batch author names: one users query instead of one per minute.
+    const users = await ctx.db
+      .query("users")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const names = new Map(users.map((u) => [u._id as string, u.name] as const));
+    return Promise.all(
+      sorted.map((d) => enrich(ctx, d, names.get(d.writtenBy as string) ?? "Unknown"))
+    );
   },
 });
 
@@ -61,7 +68,8 @@ export const getMinute = query({
     assertSecret(args.secret);
     const doc = await ctx.db.get(args.id);
     if (!doc || doc.orgId !== args.orgId) return null;
-    return enrich(ctx, doc);
+    const author = await ctx.db.get(doc.writtenBy);
+    return enrich(ctx, doc, author?.name ?? "Unknown");
   },
 });
 

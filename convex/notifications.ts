@@ -47,17 +47,22 @@ export const listForUser = query({
   handler: async (ctx, args) => {
     assertSecret(args.secret);
     await requireMember(ctx, args.orgId, args.userId);
-    const all = await ctx.db
+    // Read only the latest page plus unread notifications, never the full history.
+    const recent = await ctx.db
       .query("notifications")
-      .withIndex("by_user_unread", (q) => q.eq("userId", args.userId as never))
-      .collect();
-    // Newest first (the index groups by read status, so sort by time here).
-    const mine = all
-      .filter((n) => n.orgId === args.orgId)
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 50);
+      .withIndex("by_user_created", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(50);
+    const unreadRows = await ctx.db
+      .query("notifications")
+      .withIndex("by_user_unread", (q) =>
+        q.eq("userId", args.userId as never).eq("read", false)
+      )
+      .take(100);
+    const mine = recent.filter((n) => n.orgId === args.orgId);
+    const unread = unreadRows.filter((n) => n.orgId === args.orgId).length;
     return {
-      unread_count: mine.filter((n) => !n.read).length,
+      unread_count: unread,
       items: mine.map((n) => ({
         id: n._id,
         type: n.type,

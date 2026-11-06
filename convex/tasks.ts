@@ -15,11 +15,34 @@ const priorityValidator = v.union(
   v.literal("urgent")
 );
 
-async function enrichTask(ctx: QueryCtx, t: TaskDoc) {
-  const assignee = await ctx.db.get(t.assigneeId);
-  const creator = await ctx.db.get(t.createdBy);
-  const acknowledger = t.acknowledgedBy ? await ctx.db.get(t.acknowledgedBy) : null;
-  const updates = await ctx.db.query("taskUpdates").withIndex("by_task", (q) => q.eq("taskId", t._id)).collect();
+async function enrichTask(
+  ctx: QueryCtx,
+  t: TaskDoc,
+  updatesArg?: UpdateDoc[],
+  namesArg?: Map<string, string>
+) {
+  let assigneeName: string;
+  let creatorName: string;
+  let acknowledgedName: string | null = null;
+  if (namesArg) {
+    assigneeName = namesArg.get(t.assigneeId as string) ?? "-";
+    creatorName = namesArg.get(t.createdBy as string) ?? "-";
+    acknowledgedName = t.acknowledgedBy
+      ? namesArg.get(t.acknowledgedBy as string) ?? null
+      : null;
+  } else {
+    const [assignee, creator, acknowledger] = await Promise.all([
+      ctx.db.get(t.assigneeId),
+      ctx.db.get(t.createdBy),
+      t.acknowledgedBy ? ctx.db.get(t.acknowledgedBy) : Promise.resolve(null),
+    ]);
+    assigneeName = assignee?.name ?? "-";
+    creatorName = creator?.name ?? "-";
+    acknowledgedName = acknowledger?.name ?? null;
+  }
+  const updates =
+    updatesArg ??
+    (await ctx.db.query("taskUpdates").withIndex("by_task", (q) => q.eq("taskId", t._id)).collect());
   const reports = updates.filter((u) => u.kind === "report");
   const last = updates.reduce((m, u) => Math.max(m, u.createdAt), t.updatedAt);
   return {
@@ -30,10 +53,10 @@ async function enrichTask(ctx: QueryCtx, t: TaskDoc) {
     due_date: t.dueDate ?? null,
     status: t.status,
     created_by: t.createdBy,
-    created_by_name: creator?.name ?? "—",
+    created_by_name: creatorName,
     assignee_id: t.assigneeId,
-    assignee_name: assignee?.name ?? "—",
-    acknowledged_by_name: acknowledger?.name ?? null,
+    assignee_name: assigneeName,
+    acknowledged_by_name: acknowledgedName,
     acknowledged_at: t.acknowledgedAt ?? null,
     remark: t.remark ?? null,
     report_count: reports.length,
@@ -73,7 +96,22 @@ export const listTasks = query({
     else rows = all.filter((t) => t.assigneeId === args.viewerId);
 
     rows.sort((a, b) => b.updatedAt - a.updatedAt);
-    return Promise.all(rows.map((t) => enrichTask(ctx, t)));
+    // Batch user names and update counts for the whole list.
+    const [users, updates] = await Promise.all([
+      ctx.db.query("users").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect(),
+      ctx.db.query("taskUpdates").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect(),
+    ]);
+    const names = new Map(users.map((u) => [u._id as string, u.name] as const));
+    const byTask = new Map<string, UpdateDoc[]>();
+    for (const u of updates) {
+      const key = u.taskId as string;
+      const list = byTask.get(key);
+      if (list) list.push(u);
+      else byTask.set(key, [u]);
+    }
+    return Promise.all(
+      rows.map((t) => enrichTask(ctx, t, byTask.get(t._id as string) ?? [], names))
+    );
   },
 });
 
@@ -84,7 +122,21 @@ export const reportTasks = query({
     assertSecret(args.secret);
     const all = await ctx.db.query("tasks").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect();
     all.sort((a, b) => b.createdAt - a.createdAt);
-    return Promise.all(all.map((t) => enrichTask(ctx, t)));
+    const [users, updates] = await Promise.all([
+      ctx.db.query("users").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect(),
+      ctx.db.query("taskUpdates").withIndex("by_org", (q) => q.eq("orgId", args.orgId)).collect(),
+    ]);
+    const names = new Map(users.map((u) => [u._id as string, u.name] as const));
+    const byTask = new Map<string, UpdateDoc[]>();
+    for (const u of updates) {
+      const key = u.taskId as string;
+      const list = byTask.get(key);
+      if (list) list.push(u);
+      else byTask.set(key, [u]);
+    }
+    return Promise.all(
+      all.map((t) => enrichTask(ctx, t, byTask.get(t._id as string) ?? [], names))
+    );
   },
 });
 
@@ -103,12 +155,12 @@ export const getTask = query({
     if (!t || t.orgId !== args.orgId) return null;
     if (!canView(t, args.viewerId, isAdmin)) return null;
 
-    const task = await enrichTask(ctx, t);
     const updates: UpdateDoc[] = await ctx.db
       .query("taskUpdates")
       .withIndex("by_task", (q) => q.eq("taskId", t._id))
       .collect();
     updates.sort((a, b) => a.createdAt - b.createdAt);
+    const task = await enrichTask(ctx, t, updates);
 
     const nameCache = new Map<string, string>();
     const nameOf = async (id: Id<"users">) => {

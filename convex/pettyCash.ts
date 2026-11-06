@@ -2,7 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v, ConvexError } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
-import { assertSecret, tsNow, tsString, fmtCreated, requireMember } from "./lib";
+import { assertSecret, tsNow, tsString, fmtCreated, requireMember, userNamesForOrg } from "./lib";
 import { tryPostJournalForSource } from "./accounting";
 import { notifyStaff, pushNotification } from "./notifications";
 
@@ -12,15 +12,19 @@ type PettyDoc = Doc<"pettyCash">;
 // higher requires manager/admin approval.
 const AUTO_APPROVE_LIMIT = 5000;
 
-async function enrich(ctx: QueryCtx, p: PettyDoc) {
-  const requester = await ctx.db.get(p.requestedBy);
-  const approver = p.approvedBy ? await ctx.db.get(p.approvedBy) : null;
+async function enrich(ctx: QueryCtx, p: PettyDoc, names?: Map<string, string>) {
+  const requesterName = names ? names.get(p.requestedBy as string) ?? null : (await ctx.db.get(p.requestedBy))?.name ?? null;
+  const approverName = p.approvedBy
+    ? names
+      ? names.get(p.approvedBy as string) ?? null
+      : (await ctx.db.get(p.approvedBy))?.name ?? null
+    : null;
   return {
     id: p._id,
     requested_by: p.requestedBy,
     requisition_no: p.requisitionNo ?? null,
-    requested_by_name: requester?.name ?? null,
-    approved_by_name: approver?.name ?? null,
+    requested_by_name: requesterName,
+    approved_by_name: approverName,
     amount: p.amount,
     purpose: p.purpose,
     date_needed: p.dateNeeded,
@@ -49,7 +53,8 @@ export const listPettyCash = query({
       ? all.filter((p) => p.requestedBy === args.userId)
       : all;
     const sorted = [...docs].sort((a, b) => b.createdAt - a.createdAt);
-    return Promise.all(sorted.map((d) => enrich(ctx, d)));
+    const names = await userNamesForOrg(ctx, args.orgId);
+    return Promise.all(sorted.map((d) => enrich(ctx, d, names)));
   },
 });
 

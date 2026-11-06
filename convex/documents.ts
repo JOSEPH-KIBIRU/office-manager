@@ -5,15 +5,14 @@ import { assertSecret, requireMember, tsNow, uploadThingProxyPath } from "./lib"
 
 const DAY = 86_400_000;
 
-async function enrich(ctx: QueryCtx, d: Doc<"documents">) {
-  const user = d.userId ? await ctx.db.get(d.userId) : null;
+async function enrich(ctx: QueryCtx, d: Doc<"documents">, userName: string | null) {
   const fileUrl = d.fileKey
     ? uploadThingProxyPath(d.fileKey)
     : d.fileUrl ?? (d.fileId ? await ctx.storage.getUrl(d.fileId) : null);
   return {
     id: d._id,
     userId: d.userId ?? null,
-    userName: user?.name ?? null,
+    userName,
     title: d.title,
     category: d.category,
     issuedDate: d.issuedDate ?? null,
@@ -42,7 +41,17 @@ export const listDocuments = query({
       const bx = b.expiryDate ?? "9999-12-31";
       return ax < bx ? -1 : ax > bx ? 1 : 0;
     });
-    return Promise.all(sorted.map((d) => enrich(ctx, d)));
+    // One user query instead of one lookup per document.
+    const users = await ctx.db
+      .query("users")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const names = new Map(users.map((u) => [u._id as string, u.name] as const));
+    return Promise.all(
+      sorted.map((d) =>
+        enrich(ctx, d, d.userId ? names.get(d.userId as string) ?? null : null)
+      )
+    );
   },
 });
 

@@ -460,6 +460,7 @@ export default defineSchema(
     createdAt: v.number(),
   })
     .index("by_user_unread", ["userId", "read"])
+    .index("by_user_created", ["userId", "createdAt"])
     .index("by_org", ["orgId"]),
 
   contacts: defineTable({
@@ -1603,7 +1604,8 @@ export default defineSchema(
   })
     .index("by_org", ["orgId"])
     .index("by_channel", ["channelId"])
-    .index("by_org_channel", ["orgId", "channelId"]),
+    .index("by_org_channel", ["orgId", "channelId"])
+    .index("by_org_channel_created", ["orgId", "channelId", "createdAt"]),
 
   healthChecks: defineTable({
     status: v.union(v.literal("up"), v.literal("down")),

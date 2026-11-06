@@ -16,6 +16,30 @@ export function uploadThingProxyPath(key: string): string {
   return `/api/files/u/${encodeURIComponent(key)}`;
 }
 
+/** One query for all names used by a list view (avoids per-row user lookups). */
+export async function userNamesForOrg(
+  ctx: QueryCtx | MutationCtx,
+  orgId: Id<"organizations">
+): Promise<Map<string, string>> {
+  const users = await ctx.db
+    .query("users")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .collect();
+  return new Map(users.map((u) => [u._id as string, u.name] as const));
+}
+
+/** One query for all contacts used by a list view. */
+export async function contactsForOrg(
+  ctx: QueryCtx | MutationCtx,
+  orgId: Id<"organizations">
+): Promise<Map<string, Doc<"contacts">>> {
+  const contacts = await ctx.db
+    .query("contacts")
+    .withIndex("by_org", (q) => q.eq("orgId", orgId))
+    .collect();
+  return new Map(contacts.map((c) => [c._id as string, c] as const));
+}
+
 export function tsString(ms?: number | null): string {
   return new Date(ms ?? Date.now())
     .toISOString()

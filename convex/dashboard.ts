@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { assertSecret, fmtCreated, requireMember } from "./lib";
+import { assertSecret, fmtCreated, requireMember, userNamesForOrg } from "./lib";
 
 export const dashboardStats = query({
   args: {
@@ -50,16 +50,17 @@ export const dashboardStats = query({
       .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
       .collect();
 
+    const names = await userNamesForOrg(ctx, args.orgId);
     let pendingLeavesList: Array<Record<string, unknown>> = [];
     if (isAdmin) {
       const oldestFirst = [...pendingLeaves].sort((a, b) => a.createdAt - b.createdAt).slice(0, 5);
       pendingLeavesList = await Promise.all(
         oldestFirst.map(async (l) => {
-          const requester = await ctx.db.get(l.userId);
+          const requesterName = names.get(l.userId as string) ?? "Unknown";
           return {
             id: l._id,
             user_id: l.userId,
-            requester_name: requester?.name ?? "Unknown",
+            requester_name: requesterName,
             start_date: l.startDate,
             end_date: l.endDate,
             days: l.days,
@@ -98,8 +99,8 @@ export const dashboardStats = query({
     ).length;
     const upcomingMeetings = await Promise.all(
       upcoming.map(async (m) => {
-        const creator = await ctx.db.get(m.createdBy);
-        const director = m.directorId ? await ctx.db.get(m.directorId) : null;
+        const creatorName = names.get(m.createdBy as string) ?? "Unknown";
+        const directorName = m.directorId ? names.get(m.directorId as string) ?? null : null;
         return {
           id: m._id,
           title: m.title,
@@ -108,9 +109,9 @@ export const dashboardStats = query({
           scheduled_at: m.scheduledAt,
           attendees: JSON.stringify(m.attendeeIds),
           director_id: m.directorId ?? null,
-          director_name: director?.name ?? null,
+          director_name: directorName,
           status: m.status,
-          created_by_name: creator?.name ?? "Unknown",
+          created_by_name: creatorName,
           created_at: fmtCreated(m.createdAt),
         };
       })
