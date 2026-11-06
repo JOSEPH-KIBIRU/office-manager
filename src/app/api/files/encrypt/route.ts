@@ -4,6 +4,10 @@ import { handle, ok, readJson, requireFields } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { encryptToken } from "@/lib/email/crypto";
 import { mimeForName } from "@/lib/mime";
+import { fetchUploadCipherByKey, scanEncryptedBytes, type FileRow } from "@/lib/scanStoredFile";
+import { deleteUploadThingFiles } from "@/lib/uploadthingServer";
+
+export const maxDuration = 60;
 
 function decodeBase64(value: string, expectedBytes: number, label: string): void {
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(value)) throw new HttpError(400, `Invalid ${label}`);
@@ -12,8 +16,8 @@ function decodeBase64(value: string, expectedBytes: number, label: string): void
 }
 
 /**
- * Store the client-generated AES key for a freshly uploaded file. The key is
- * encrypted with TOKEN_ENCRYPTION_KEY before it is written to Convex.
+ * Verify, decrypt and scan a freshly uploaded file before storing its AES key.
+ * Malicious/unsafe files are quarantined (deleted) and never become accessible.
  */
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -41,9 +45,36 @@ export async function POST(req: NextRequest) {
       secret: secret(),
       orgId: session.orgId as never,
       key,
-    })) as { encrypted: boolean } | null;
+    })) as FileRow | null;
     if (!row) throw new HttpError(404, "File not found");
-    if (row.encrypted) return ok({ ok: true });
+    if (row.scanStatus === "infected") {
+      throw new HttpError(422, row.scanReason || "This file was blocked by the scanner");
+    }
+    if (row.encrypted && row.scanStatus === "clean") return ok({ ok: true });
+
+    let cipher: Buffer;
+    try {
+      cipher = await fetchUploadCipherByKey(key, row);
+    } catch {
+      throw new HttpError(503, "Could not read the uploaded file for scanning");
+    }
+
+    const scan = await scanEncryptedBytes(cipher, String(body.encKey), String(body.iv), name);
+    if (!scan.clean) {
+      try {
+        await cx().mutation(api.storage.setFileScanStatus, {
+          secret: secret(),
+          orgId: session.orgId as never,
+          key,
+          status: scan.error ? "error" : "infected",
+          reason: scan.reason ?? null,
+        });
+      } catch {
+        /* best effort */
+      }
+      if (!scan.error) await deleteUploadThingFiles(key);
+      throw new HttpError(scan.error ? 503 : 422, scan.reason || "File rejected by the scanner");
+    }
 
     try {
       await cx().mutation(api.storage.setFileEncryption, {
@@ -54,6 +85,8 @@ export async function POST(req: NextRequest) {
         encIv: String(body.iv),
         name,
         type,
+        scanStatus: "clean",
+        scanReason: null,
       });
     } catch (e) {
       return mapConvexError(e);

@@ -51,6 +51,7 @@ async function register(metadata: UploadMeta, file: UploadedFile) {
       size: file.size,
       type: file.type,
       kind: metadata.kind,
+      scanStatus: "pending",
     });
   } catch {
     /* registry is best-effort; the record itself still stores the key */

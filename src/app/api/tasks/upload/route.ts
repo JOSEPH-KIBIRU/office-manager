@@ -5,6 +5,8 @@ import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { uploadToUploadThing } from "@/lib/uploadthingServer";
 import { uploadThingProxyPath } from "@/lib/fileUrls";
+import { scanUploadBytes } from "@/lib/uploadScan";
+export const maxDuration = 60;
 
 const MAX_SIZE = 8 * 1024 * 1024; // 8MB
 const ALLOWED = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
@@ -30,6 +32,11 @@ export async function POST(req: NextRequest) {
       return fail(400, `Image type not allowed. Allowed: ${ALLOWED.join(", ")}`);
     }
 
+    const scan = await scanUploadBytes(Buffer.from(await file.arrayBuffer()), file.name);
+    if (!scan.clean) {
+      return fail(scan.error ? 503 : 422, scan.reason || "File rejected by the scanner");
+    }
+
     const uploaded = await uploadToUploadThing(file);
 
     try {
@@ -42,6 +49,7 @@ export async function POST(req: NextRequest) {
         size: uploaded.size,
         type: uploaded.type,
         kind: "task",
+        scanStatus: "clean",
       });
     } catch (e) {
       return mapConvexError(e);

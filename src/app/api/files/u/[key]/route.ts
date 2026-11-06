@@ -32,18 +32,33 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ key: string
     return NextResponse.json({ error: "Invalid file key" }, { status: 400 });
   }
 
-  let file: { url: string; name: string | null; type: string | null; encrypted: boolean } | null;
+  let file: { url: string; name: string | null; type: string | null; encrypted: boolean; scanStatus: "pending" | "clean" | "infected" | "error" | null; scanReason: string | null } | null;
   try {
     file = (await cx().query(api.storage.getFileByKey, {
       secret: secret(),
       orgId: session.orgId as never,
       key,
-    })) as { url: string; name: string | null; type: string | null; encrypted: boolean } | null;
+    })) as { url: string; name: string | null; type: string | null; encrypted: boolean; scanStatus: "pending" | "clean" | "infected" | "error" | null; scanReason: string | null } | null;
   } catch {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
   if (!file) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
+  }
+  if (file.scanStatus === "infected") {
+    return NextResponse.json(
+      { error: file.scanReason || "This file was blocked by the scanner" },
+      { status: 403 }
+    );
+  }
+  if (file.scanStatus === "pending") {
+    return NextResponse.json({ error: "This file is still being scanned" }, { status: 409 });
+  }
+  if (file.scanStatus === "error") {
+    return NextResponse.json(
+      { error: file.scanReason || "This file could not be scanned" },
+      { status: 503 }
+    );
   }
   if (!file.url && !privateUploadThingAclEnabled()) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });

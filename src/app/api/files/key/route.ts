@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
     encrypted: boolean;
     encKeyEnc: string | null;
     encIv: string | null;
+    scanStatus: "pending" | "clean" | "infected" | "error" | null;
+    scanReason: string | null;
   } | null;
   try {
     row = (await cx().query(api.storage.getFileByKey, {
@@ -43,6 +45,24 @@ export async function GET(req: NextRequest) {
   }
   if (!row) {
     return NextResponse.json({ error: "File not found" }, { status: 404, headers: NO_STORE });
+  }
+  if (row.scanStatus === "infected") {
+    return NextResponse.json(
+      { error: row.scanReason || "This file was blocked by the scanner" },
+      { status: 403, headers: NO_STORE }
+    );
+  }
+  if (row.scanStatus === "pending") {
+    return NextResponse.json(
+      { error: "This file is still being scanned" },
+      { status: 409, headers: NO_STORE }
+    );
+  }
+  if (row.scanStatus === "error") {
+    return NextResponse.json(
+      { error: row.scanReason || "This file could not be scanned" },
+      { status: 503, headers: NO_STORE }
+    );
   }
 
   if (!row.encrypted || !row.encKeyEnc || !row.encIv) {

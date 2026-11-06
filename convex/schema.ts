@@ -650,6 +650,10 @@ export default defineSchema(
     encrypted: v.optional(v.boolean()),
     encKeyEnc: v.optional(v.string()),
     encIv: v.optional(v.string()),
+    scanStatus: v.optional(
+      v.union(v.literal("pending"), v.literal("clean"), v.literal("infected"), v.literal("error"))
+    ),
+    scanReason: v.optional(v.string()),
     kind: v.union(v.literal("logo"), v.literal("minutes"), v.literal("task"), v.literal("other")),
     createdAt: v.number(),
   })

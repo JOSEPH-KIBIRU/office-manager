@@ -4,6 +4,8 @@ import { HttpError } from "@/lib/auth";
 import { handle, ok, fail } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { deleteUploadThingFiles } from "@/lib/uploadthingServer";
+import { scanStoredFile } from "@/lib/scanStoredFile";
+export const maxDuration = 60;
 
 /**
  * Organization branding.
@@ -46,6 +48,9 @@ export async function PATCH(req: NextRequest) {
     if (body.logoFileId !== undefined) input.logoFileId = body.logoFileId;
     if (body.logoUrl !== undefined) input.logoUrl = body.logoUrl === null ? null : String(body.logoUrl);
     if (body.logoKey !== undefined) input.logoKey = body.logoKey === null ? null : String(body.logoKey);
+    if (typeof input.logoUrl === "string" && input.logoUrl && !input.logoKey) {
+      throw new HttpError(400, "logoKey is required when setting a logo URL");
+    }
 
     // Validate the eTIMS endpoint at save time too (the request-time guard also
     // blocks private/reserved addresses and redirects).
@@ -67,6 +72,13 @@ export async function PATCH(req: NextRequest) {
 
     if (!("name" in input) && !("logoFileId" in input) && !("logoUrl" in input) && !("logoKey" in input) && !allowed.some((k) => input[k] !== undefined)) {
       return fail(400, "No fields to update");
+    }
+
+    if (typeof input.logoKey === "string" && input.logoKey) {
+      const scan = await scanStoredFile(input.logoKey, session.orgId as string);
+      if (!scan.clean) {
+        throw new HttpError(scan.error ? 503 : 422, scan.reason || "Logo rejected by the scanner");
+      }
     }
 
     try {

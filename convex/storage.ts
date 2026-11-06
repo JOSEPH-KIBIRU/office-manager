@@ -25,6 +25,10 @@ export const registerFile = mutation({
     name: v.optional(v.string()),
     size: v.optional(v.number()),
     type: v.optional(v.string()),
+    scanStatus: v.optional(
+      v.union(v.literal("pending"), v.literal("clean"), v.literal("infected"), v.literal("error"))
+    ),
+    scanReason: v.optional(v.string()),
     kind: v.union(v.literal("logo"), v.literal("minutes"), v.literal("task"), v.literal("other")),
   },
   handler: async (ctx, args) => {
@@ -51,6 +55,8 @@ export const registerFile = mutation({
       name: args.name,
       size: args.size,
       type: args.type,
+      scanStatus: args.scanStatus ?? "pending",
+      scanReason: args.scanReason,
       kind: args.kind,
       createdAt: tsNow(),
     });
@@ -79,6 +85,8 @@ export const getFileByKey = query({
         encrypted: !!row.encrypted,
         encKeyEnc: row.encKeyEnc ?? null,
         encIv: row.encIv ?? null,
+        scanStatus: row.scanStatus ?? null,
+        scanReason: row.scanReason ?? null,
       };
     }
 
@@ -97,6 +105,8 @@ export const getFileByKey = query({
         encrypted: false,
         encKeyEnc: null,
         encIv: null,
+        scanStatus: null,
+        scanReason: null,
       };
     }
 
@@ -113,6 +123,8 @@ export const getFileByKey = query({
         encrypted: false,
         encKeyEnc: null,
         encIv: null,
+        scanStatus: null,
+        scanReason: null,
       };
     }
 
@@ -125,6 +137,8 @@ export const getFileByKey = query({
         encrypted: false,
         encKeyEnc: null,
         encIv: null,
+        scanStatus: null,
+        scanReason: null,
       };
     }
 
@@ -145,6 +159,10 @@ export const setFileEncryption = mutation({
     encIv: v.string(),
     name: v.optional(v.string()),
     type: v.optional(v.string()),
+    scanStatus: v.optional(
+      v.union(v.literal("pending"), v.literal("clean"), v.literal("infected"), v.literal("error"))
+    ),
+    scanReason: v.optional(v.union(v.string(), v.null())),
   },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
@@ -159,6 +177,32 @@ export const setFileEncryption = mutation({
       encIv: args.encIv,
       name: args.name ?? row.name,
       type: args.type ?? row.type,
+      scanStatus: args.scanStatus ?? row.scanStatus,
+      scanReason: args.scanReason ?? undefined,
+    });
+    return true;
+  },
+});
+
+/** Record a scan outcome (clean / infected / scanner error). */
+export const setFileScanStatus = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    key: v.string(),
+    status: v.union(v.literal("clean"), v.literal("infected"), v.literal("error")),
+    reason: v.optional(v.union(v.string(), v.null())),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const row = await ctx.db
+      .query("storedFiles")
+      .withIndex("by_key", (q) => q.eq("key", args.key))
+      .first();
+    if (!row || row.orgId !== args.orgId) throw new Error("File not found");
+    await ctx.db.patch(row._id, {
+      scanStatus: args.status,
+      scanReason: args.reason ?? undefined,
     });
     return true;
   },
