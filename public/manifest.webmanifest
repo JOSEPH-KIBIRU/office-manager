@@ -1,7 +1,9 @@
 {
   "name": "Office Manager",
+  "lang": "en-KE",
+  "dir": "ltr",
   "short_name": "Office",
-  "description": "Office management system — leave, car logs, petty cash, meetings and minutes",
+  "description": "Office management system - leave, car logs, petty cash, meetings and minutes",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -10,6 +12,7 @@
   "background_color": "#06142F",
   "theme_color": "#06142F",
   "categories": ["business", "productivity", "finance"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon-192.png",

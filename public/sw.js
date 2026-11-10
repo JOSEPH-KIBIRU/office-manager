@@ -1,4 +1,4 @@
-const CACHE_NAME = "office-manager-v2";
+const CACHE_NAME = "office-manager-v3";
 
 // Do not cache API responses or auth pages. API responses are dynamic and
 // must always hit the network, otherwise cached copies would show stale data
@@ -45,7 +45,7 @@ self.addEventListener("fetch", (event) => {
 
   // Only ever cache genuine static assets (hashed Next build files, images,
   // fonts, icons). Cache-first for speed; fall back to network.
-  const isStatic = /\/_next\/static\//.test(url.pathname) || /\\.(?:png|jpg|jpeg|svg|ico|webp|css|js|json|ttf|woff2?)$/.test(url.pathname);
+  const isStatic = /\/_next\/static\//.test(url.pathname) || /\.(?:png|jpg|jpeg|svg|ico|webp|css|js|json|ttf|woff2?)$/.test(url.pathname);
   if (isStatic) {
     event.respondWith(
       caches.match(request).then(

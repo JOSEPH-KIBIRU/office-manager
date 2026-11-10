@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import PwaRegister from "@/components/PwaRegister";
+import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import WhatsAppWidget from "@/components/WhatsAppWidget";
 import CookieConsent from "@/components/CookieConsent";
 import MotionProvider from "@/components/MotionProvider";
@@ -38,13 +39,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-KE">
       <body className={`${inter.variable} font-sans antialiased`}>
+        <PwaRegister />
+        <PwaInstallPrompt />
         <MotionProvider>
           {children}
           <WhatsAppWidget />
         </MotionProvider>
         <CookieConsent />
       </body>
-      <PwaRegister />
     </html>
   );
 }
