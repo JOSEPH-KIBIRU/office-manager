@@ -1,8 +1,10 @@
 import { NextRequest } from "next/server";
+import { after } from "next/server";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { recordAudit } from "@/lib/audit";
+import { scoreLeadById } from "@/lib/crmLeadAi";
 
 export async function GET(req: NextRequest) {
   return handle(async () => {
@@ -57,6 +59,10 @@ export async function POST(req: NextRequest) {
         summary: `Created lead "${body.companyName ?? body.contactName ?? body.email ?? id}"`,
         targetType: "crmLead",
         targetId: String(id),
+      });
+      // Score in the background so lead creation stays fast.
+      after(() => {
+        void scoreLeadById(session.orgId as string, String(id)).catch(() => {});
       });
       return ok({ id });
     } catch (e) {

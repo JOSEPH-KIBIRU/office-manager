@@ -391,6 +391,8 @@ export const listInbox = query({
       receivedAt: m.receivedAt,
       hasAttachments: m.hasAttachments ?? false,
       ignored: m.ignored ?? false,
+      aiReviewedAt: m.aiReviewedAt ?? null,
+      aiDecision: m.aiDecision ?? null,
       contactId: m.contactId ?? null,
       contactName: m.contactId ? contactName.get(m.contactId as string) ?? null : null,
       companyId: m.companyId ?? null,
@@ -512,4 +514,67 @@ export const convertToLead = mutation({
     return { leadId, created };
   },
 });
+/** Inbound messages that have never been reviewed by AI and are not linked yet. */
+export const listUnreviewedInbound = query({
+  args: { secret: v.string(), orgId: v.id("organizations"), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireOrg(ctx, args.orgId);
+    const rows = await ctx.db
+      .query("crmEmailMessages")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const connections = await ctx.db
+      .query("crmEmailConnections")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    const owners = new Map(connections.map((c) => [c._id as string, c.userId as string] as const));
+    return rows
+      .filter(
+        (m) =>
+          m.direction === "inbound" &&
+          !m.ignored &&
+          !m.leadId &&
+          m.aiReviewedAt === undefined
+      )
+      .sort((a, b) => b.receivedAt - a.receivedAt)
+      .slice(0, Math.min(Math.max(args.limit ?? 10, 1), 25))
+      .map((m) => ({
+        id: m._id,
+        from: m.from,
+        subject: m.subject ?? null,
+        snippet: m.snippet ?? null,
+        receivedAt: m.receivedAt,
+        connectionId: m.connectionId,
+        userId: owners.get(m.connectionId as string) ?? null,
+      }));
+  },
+});
 
+/** Record an AI review outcome so the same message is not re-processed. */
+export const markAiReviewed = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    id: v.id("crmEmailMessages"),
+    decision: v.union(
+      v.literal("lead"),
+      v.literal("not_lead"),
+      v.literal("uncertain"),
+      v.literal("error")
+    ),
+    reason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireOrg(ctx, args.orgId);
+    const msg = await ctx.db.get(args.id);
+    if (!msg || msg.orgId !== args.orgId) throw new Error("Email not found");
+    await ctx.db.patch(args.id, {
+      aiReviewedAt: tsNow(),
+      aiDecision: args.decision,
+      aiReason: args.reason?.trim().slice(0, 1000) || undefined,
+    });
+    return true;
+  },
+});

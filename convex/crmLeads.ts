@@ -264,3 +264,56 @@ export const deleteLead = mutation({
     return true;
   },
 });
+/** Store AI qualification metadata on a lead (or refresh it). */
+export const updateLeadAI = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    id: v.id("crmLeads"),
+    score: v.number(),
+    confidence: v.optional(v.number()),
+    summary: v.optional(v.string()),
+    intent: v.optional(v.string()),
+    nextAction: v.optional(v.string()),
+    model: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    const lead = await ctx.db.get(args.id);
+    if (!lead || lead.orgId !== args.orgId) throw new Error("Lead not found");
+    if (!Number.isFinite(args.score) || args.score < 0 || args.score > 100) {
+      throw new Error("AI score must be between 0 and 100");
+    }
+    const confidence =
+      args.confidence === undefined
+        ? undefined
+        : Math.max(0, Math.min(1, Number(args.confidence)));
+    await ctx.db.patch(args.id, {
+      aiScore: Math.round(args.score),
+      aiConfidence: confidence,
+      aiSummary: clean(args.summary)?.slice(0, 1200),
+      aiIntent: clean(args.intent)?.slice(0, 300),
+      aiNextAction: clean(args.nextAction)?.slice(0, 500),
+      aiModel: clean(args.model)?.slice(0, 120),
+      aiUpdatedAt: tsNow(),
+    });
+    return true;
+  },
+});
+
+/** Leads that have never been scored, oldest first. */
+export const listLeadsToScore = query({
+  args: { secret: v.string(), orgId: v.id("organizations"), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireOrg(ctx, args.orgId);
+    const rows = await ctx.db
+      .query("crmLeads")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+    return rows
+      .filter((r) => r.aiUpdatedAt === undefined && r.status !== "converted")
+      .sort((a, b) => a.createdAt - b.createdAt)
+      .slice(0, Math.min(Math.max(args.limit ?? 10, 1), 25));
+  },
+});

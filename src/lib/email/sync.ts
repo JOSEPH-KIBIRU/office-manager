@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { cx, secret, api } from "@/lib/convex";
 import { decryptToken, encryptToken } from "./crypto";
 import { getEmailProvider, type EmailProvider } from "./providers";
+import { reviewInboundLeads } from "@/lib/crmLeadAi";
 
 interface ConnLike {
   _id: string;
@@ -101,13 +102,24 @@ export function queueEmailSync(connectionId: string): void {
   }
 }
 
-export async function processEmailSync(limit = 10): Promise<{ synced: number; failed: number }> {
+export async function processEmailSync(limit = 10): Promise<{
+  synced: number;
+  failed: number;
+  reviewed: number;
+  leadsCreated: number;
+}> {
   const conns = await cx().query(api.crmEmail.listConnectionsForSync, {
     secret: secret(),
     limit,
   });
   let synced = 0;
   let failed = 0;
+  const orgs = new Map<string, string>();
+  for (const conn of conns) {
+    const orgId = (conn as unknown as { orgId: string }).orgId;
+    const userId = (conn as unknown as { userId: string }).userId;
+    if (orgId && userId) orgs.set(orgId, userId);
+  }
   for (const conn of conns) {
     try {
       await syncConnection(conn as unknown as ConnLike);
@@ -117,5 +129,19 @@ export async function processEmailSync(limit = 10): Promise<{ synced: number; fa
       await markError(conn as unknown as ConnLike, e instanceof Error ? e.message : "Sync failed");
     }
   }
-  return { synced, failed };
+  let reviewed = 0;
+  let leadsCreated = 0;
+  if (process.env.CRM_AI_AUTO_REVIEW !== "false") {
+    const perOrg = Math.min(Math.max(Number(process.env.CRM_AI_AUTO_REVIEW_LIMIT ?? 1), 1), 3);
+    for (const [orgId, actorId] of orgs) {
+      try {
+        const result = await reviewInboundLeads({ orgId, actorId, limit: perOrg });
+        reviewed += result.reviewed;
+        leadsCreated += result.created;
+      } catch {
+        /* AI review is best-effort; the sync itself already succeeded */
+      }
+    }
+  }
+  return { synced, failed, reviewed, leadsCreated };
 }

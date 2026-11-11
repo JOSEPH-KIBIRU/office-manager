@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import { handle, ok, fail } from "@/lib/api";
 import { processEmailSync } from "@/lib/email/sync";
 
+export const maxDuration = 60;
+
 /**
  * Scheduled email-sync runner. Authorised by a shared secret
  * (Authorization: Bearer <secret>, or ?key=<secret>).

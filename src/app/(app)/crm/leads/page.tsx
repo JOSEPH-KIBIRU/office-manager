@@ -15,6 +15,12 @@ interface Lead {
   status: "new" | "contacted" | "qualified" | "disqualified" | "converted";
   value?: number;
   notes?: string;
+  aiScore?: number;
+  aiConfidence?: number;
+  aiSummary?: string;
+  aiIntent?: string;
+  aiNextAction?: string;
+  aiUpdatedAt?: number;
 }
 
 const EMPTY = {
@@ -28,6 +34,13 @@ const EMPTY = {
 };
 
 const EDITABLE_STATUSES = ["new", "contacted", "qualified", "disqualified"] as const;
+
+function aiTone(score?: number): string {
+  if (score == null) return "bg-slate-100 text-slate-600";
+  if (score >= 70) return "bg-emerald-50 text-emerald-700";
+  if (score >= 45) return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
 
 export default function LeadsPage() {
   const toast = useToast();
@@ -45,6 +58,8 @@ export default function LeadsPage() {
   const [formStatus, setFormStatus] = useState<string>("new");
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [scoringId, setScoringId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,6 +163,70 @@ export default function LeadsPage() {
     }
   }
 
+  async function reviewInbox() {
+    setAiBusy(true);
+    try {
+      const result = await api<{ reviewed: number; created: number; linked: number }>(
+        "/api/crm/ai/leads/review",
+        { method: "POST", json: { limit: 8 } }
+      );
+      toast.success(
+        `AI reviewed ${result.reviewed} email(s): ${result.created} new lead(s), ${result.linked} linked.`
+      );
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI review failed");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function scoreUnscored() {
+    setAiBusy(true);
+    try {
+      const result = await api<{ scored: number }>("/api/crm/ai/leads/score", {
+        method: "POST",
+        json: { limit: 5 },
+      });
+      toast.success(`AI scored ${result.scored} lead(s).`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI scoring failed");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function scoreLead(l: Lead) {
+    setScoringId(l._id);
+    try {
+      const result = await api<{
+        score: number;
+        confidence: number;
+        summary: string;
+        intent: string;
+        nextAction: string;
+      }>(`/api/crm/ai/leads/${l._id}/score`, { method: "POST" });
+      setEditing((prev) =>
+        prev && prev._id === l._id
+          ? {
+              ...prev,
+              aiScore: result.score,
+              aiConfidence: result.confidence,
+              aiSummary: result.summary,
+              aiIntent: result.intent,
+              aiNextAction: result.nextAction,
+            }
+          : prev
+      );
+      toast.success(`AI score: ${result.score}/100`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI scoring failed");
+    } finally {
+      setScoringId(null);
+    }
+  }
   if (Array.isArray(modules) && !can("crm-leads")) {
     return (
       <>
@@ -183,6 +262,14 @@ export default function LeadsPage() {
           <option value="converted">Converted</option>
         </select>
         <span className="text-xs text-slate-500">{rows.length} lead(s)</span>
+        {can("crm-email") && (
+          <button type="button" className="btn-secondary" onClick={reviewInbox} disabled={aiBusy}>
+            {aiBusy ? "Reviewing..." : "AI review inbox"}
+          </button>
+        )}
+        <button type="button" className="btn-secondary" onClick={scoreUnscored} disabled={aiBusy}>
+          {aiBusy ? "Scoring..." : "Score unrated"}
+        </button>
       </div>
 
       <div className="card overflow-x-auto">
@@ -195,14 +282,15 @@ export default function LeadsPage() {
               <th>Phone</th>
               <th>Source</th>
               <th className="text-right">Value</th>
+              <th>AI</th>
               <th>Status</th>
               <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={8} className="py-8 text-center text-slate-500">Loading leads…</td></tr>}
+            {loading && <tr><td colSpan={9} className="py-8 text-center text-slate-500">Loading leads…</td></tr>}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={8} className="py-8 text-center text-slate-500">No leads yet.</td></tr>
+              <tr><td colSpan={9} className="py-8 text-center text-slate-500">No leads yet.</td></tr>
             )}
             {!loading && rows.map((l) => (
               <tr key={l._id}>
@@ -212,8 +300,34 @@ export default function LeadsPage() {
                 <td>{l.phone || "—"}</td>
                 <td>{l.source || "—"}</td>
                 <td className="text-right">{l.value != null ? l.value.toLocaleString() : "—"}</td>
+                <td>
+                  {l.aiScore != null ? (
+                    <div className="flex max-w-[17rem] flex-col gap-0.5">
+                      <span className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${aiTone(l.aiScore)}`}>
+                        {l.aiScore}/100
+                      </span>
+                      {l.aiNextAction && (
+                        <span
+                          className="truncate text-[11px] text-slate-500"
+                          title={[l.aiSummary, l.aiIntent, l.aiNextAction].filter(Boolean).join("\n")}
+                        >
+                          {l.aiNextAction}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-slate-400">&mdash;</span>
+                  )}
+                </td>
                 <td><StatusBadge status={l.status} /></td>
                 <td className="space-x-1.5 whitespace-nowrap text-right">
+                  <button
+                    className="btn-secondary px-2 py-1 text-xs"
+                    onClick={() => scoreLead(l)}
+                    disabled={scoringId === l._id}
+                  >
+                    {scoringId === l._id ? "Scoring..." : "AI"}
+                  </button>
                   {l.status !== "converted" && l.status !== "disqualified" && (
                     <button className="btn-success px-2 py-1 text-xs" onClick={() => convert(l)}>Convert</button>
                   )}
@@ -230,6 +344,27 @@ export default function LeadsPage() {
         <Modal title={editing ? "Edit lead" : "New lead"} onClose={() => setOpen(false)}>
           <form onSubmit={save} className="space-y-3">
             {formError && <Alert kind="error">{formError}</Alert>}
+            {editing && (
+              <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-xs text-slate-600">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-slate-800">AI assessment</span>
+                  <span className={`rounded-full px-2 py-0.5 font-semibold ${aiTone(editing.aiScore)}`}>
+                    {editing.aiScore != null ? `${editing.aiScore}/100` : "Not scored"}
+                  </span>
+                </div>
+                {editing.aiSummary && <p className="mt-2 max-h-20 overflow-y-auto">{editing.aiSummary}</p>}
+                {editing.aiIntent && <p className="mt-1"><strong>Intent:</strong> {editing.aiIntent}</p>}
+                {editing.aiNextAction && <p className="mt-1"><strong>Next action:</strong> {editing.aiNextAction}</p>}
+                <button
+                  type="button"
+                  className="btn-secondary mt-2 px-2 py-1 text-xs"
+                  onClick={() => scoreLead(editing)}
+                  disabled={scoringId === editing._id}
+                >
+                  {scoringId === editing._id ? "Scoring..." : "Score with AI"}
+                </button>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div><label className="label">Company</label><input className="input" value={form.companyName} onChange={(e) => setForm((p) => ({ ...p, companyName: e.target.value }))} autoFocus /></div>
               <div><label className="label">Contact name</label><input className="input" value={form.contactName} onChange={(e) => setForm((p) => ({ ...p, contactName: e.target.value }))} /></div>
