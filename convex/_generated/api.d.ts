@@ -24,6 +24,7 @@ import type * as chat from "../chat.js";
 import type * as checklists from "../checklists.js";
 import type * as close from "../close.js";
 import type * as crmActivities from "../crmActivities.js";
+import type * as crmAutomation from "../crmAutomation.js";
 import type * as crmCompanies from "../crmCompanies.js";
 import type * as crmContacts from "../crmContacts.js";
 import type * as crmDeals from "../crmDeals.js";
@@ -98,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   checklists: typeof checklists;
   close: typeof close;
   crmActivities: typeof crmActivities;
+  crmAutomation: typeof crmAutomation;
   crmCompanies: typeof crmCompanies;
   crmContacts: typeof crmContacts;
   crmDeals: typeof crmDeals;

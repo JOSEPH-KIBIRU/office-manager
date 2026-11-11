@@ -1450,6 +1450,8 @@ export default defineSchema(
     contactId: v.optional(v.id("crmContacts")),
     leadId: v.optional(v.id("crmLeads")),
     dealId: v.optional(v.id("crmDeals")),
+    quotationId: v.optional(v.id("crmQuotations")),
+    automationKey: v.optional(v.string()),
     completedAt: v.optional(v.number()),
     createdBy: v.id("users"),
     createdAt: v.number(),
@@ -1459,7 +1461,8 @@ export default defineSchema(
     .index("by_org_assignee", ["orgId", "assigneeId"])
     .index("by_org_status", ["orgId", "status"])
     .index("by_org_due", ["orgId", "dueAt"])
-    .index("by_org_deal", ["orgId", "dealId"]),
+    .index("by_org_deal", ["orgId", "dealId"])
+    .index("by_org_automation", ["orgId", "automationKey"]),
 
   crmQuotations: defineTable({
     orgId: v.id("organizations"),

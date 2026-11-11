@@ -12,6 +12,7 @@ interface Task {
   dueAt?: number;
   status: "open" | "done" | "cancelled";
   priority?: "low" | "normal" | "high" | "urgent";
+  automationKey?: string;
 }
 
 const EMPTY = { title: "", description: "", due: "", priority: "normal" };
@@ -31,6 +32,7 @@ export default function CrmTasksPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -90,6 +92,23 @@ export default function CrmTasksPage() {
     }
   }
 
+  async function runAutomation() {
+    setRunning(true);
+    try {
+      const result = await api<{ leads: number; deals: number; quotes: number }>(
+        "/api/crm/automation/run",
+        { method: "POST" }
+      );
+      toast.success(
+        `Follow-up run complete: ${result.leads} lead, ${result.deals} deal, ${result.quotes} quote task(s).`
+      );
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Follow-up run failed");
+    } finally {
+      setRunning(false);
+    }
+  }
   async function remove(t: Task) {
     if (!confirm(`Delete task "${t.title}"?`)) return;
     try {
@@ -115,7 +134,14 @@ export default function CrmTasksPage() {
       <PageHeader
         title="Tasks"
         subtitle="Follow-ups across your CRM."
-        action={<button className="btn-primary" onClick={() => setOpen(true)}>+ New task</button>}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={runAutomation} disabled={running}>
+              {running ? "Running..." : "Run follow-ups"}
+            </button>
+            <button className="btn-primary" onClick={() => setOpen(true)}>+ New task</button>
+          </div>
+        }
       />
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
@@ -143,7 +169,10 @@ export default function CrmTasksPage() {
             {!loading && rows.map((t) => (
               <tr key={t._id}>
                 <td><input type="checkbox" className="h-4 w-4" checked={t.status === "done"} onChange={() => toggle(t)} aria-label="Toggle task" /></td>
-                <td className={t.status === "done" ? "text-slate-400 line-through" : "font-medium"}>{t.title}</td>
+                <td className={t.status === "done" ? "text-slate-400 line-through" : "font-medium"}>
+                  {t.title}
+                  {t.automationKey && <span className="ml-1.5 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-indigo-700">auto</span>}
+                </td>
                 <td>{fmtDue(t.dueAt)}</td>
                 <td className="capitalize">{t.priority ?? "normal"}</td>
                 <td><StatusBadge status={t.status} /></td>
