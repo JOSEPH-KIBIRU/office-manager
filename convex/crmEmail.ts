@@ -511,6 +511,8 @@ export const convertToLead = mutation({
     }
 
     await ctx.db.patch(args.id, { leadId, ignored: false });
+    // A linked email counts as activity and resets the stale-lead timer.
+    await ctx.db.patch(leadId, { updatedAt: tsNow() });
     return { leadId, created };
   },
 });

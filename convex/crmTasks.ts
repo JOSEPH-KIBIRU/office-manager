@@ -74,7 +74,7 @@ export const createTask = mutation({
     if (args.dealId) await requireOptionalRef(ctx, args.orgId, args.dealId, "Deal");
 
     const now = tsNow();
-    return ctx.db.insert("crmTasks", {
+    const id = await ctx.db.insert("crmTasks", {
       orgId: args.orgId,
       title,
       description: clean(args.description),
@@ -90,6 +90,12 @@ export const createTask = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    // A manually created follow-up is CRM activity; reset stale timers.
+    if (args.leadId) await ctx.db.patch(args.leadId, { updatedAt: now });
+    if (args.dealId) await ctx.db.patch(args.dealId, { updatedAt: now });
+    if (args.companyId) await ctx.db.patch(args.companyId, { updatedAt: now });
+    if (args.contactId) await ctx.db.patch(args.contactId, { updatedAt: now });
+    return id;
   },
 });
 

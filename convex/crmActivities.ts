@@ -72,7 +72,7 @@ export const createActivity = mutation({
     await requireMember(ctx, args.orgId, args.actorId);
     await requireActivityEntity(ctx, args.orgId, args.entityType, args.entityId);
     const now = tsNow();
-    return ctx.db.insert("crmActivities", {
+    const id = await ctx.db.insert("crmActivities", {
       orgId: args.orgId,
       entityType: args.entityType,
       entityId: args.entityId,
@@ -84,6 +84,15 @@ export const createActivity = mutation({
       metadata: args.metadata,
       createdAt: now,
     });
+    try {
+      const entity = await ctx.db.get(args.entityId as never);
+      if (entity && (entity as { orgId?: unknown }).orgId === args.orgId) {
+        await ctx.db.patch((entity as { _id: any })._id, { updatedAt: now });
+      }
+    } catch {
+      /* activity is still recorded if the source record was removed */
+    }
+    return id;
   },
 });
 
