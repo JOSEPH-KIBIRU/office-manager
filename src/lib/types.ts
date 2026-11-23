@@ -180,6 +180,49 @@ export interface MeetingRow {
   updated_at: string;
 }
 
+/** Hospital / clinic add-on: a registered patient. */
+export interface PatientRow {
+  id: string;
+  patientNumber: string;
+  fullName: string;
+  phone: string | null;
+  email: string | null;
+  gender: string | null;
+  dateOfBirth: string | null;
+  address: string | null;
+  notes: string | null;
+  createdAt: number;
+  updatedAt: number | null;
+}
+
+export type ConsultationPaymentMethod =
+  | "cash"
+  | "mpesa"
+  | "card"
+  | "bank_transfer"
+  | "insurance"
+  | "other";
+
+export type ConsultationPaymentStatus = "paid" | "unpaid";
+
+/** Hospital / clinic add-on: one billable consultation / procedure. */
+export interface ConsultationRow {
+  id: string;
+  patientId: string;
+  patientName: string;
+  patientNumber: string;
+  patientPhone: string | null;
+  consultationDate: string;
+  procedureName: string;
+  doctorName: string | null;
+  amount: number;
+  paymentMethod: ConsultationPaymentMethod;
+  paymentStatus: ConsultationPaymentStatus;
+  notes: string | null;
+  createdAt: number;
+  updatedAt: number | null;
+}
+
 export interface MinuteRow {
   id: string;
   meeting_id: string | null;

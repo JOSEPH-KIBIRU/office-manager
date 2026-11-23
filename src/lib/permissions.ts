@@ -55,6 +55,7 @@ export type ModuleKey =
   | "petty-cash"
   | "accounting"
   | "cars"
+  | "patients"
   | "reports"
   | "tasks"
   | "meetings"
@@ -122,6 +123,8 @@ export const MODULES: ModuleDef[] = [
   // Kept separate from the Accounting bundle (operational expenses).
   { key: "petty-cash", label: "Petty Cash", group: "Finance" },
   { key: "cars", label: "Car Logs", group: "Finance" },
+  // Hospital / clinic add-on (grant it to the roles that work with patients).
+  { key: "patients", label: "Patient Consultations", group: "Healthcare" },
   { key: "reports", label: "Reports", group: "Reporting" },
   { key: "tasks", label: "Tasks", group: "Operations" },
   { key: "chat", label: "Team chat", group: "Operations" },
@@ -145,6 +148,7 @@ export const GROUP_ORDER = [
   "Accounting",
   "Controls",
   "Finance",
+  "Healthcare",
   "Reporting",
   "Operations",
   "Company",

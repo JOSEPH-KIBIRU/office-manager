@@ -77,13 +77,16 @@ export function Modal({
   title,
   children,
   onClose,
+  size = "md",
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  size?: "md" | "lg" | "xl";
 }) {
   const ref = useDialogA11y(onClose);
   const titleId = useId();
+  const width = size === "xl" ? "max-w-4xl" : size === "lg" ? "max-w-2xl" : "max-w-lg";
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4"
@@ -96,7 +99,7 @@ export function Modal({
         aria-labelledby={titleId}
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
-        className="card my-auto max-h-[90vh] w-full max-w-lg overflow-y-auto p-6 outline-none"
+        className={`card my-auto max-h-[90vh] w-full ${width} overflow-y-auto p-6 outline-none`}
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 id={titleId} className="text-lg font-bold">{title}</h3>
@@ -114,6 +117,7 @@ const STATUS_STYLES: Record<string, string> = {
   approved: "bg-emerald-100 text-emerald-800",
   rejected: "bg-red-100 text-red-700",
   paid: "bg-blue-100 text-blue-800",
+  unpaid: "bg-amber-100 text-amber-800",
   scheduled: "bg-blue-100 text-blue-800",
   completed: "bg-emerald-100 text-emerald-800",
   cancelled: "bg-red-100 text-red-700",

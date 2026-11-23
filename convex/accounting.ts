@@ -61,6 +61,8 @@ export const DEFAULT_CHART: SeedAccount[] = [
   { code: "3100", name: "Retained earnings", type: "equity", group: "Equity", control: "retained_earnings" },
   { code: "4000", name: "Sales and services", type: "income", group: "Revenue", taxTreatment: "vat_16" },
   { code: "4100", name: "Other income", type: "income", group: "Other income" },
+  // Hospital / clinic add-on. Medical services are VAT-exempt in Kenya.
+  { code: "4200", name: "Consultation income", type: "income", group: "Revenue", parentCode: "4000", taxTreatment: "exempt" },
   { code: "4600", name: "Cost of sales", type: "cost_of_sales", group: "Cost of sales", parentCode: undefined },
   { code: "4610", name: "Direct materials", type: "cost_of_sales", group: "Cost of sales", parentCode: "4600" },
   { code: "4620", name: "Direct labour", type: "cost_of_sales", group: "Cost of sales", parentCode: "4600" },
@@ -268,6 +270,7 @@ export type PostSource =
   | "bank"
   | "vat"
   | "depreciation"
+  | "consultation"
   | "manual";
 
 export interface PostJournalInput {

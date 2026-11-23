@@ -56,6 +56,7 @@ import type * as orgData from "../orgData.js";
 import type * as organizations from "../organizations.js";
 import type * as orgs from "../orgs.js";
 import type * as passwordReset from "../passwordReset.js";
+import type * as patients from "../patients.js";
 import type * as payroll from "../payroll.js";
 import type * as permissions from "../permissions.js";
 import type * as pettyCash from "../pettyCash.js";
@@ -131,6 +132,7 @@ declare const fullApi: ApiFromModules<{
   organizations: typeof organizations;
   orgs: typeof orgs;
   passwordReset: typeof passwordReset;
+  patients: typeof patients;
   payroll: typeof payroll;
   permissions: typeof permissions;
   pettyCash: typeof pettyCash;

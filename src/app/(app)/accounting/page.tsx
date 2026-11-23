@@ -270,7 +270,7 @@ export default function AccountingPage() {
     <>
       <PageHeader
         title="Accounting"
-        subtitle="A double-entry general ledger fed automatically by invoices, bills, petty cash, car logs and payroll."
+        subtitle="A double-entry general ledger fed automatically by invoices, bills, petty cash, car logs, patient consultations and payroll."
       />
 
       {error && <div className="mb-4"><Alert kind="error">{error}</Alert></div>}
@@ -432,7 +432,7 @@ function LedgerTab({ onPosted }: { onPosted: () => void }) {
         <p className="card p-6 text-sm text-slate-400">Loading ledger…</p>
       ) : journals.length === 0 ? (
         <p className="card p-6 text-sm text-slate-400">
-          No journals yet. Approve an invoice, bill, petty cash request, car log or payroll run and it will appear here.
+          No journals yet. Approve an invoice, bill, petty cash request, car log, patient consultation or payroll run and it will appear here.
         </p>
       ) : (
         <div className="space-y-3">

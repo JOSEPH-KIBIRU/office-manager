@@ -49,6 +49,8 @@ const FK: Record<string, string[]> = {
   calendarEvents: ["userId"],
   calendarSyncJobs: ["userId"],
   visitors: ["visitorTo"],
+  patients: ["createdBy"],
+  patientConsultations: ["patientId", "recordedBy", "journalId"],
 };
 
 /** Dependency order for rebuilding (referenced tables must come first). */
@@ -57,6 +59,7 @@ const RESTORE_ORDER = [
   "users",
   "casuals",
   "contacts",
+  "patients",
   "ledgerAccounts",
   "holidays",
   "staffLoans",
@@ -83,6 +86,7 @@ const RESTORE_ORDER = [
   "pettyCashBudgets",
   "accountingPeriods",
   "journals",
+  "patientConsultations",
   "bankLines",
   "calendarConnections",
   "calendarEvents",

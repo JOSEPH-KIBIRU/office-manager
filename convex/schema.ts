@@ -799,6 +799,7 @@ export default defineSchema(
       v.literal("bank"),
       v.literal("vat"),
       v.literal("depreciation"),
+      v.literal("consultation"),
       v.literal("manual")
     ),
     sourceId: v.optional(v.string()),
@@ -1219,6 +1220,45 @@ export default defineSchema(
     status: v.union(v.literal("pending"), v.literal("seen"), v.literal("completed")),
     createdAt: v.number(),
   }).index("by_org", ["orgId"]),
+
+  // Hospital / clinic add-on: patient register and consultation (service) log.
+  patients: defineTable({
+    orgId: v.id("organizations"),
+    patientNumber: v.string(),
+    fullName: v.string(),
+    phone: v.optional(v.string()),
+    email: v.optional(v.string()),
+    gender: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
+    address: v.optional(v.string()),
+    notes: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_name", ["orgId", "fullName"])
+    .index("by_org_number", ["orgId", "patientNumber"]),
+
+  patientConsultations: defineTable({
+    orgId: v.id("organizations"),
+    patientId: v.id("patients"),
+    consultationDate: v.string(),
+    procedureName: v.string(),
+    doctorName: v.optional(v.string()),
+    amount: v.number(),
+    paymentMethod: v.string(),
+    paymentStatus: v.union(v.literal("paid"), v.literal("unpaid")),
+    notes: v.optional(v.string()),
+    recordedBy: v.optional(v.id("users")),
+    // The journal this fee posted to. Editing/deleting reverses and re-posts.
+    journalId: v.optional(v.id("journals")),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_org", ["orgId"])
+    .index("by_org_date", ["orgId", "consultationDate"])
+    .index("by_patient", ["patientId"]),
 
   holidays: defineTable({
     orgId: v.id("organizations"),

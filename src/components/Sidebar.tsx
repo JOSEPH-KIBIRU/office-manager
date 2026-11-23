@@ -119,6 +119,12 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: "Healthcare",
+    items: [
+      { href: "/patients", label: "Patient Consultations", icon: "🩺", roles: ["admin", "secretary", "manager"], module: "patients" },
+    ],
+  },
+  {
     title: "Company",
     items: [
       { href: "/organization", label: "Branding & Company", icon: "🎨", roles: ["admin", "secretary"], module: "organization" },

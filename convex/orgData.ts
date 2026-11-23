@@ -19,6 +19,9 @@ export const ORG_TABLES = [
   "payrolls",
   "notifications",
   "contacts",
+  // Hospital / clinic add-on.
+  "patients",
+  "patientConsultations",
   "invoices",
   "bills",
   "storedFiles",
