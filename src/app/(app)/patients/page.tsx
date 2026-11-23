@@ -5,6 +5,9 @@ import Link from "next/link";
 import { PageHeader, Alert, Modal, ConfirmDialog, StatusBadge, FieldError, api } from "@/components/ui";
 import { useToast } from "@/components/toast";
 import { useSession } from "@/components/SessionProvider";
+import PatientsImportModal from "@/components/patients/PatientsImportModal";
+import PatientsReportPanel from "@/components/patients/PatientsReportPanel";
+import type { ApiOrg } from "@/components/OrgBranding";
 import { formatKes, formatDate } from "@/lib/format";
 import { toCsv } from "@/lib/csv";
 import type {
@@ -553,7 +556,7 @@ function ConsultationModal({
  * Page
  * ------------------------------------------------------------------ */
 
-type Tab = "consultations" | "patients";
+type Tab = "consultations" | "patients" | "reports";
 
 type DeleteTarget =
   | { kind: "consultation"; row: ConsultationRow }
@@ -572,6 +575,9 @@ export default function PatientsPage() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [methodFilter, setMethodFilter] = useState("all");
+  const [genderFilter, setGenderFilter] = useState("all");
+  const [balanceFilter, setBalanceFilter] = useState("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [patientFilter, setPatientFilter] = useState("");
@@ -580,6 +586,8 @@ export default function PatientsPage() {
   const [editingConsultation, setEditingConsultation] = useState<ConsultationRow | null>(null);
   const [patientOpen, setPatientOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<PatientRow | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [org, setOrg] = useState<ApiOrg | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -604,6 +612,9 @@ export default function PatientsPage() {
 
   useEffect(() => {
     load();
+    api<ApiOrg>("/api/organization")
+      .then(setOrg)
+      .catch(() => setOrg(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -646,23 +657,35 @@ export default function PatientsPage() {
           .toLowerCase()
           .includes(term);
       const matchesStatus = statusFilter === "all" || c.paymentStatus === statusFilter;
+      const matchesMethod = methodFilter === "all" || c.paymentMethod === methodFilter;
       const matchesPatient = !patientFilter || c.patientId === patientFilter;
       const matchesFrom = !fromDate || c.consultationDate >= fromDate;
       const matchesTo = !toDate || c.consultationDate <= toDate;
-      return matchesSearch && matchesStatus && matchesPatient && matchesFrom && matchesTo;
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesMethod &&
+        matchesPatient &&
+        matchesFrom &&
+        matchesTo
+      );
     });
-  }, [consultations, search, statusFilter, patientFilter, fromDate, toDate]);
+  }, [consultations, search, statusFilter, methodFilter, patientFilter, fromDate, toDate]);
 
   const filteredPatients = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return patients;
-    return patients.filter((p) =>
-      [p.fullName, p.patientNumber, p.phone ?? "", p.email ?? ""]
+    return patients.filter((p) => {
+      if (genderFilter !== "all" && p.gender !== genderFilter) return false;
+      const totals = patientTotals.get(p.id);
+      if (balanceFilter === "outstanding" && (totals?.outstanding ?? 0) <= 0) return false;
+      if (balanceFilter === "clear" && (totals?.outstanding ?? 0) > 0) return false;
+      if (!term) return true;
+      return [p.fullName, p.patientNumber, p.phone ?? "", p.email ?? ""]
         .join(" ")
         .toLowerCase()
-        .includes(term)
-    );
-  }, [patients, search]);
+        .includes(term);
+    });
+  }, [patients, patientTotals, search, genderFilter, balanceFilter]);
 
   const selectedPatient = patients.find((p) => p.id === patientFilter) ?? null;
 
@@ -670,6 +693,7 @@ export default function PatientsPage() {
     setPatientFilter(patientId);
     setSearch("");
     setStatusFilter("all");
+    setMethodFilter("all");
     setFromDate("");
     setToDate("");
     setTab("consultations");
@@ -748,44 +772,51 @@ export default function PatientsPage() {
     setToDate("");
     setPatientFilter("");
     setStatusFilter("all");
+    setMethodFilter("all");
+    setGenderFilter("all");
+    setBalanceFilter("all");
   };
 
   return (
     <>
-      <PageHeader
-        title="Patient Consultations"
-        subtitle="Register patients, record procedures and fees. Every fee posts to the accounting ledger automatically."
-        action={
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setEditingPatient(null);
-                setPatientOpen(true);
-              }}
-            >
-              Register patient
-            </button>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => {
-                setEditingConsultation(null);
-                setConsultationOpen(true);
-              }}
-            >
-              New consultation
-            </button>
-          </div>
-        }
-      />
+      <div className={tab === "reports" ? "no-print" : undefined}>
+        <PageHeader
+          title="Patient Consultations"
+          subtitle="Register patients, record procedures and fees. Every fee posts to the accounting ledger automatically."
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setImportOpen(true)}>
+                Import Excel
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setEditingPatient(null);
+                  setPatientOpen(true);
+                }}
+              >
+                Register patient
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setEditingConsultation(null);
+                  setConsultationOpen(true);
+                }}
+              >
+                New consultation
+              </button>
+            </div>
+          }
+        />
 
-      {error && (
-        <div className="mb-4">
-          <Alert kind="error">{error}</Alert>
-        </div>
-      )}
+        {error && (
+          <div className="mb-4">
+            <Alert kind="error">{error}</Alert>
+          </div>
+        )}
 
       <div className="card mb-6 flex flex-wrap items-center gap-3 border-indigo-100 bg-indigo-50/60 p-4">
         <span className="text-xl" aria-hidden="true">📒</span>
@@ -855,8 +886,22 @@ export default function PatientsPage() {
         >
           Patients <span className="ml-1 text-xs opacity-80">({patients.length})</span>
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("reports")}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            tab === "reports"
+              ? "bg-slate-900 text-white shadow-sm"
+              : "border border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+          }`}
+        >
+          Reports
+        </button>
+      </div>
       </div>
 
+      {tab !== "reports" && (
+      <>
       <div className="card mt-4 flex flex-wrap items-end gap-3 p-4">
         <label className="block min-w-[14rem] flex-1">
           <span className="label">Search</span>
@@ -887,6 +932,21 @@ export default function PatientsPage() {
               </select>
             </label>
             <label className="block">
+              <span className="label">Method</span>
+              <select
+                className="input"
+                value={methodFilter}
+                onChange={(e) => setMethodFilter(e.target.value)}
+              >
+                <option value="all">All methods</option>
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
               <span className="label">From</span>
               <input
                 type="date"
@@ -904,7 +964,45 @@ export default function PatientsPage() {
                 onChange={(e) => setToDate(e.target.value)}
               />
             </label>
-            {(fromDate || toDate || patientFilter || statusFilter !== "all") && (
+            {(fromDate ||
+              toDate ||
+              patientFilter ||
+              statusFilter !== "all" ||
+              methodFilter !== "all") && (
+              <button type="button" className="btn-secondary" onClick={clearFilters}>
+                Clear filters
+              </button>
+            )}
+          </>
+        )}
+
+        {tab === "patients" && (
+          <>
+            <label className="block">
+              <span className="label">Gender</span>
+              <select
+                className="input"
+                value={genderFilter}
+                onChange={(e) => setGenderFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="label">Balance</span>
+              <select
+                className="input"
+                value={balanceFilter}
+                onChange={(e) => setBalanceFilter(e.target.value)}
+              >
+                <option value="all">All patients</option>
+                <option value="outstanding">Has outstanding</option>
+                <option value="clear">Fully paid</option>
+              </select>
+            </label>
+            {(genderFilter !== "all" || balanceFilter !== "all") && (
               <button type="button" className="btn-secondary" onClick={clearFilters}>
                 Clear filters
               </button>
@@ -1128,6 +1226,14 @@ export default function PatientsPage() {
         Fees are recognised in the accounting ledger on the consultation date. Mark a visit as unpaid
         to track it as outstanding, then edit it to paid once settled.
       </p>
+      </>
+      )}
+
+      {tab === "reports" && (
+        <div className="mt-4">
+          <PatientsReportPanel patients={patients} consultations={consultations} org={org} />
+        </div>
+      )}
 
       {consultationOpen && (
         <ConsultationModal
@@ -1155,6 +1261,15 @@ export default function PatientsPage() {
           onSaved={() => {
             setPatientOpen(false);
             setEditingPatient(null);
+            load();
+          }}
+        />
+      )}
+
+      {importOpen && (
+        <PatientsImportModal
+          onClose={() => setImportOpen(false)}
+          onImported={() => {
             load();
           }}
         />

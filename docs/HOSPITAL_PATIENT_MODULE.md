@@ -60,7 +60,58 @@ post an adjustment journal or move the visit to an open period instead.
 - **Patients** — patient number (`P-0001`…), name, contact, age/gender, visits,
   total billed and outstanding balance. **History** jumps to that patient's
   consultations.
-- Search, payment-status and date-range filters, plus CSV export on both tabs.
+- **Reports** — patient register, consultation register and a per-patient
+  statement/history. Every report can be filtered, exported to CSV/Excel and
+  printed or saved as PDF.
+- Search, payment-status, payment-method, gender and balance filters, plus CSV
+  export on both tabs.
+
+## Importing existing Excel records
+
+Open **Patient Consultations → Import Excel**. Three layouts are supported:
+
+| Layout | Use it when |
+| --- | --- |
+| **Patients only** | The sheet is one row per patient. |
+| **Consultations only** | The patients already exist; the sheet is one row per visit. |
+| **Patients + consultations** | The sheet is one row per visit and contains the patient details (repeated or only on the first row). |
+
+Each layout has a **Download template** button that generates a real `.xlsx`
+file with the expected headings, a sample row and an instructions sheet.
+
+Import rules:
+
+- Accepted files: `.xlsx`, `.xlsm`, `.csv` (legacy `.xls` must be saved as `.xlsx`).
+- Maximum 5,000 data rows per file; 20MB upload limit.
+- Dates: `YYYY-MM-DD` or `DD/MM/YYYY` (Excel date cells are also supported).
+- Gender: `male` or `female`.
+- Payment method: cash, M-Pesa, card, bank transfer, insurance or other.
+- Payment status: paid or unpaid (default paid).
+- Duplicate patients are matched by **patient number**, then **phone**, then
+  **full name** and skipped instead of duplicated.
+- In a combined sheet, patient details can be left blank on later rows — the
+  previous patient is carried forward (handles merged cells).
+- Imports are previewed first: the page shows how many patients/visits were
+  detected, sample rows and any row-level errors before you commit.
+- Large consultation imports are committed in slices so the request does not
+  time out. Every imported visit posts to the accounting ledger exactly like a
+  manually captured visit.
+- Patients with invalid visit rows are still created; the bad visit rows are
+  reported so they can be corrected and re-imported.
+
+## Reports
+
+The **Reports** tab offers:
+
+- **Patient register** — every patient with visits, billed, collected and
+  outstanding totals.
+- **Consultation register** — visits filtered by date, payment status, payment
+  method and search.
+- **Patient statement (history)** — one patient's details, full visit history
+  and balances.
+
+Reports use the organisation header/footer and can be printed or saved as PDF,
+exported to CSV, or exported to Excel (`.xls`).
 
 ## Tests
 

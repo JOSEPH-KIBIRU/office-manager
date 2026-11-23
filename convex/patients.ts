@@ -514,3 +514,232 @@ export const deleteConsultation = mutation({
     return { id: args.id };
   },
 });
+
+/* ------------------------------------------------------------------ *
+ * Bulk import (Excel)
+ * ------------------------------------------------------------------ */
+
+function phoneDigits(value?: string): string {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function normalizedName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Create patients from an import batch. Existing patients are matched by
+ * patient number, phone or full name and returned as `skipped` so the caller
+ * can still resolve their ids for consultation rows.
+ */
+export const bulkCreatePatients = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    viewerId: v.id("users"),
+    rows: v.array(
+      v.object({
+        importKey: v.string(),
+        patientNumber: v.optional(v.string()),
+        fullName: v.string(),
+        phone: v.optional(v.string()),
+        email: v.optional(v.string()),
+        gender: v.optional(v.string()),
+        dateOfBirth: v.optional(v.string()),
+        address: v.optional(v.string()),
+        notes: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireOrg(ctx, args.orgId);
+    const viewer = await requireMember(ctx, args.orgId, args.viewerId);
+    if (args.rows.length > 200) throw new Error("Import batch is too large (max 200 patients per call)");
+
+    const existing = await ctx.db
+      .query("patients")
+      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
+      .collect();
+
+    const byNumber = new Map(existing.map((p) => [p.patientNumber.toUpperCase(), p] as const));
+    const byPhone = new Map(
+      existing.filter((p) => p.phone).map((p) => [phoneDigits(p.phone), p] as const)
+    );
+    const byName = new Map(existing.map((p) => [normalizedName(p.fullName), p] as const));
+
+    const results: Array<{
+      importKey: string;
+      status: "created" | "skipped" | "error";
+      id?: Id<"patients">;
+      patientNumber?: string;
+      message?: string;
+    }> = [];
+
+    for (const row of args.rows) {
+      const fullName = row.fullName.trim();
+      if (fullName.length < 2) {
+        results.push({ importKey: row.importKey, status: "error", message: "Patient full name is required" });
+        continue;
+      }
+
+      const gender = row.gender?.trim().toLowerCase() || undefined;
+      if (gender && gender !== "male" && gender !== "female") {
+        results.push({ importKey: row.importKey, status: "error", message: "Gender must be male or female" });
+        continue;
+      }
+
+      const dateOfBirth = row.dateOfBirth?.trim() || undefined;
+      if (dateOfBirth && !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+        results.push({ importKey: row.importKey, status: "error", message: "Date of birth must be YYYY-MM-DD" });
+        continue;
+      }
+
+      const suppliedNumber = row.patientNumber?.trim().toUpperCase() || undefined;
+      const phone = row.phone?.trim() || undefined;
+      const phoneKey = phoneDigits(phone);
+
+      const duplicate =
+        (suppliedNumber ? byNumber.get(suppliedNumber) : undefined) ||
+        (phoneKey ? byPhone.get(phoneKey) : undefined) ||
+        byName.get(normalizedName(fullName));
+
+      if (duplicate) {
+        results.push({
+          importKey: row.importKey,
+          status: "skipped",
+          id: duplicate._id,
+          patientNumber: duplicate.patientNumber,
+        });
+        continue;
+      }
+
+      const patientNumber = suppliedNumber ?? (await nextPatientNumber(ctx, args.orgId));
+      const now = tsNow();
+      const id = await ctx.db.insert("patients", {
+        orgId: args.orgId,
+        patientNumber,
+        fullName,
+        phone,
+        email: row.email?.trim() || undefined,
+        gender,
+        dateOfBirth,
+        address: row.address?.trim() || undefined,
+        notes: row.notes?.trim() || undefined,
+        createdBy: viewer._id,
+        createdAt: now,
+      });
+
+      const created = await ctx.db.get(id);
+      if (created) {
+        byNumber.set(created.patientNumber.toUpperCase(), created);
+        if (created.phone) byPhone.set(phoneDigits(created.phone), created);
+        byName.set(normalizedName(created.fullName), created);
+      }
+      results.push({ importKey: row.importKey, status: "created", id, patientNumber });
+    }
+
+    return {
+      results,
+      created: results.filter((r) => r.status === "created").length,
+      skipped: results.filter((r) => r.status === "skipped").length,
+      failed: results.filter((r) => r.status === "error").length,
+    };
+  },
+});
+
+/** Create consultations from an import batch; each fee posts to the ledger. */
+export const bulkCreateConsultations = mutation({
+  args: {
+    secret: v.string(),
+    orgId: v.id("organizations"),
+    viewerId: v.id("users"),
+    rows: v.array(
+      v.object({
+        importKey: v.string(),
+        patientId: v.id("patients"),
+        consultationDate: v.string(),
+        procedureName: v.string(),
+        doctorName: v.optional(v.string()),
+        amount: v.number(),
+        paymentMethod,
+        paymentStatus: v.union(v.literal("paid"), v.literal("unpaid")),
+        notes: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    await requireOrg(ctx, args.orgId);
+    const viewer = await requireMember(ctx, args.orgId, args.viewerId);
+    if (args.rows.length > 100) throw new Error("Import batch is too large (max 100 consultations per call)");
+
+    const results: Array<{
+      importKey: string;
+      status: "created" | "error";
+      id?: Id<"patientConsultations">;
+      message?: string;
+    }> = [];
+
+    for (const row of args.rows) {
+      const patient = await ctx.db.get(row.patientId);
+      if (!patient || patient.orgId !== args.orgId) {
+        results.push({ importKey: row.importKey, status: "error", message: "Patient not found" });
+        continue;
+      }
+
+      const procedureName = row.procedureName.trim();
+      if (!procedureName) {
+        results.push({ importKey: row.importKey, status: "error", message: "Procedure is required" });
+        continue;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(row.consultationDate)) {
+        results.push({ importKey: row.importKey, status: "error", message: "Visit date must be YYYY-MM-DD" });
+        continue;
+      }
+      const amount = roundKes(row.amount);
+      if (!(amount > 0)) {
+        results.push({ importKey: row.importKey, status: "error", message: "Amount must be greater than zero" });
+        continue;
+      }
+
+      const now = tsNow();
+      const id = await ctx.db.insert("patientConsultations", {
+        orgId: args.orgId,
+        patientId: patient._id,
+        consultationDate: row.consultationDate,
+        procedureName,
+        doctorName: row.doctorName?.trim() || undefined,
+        amount,
+        paymentMethod: row.paymentMethod,
+        paymentStatus: row.paymentStatus,
+        notes: row.notes?.trim() || undefined,
+        recordedBy: viewer._id,
+        createdAt: now,
+      });
+
+      const journalId = await postConsultationJournal(ctx, {
+        orgId: args.orgId,
+        userId: viewer._id,
+        userName: viewer.name,
+        consultationId: id,
+        patientNumber: patient.patientNumber,
+        patientName: patient.fullName,
+        consultationDate: row.consultationDate,
+        procedureName,
+        amount,
+        paymentMethod: row.paymentMethod,
+        paymentStatus: row.paymentStatus,
+      });
+      await ctx.db.patch(id, { journalId });
+
+      results.push({ importKey: row.importKey, status: "created", id });
+    }
+
+    return {
+      results,
+      created: results.filter((r) => r.status === "created").length,
+      failed: results.filter((r) => r.status === "error").length,
+    };
+  },
+});
