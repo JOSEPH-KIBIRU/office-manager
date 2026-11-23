@@ -104,8 +104,8 @@ export async function POST(req: NextRequest) {
       if (phone) maxLen(phone, "Phone", 30);
 
       const gender = String(body.newPatient?.gender ?? "").trim().toLowerCase() || undefined;
-      if (gender && !["male", "female", "other"].includes(gender)) {
-        throw new HttpError(400, "Gender must be male, female or other");
+      if (gender && !["male", "female"].includes(gender)) {
+        throw new HttpError(400, "Gender must be male or female");
       }
 
       let dateOfBirth = String(body.newPatient?.dateOfBirth ?? "").trim() || undefined;

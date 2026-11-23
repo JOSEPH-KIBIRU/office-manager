@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, maxLen, validDate } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
-const GENDERS = new Set(["male", "female", "other"]);
+const GENDERS = new Set(["male", "female"]);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface PatientBody {
@@ -38,7 +38,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
 
     const gender = String(body.gender ?? "").trim().toLowerCase() || undefined;
-    if (gender && !GENDERS.has(gender)) throw new HttpError(400, "Gender must be male, female or other");
+    if (gender && !GENDERS.has(gender)) throw new HttpError(400, "Gender must be male or female");
 
     let dateOfBirth = String(body.dateOfBirth ?? "").trim() || undefined;
     if (dateOfBirth) {
