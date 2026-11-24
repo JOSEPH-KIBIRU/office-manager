@@ -41,8 +41,13 @@ export default function Hero() {
           initial="hidden"
           whileInView="visible"
           viewport={viewportOnce}
-          className="mx-auto max-w-2xl text-center lg:mx-0 lg:text-left"
+          className="relative mx-auto max-w-2xl text-center lg:mx-0 lg:text-left"
         >
+          {/* Soft local scrim so the copy stays readable without hiding the photo. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -inset-6 rounded-[3rem] bg-zinc-950/45 blur-2xl sm:-inset-10"
+          />
           <motion.div variants={staggerItem} className="mb-5">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1 text-sm font-medium text-zinc-200 backdrop-blur">
               AI meeting minutes, now included
