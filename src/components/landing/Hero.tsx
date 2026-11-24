@@ -1,32 +1,46 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import {
   fadeInUpStrong,
-  scaleIn,
   staggerContainer,
   staggerItem,
   viewportOnce,
   hoverScale,
   tapScale,
 } from "@/lib/motion";
-import DashboardMockup from "@/components/DashboardMockup";
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden pt-6 pb-12 lg:pt-10 lg:pb-16">
-      {/* Ambient glow */}
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_50%_at_20%_0%,rgba(79,70,229,0.22),transparent_60%),radial-gradient(50%_45%_at_95%_10%,rgba(56,189,248,0.12),transparent_60%)]" />
+    <section className="relative flex min-h-[560px] items-center overflow-hidden py-16 sm:py-20 lg:min-h-[660px] lg:py-28">
+      {/* Real office photography as the hero backdrop */}
+      <div className="absolute inset-0 -z-20">
+        <Image
+          src="/images/hero/office-working.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          quality={82}
+          className="object-cover object-center"
+        />
+      </div>
+      {/* Layered overlays keep the copy readable and the brand colours intact. */}
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-zinc-950/70" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-zinc-950 via-zinc-950/80 to-zinc-950/25" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-zinc-950 via-transparent to-zinc-950/20" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_20%_10%,rgba(79,70,229,0.18),transparent_65%)]" />
 
-      <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 lg:grid-cols-[0.9fr_1.1fr] lg:gap-10 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-6 lg:px-8">
         {/* Copy */}
         <motion.div
           variants={staggerContainer}
           initial="hidden"
           whileInView="visible"
           viewport={viewportOnce}
-          className="mx-auto max-w-xl text-center lg:mx-0 lg:text-left"
+          className="mx-auto max-w-2xl text-center lg:mx-0 lg:text-left"
         >
           <motion.div variants={staggerItem} className="mb-5">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1 text-sm font-medium text-zinc-200 backdrop-blur">
@@ -73,36 +87,6 @@ export default function Hero() {
           <motion.p variants={staggerItem} className="mt-7 text-sm text-zinc-400">
             KRA-ready payroll · Isolated workspaces · Free onboarding &amp; Excel import
           </motion.p>
-        </motion.div>
-
-        {/* Right visual — a real dashboard preview, framed like an app window */}
-        <motion.div
-          variants={scaleIn}
-          initial="hidden"
-          whileInView="visible"
-          viewport={viewportOnce}
-          className="relative mx-auto w-full max-w-2xl lg:max-w-none"
-        >
-          <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-blue-600/25 via-indigo-500/20 to-violet-600/20 blur-2xl" />
-          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl shadow-black/50 ring-1 ring-white/10">
-            <div className="flex items-center gap-2 border-b border-slate-700 bg-slate-900 px-4 py-2.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
-              <span className="ml-3 hidden flex-1 sm:block">
-                <span className="inline-block rounded-md bg-white/10 px-3 py-1 text-[11px] font-medium text-slate-300 ring-1 ring-white/10">
-                  app.officemanager.co.ke/dashboard
-                </span>
-              </span>
-            </div>
-            <div className="relative max-h-[420px] overflow-hidden sm:max-h-[560px] lg:max-h-none">
-              <DashboardMockup />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-50 to-transparent lg:hidden" />
-            </div>
-          </div>
-          <p className="mt-3 text-center text-xs text-zinc-400">
-            Sample workspace — your company data stays private and isolated.
-          </p>
         </motion.div>
       </div>
     </section>
