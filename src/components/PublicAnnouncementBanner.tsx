@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 interface Ann {
   id: string;
@@ -18,7 +18,16 @@ const TYPE_ICON: Record<string, string> = {
   outage: "⚠️",
 };
 
-const DEFAULT_COLOR = "#2563eb";
+const DEFAULT_COLOR = "#4f46e5";
+const DISMISS_KEY = "om_announcement_dismissed";
+
+const DEFAULT_ANN: Ann = {
+  id: "default",
+  message: "New: AI meeting minutes — recap faster",
+  type: "info",
+  link: "#product-tour",
+  color: DEFAULT_COLOR,
+};
 
 function textForHex(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -44,36 +53,21 @@ function gradientFor(hex: string): string {
 }
 
 /**
- * Full-width strip flush with the top of the page, so the announcement reads
- * as part of the navbar rather than a floating card hovering above it.
+ * Single-line, dismissible announcement strip. It intentionally avoids the
+ * old duplicated marquee: one accessible copy, a close button and a clear link.
  */
-function AnimatedBanner({ children }: { children: ReactNode }) {
-  return <div className="relative z-40 w-full">{children}</div>;
-}
-
-/** Slow left-to-right crawl of the message only — the bar itself stays still. */
-function Marquee({ children }: { children: ReactNode }) {
-  const group = (hidden: boolean) => (
-    <div className="flex shrink-0 items-center gap-12 pr-12" aria-hidden={hidden || undefined}>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <span key={i} className="whitespace-nowrap">
-          {children}
-        </span>
-      ))}
-    </div>
-  );
-  return (
-    <div className="relative w-full overflow-hidden">
-      <div className="marquee-right flex w-max" style={{ "--marquee-duration": "95s" } as CSSProperties}>
-        {group(false)}
-        {group(true)}
-      </div>
-    </div>
-  );
-}
-
 export default function PublicAnnouncementBanner() {
   const [anns, setAnns] = useState<Ann[]>([]);
+  const [dismissed, setDismissed] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DISMISS_KEY);
+      if (raw) setDismissed(JSON.parse(raw) as string[]);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -93,49 +87,61 @@ export default function PublicAnnouncementBanner() {
     };
   }, []);
 
-  if (anns.length === 0) {
-    return (
-      <AnimatedBanner>
-        <div
-          className="flex w-full items-center justify-center gap-3 px-4 py-2 text-center text-sm font-semibold text-white"
-          style={{ background: gradientFor(DEFAULT_COLOR) }}
-        >
-          <span className="flex-none text-base leading-none">✨</span>
-          <div className="min-w-0 flex-1">
-            <Marquee>New: AI meeting minutes — recap faster</Marquee>
-          </div>
-        </div>
-      </AnimatedBanner>
-    );
+  const active = anns[0] ?? DEFAULT_ANN;
+  if (dismissed.includes(active.id)) return null;
+
+  const color = /^#[0-9a-fA-F]{6}$/.test(active.color || "") ? (active.color as string) : DEFAULT_COLOR;
+  const external = Boolean(active.link && /^https?:\/\//i.test(active.link));
+
+  function dismiss() {
+    setDismissed((prev) => {
+      const next = Array.from(new Set([...prev, active.id]));
+      try {
+        localStorage.setItem(DISMISS_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
   }
 
   return (
-    <AnimatedBanner>
-      <div className="w-full">
-        {anns.map((a) => {
-          const color = /^#[0-9a-fA-F]{6}$/.test(a.color || "") ? (a.color as string) : DEFAULT_COLOR;
-          return (
-            <div
-              key={a.id}
-              className={`flex w-full items-center gap-3 px-4 py-2 text-sm font-semibold ${textForHex(color)}`}
-              style={{ background: gradientFor(color) }}
-            >
-              <span className="flex-none text-base leading-none">{TYPE_ICON[a.type] || "🔔"}</span>
-              <div className="min-w-0 flex-1">
-                <Marquee>
-                  {a.link ? (
-                    <a href={a.link} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">
-                      {a.message}
-                    </a>
-                  ) : (
-                    a.message
-                  )}
-                </Marquee>
-              </div>
-            </div>
-          );
-        })}
+    <div
+      role="status"
+      aria-live="polite"
+      className={`flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold sm:px-4 sm:text-sm ${textForHex(color)}`}
+      style={{ background: gradientFor(color) }}
+    >
+      <span aria-hidden="true" className="flex-none text-base leading-none">
+        {TYPE_ICON[active.type] || "🔔"}
+      </span>
+      <div className="min-w-0 flex-1 text-center">
+        {active.link ? (
+          <a
+            href={active.link}
+            target={external ? "_blank" : undefined}
+            rel={external ? "noopener noreferrer" : undefined}
+            title={active.message}
+            className="block truncate underline-offset-2 hover:underline"
+          >
+            {active.message}
+          </a>
+        ) : (
+          <span title={active.message} className="block truncate">
+            {active.message}
+          </span>
+        )}
       </div>
-    </AnimatedBanner>
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label="Dismiss announcement"
+        className="flex-none rounded p-1 opacity-80 transition hover:bg-black/10 hover:opacity-100"
+      >
+        <svg fill="none" viewBox="0 0 24 24" strokeWidth={2.2} stroke="currentColor" className="h-4 w-4" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
   );
 }

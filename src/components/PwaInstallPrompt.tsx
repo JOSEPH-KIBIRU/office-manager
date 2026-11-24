@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -20,7 +21,12 @@ function isStandalone(): boolean {
  * page until the app is installed. Falls back to browser-specific instructions
  * when the browser does not expose beforeinstallprompt (notably iOS).
  */
+const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/terms", "/privacy", "/cookie-policy", "/accept-terms"];
+
 export default function PwaInstallPrompt() {
+  const pathname = usePathname();
+  const onMarketingSite =
+    PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/solutions");
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(true);
   const [help, setHelp] = useState(false);
@@ -58,7 +64,7 @@ export default function PwaInstallPrompt() {
     setHelp(true);
   }
 
-  if (installed) return null;
+  if (installed || onMarketingSite) return null;
 
   return (
     <>
@@ -66,7 +72,7 @@ export default function PwaInstallPrompt() {
         type="button"
         onClick={install}
         className="no-print fixed bottom-24 left-4 z-40 inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/10 transition hover:bg-slate-800 sm:left-6"
-        aria-label="Install Office Manager app"
+        aria-label="Install app"
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />

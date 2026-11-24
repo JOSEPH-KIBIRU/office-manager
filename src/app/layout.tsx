@@ -6,10 +6,12 @@ import PwaInstallPrompt from "@/components/PwaInstallPrompt";
 import WhatsAppWidget from "@/components/WhatsAppWidget";
 import CookieConsent from "@/components/CookieConsent";
 import MotionProvider from "@/components/MotionProvider";
+import { siteUrl } from "@/lib/siteUrl";
 
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter", preload: false });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
   title: "Office Manager",
   description: "Office management system — leave, car logs, petty cash, meetings and minutes",
   manifest: "/manifest.webmanifest",

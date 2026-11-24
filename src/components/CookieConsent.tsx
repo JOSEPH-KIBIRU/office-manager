@@ -80,6 +80,12 @@ export default function CookieConsent() {
     if (!readConsent()) setOpen(true);
   }, [isPublicPath]);
 
+  // Let floating widgets (e.g. WhatsApp) move out of the way while the banner
+  // is open, so they never cover the consent buttons or each other.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("om-cookie-banner", { detail: open }));
+  }, [open]);
+
   // Allow any "Cookie settings" link anywhere on the site to reopen the banner.
   useEffect(() => {
     const reopen = () => {
@@ -113,9 +119,9 @@ export default function CookieConsent() {
     <div
       role="dialog"
       aria-label="Cookie consent"
-      className="fixed inset-x-4 bottom-4 z-[90] sm:left-4 sm:right-auto sm:w-[26rem]"
+      className="fixed inset-x-4 bottom-4 z-[90] sm:left-4 sm:right-auto sm:w-[24rem]"
     >
-      <div className="rounded-2xl border border-white/10 bg-zinc-900/95 p-4 text-zinc-200 shadow-2xl shadow-black/50 backdrop-blur-xl">
+      <div className="rounded-2xl border border-white/10 bg-zinc-900/95 p-3.5 text-zinc-200 shadow-2xl shadow-black/50 backdrop-blur-xl">
         <div className="flex items-start gap-3">
           <span className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-indigo-600/20 text-lg">🍪</span>
           <div className="min-w-0">

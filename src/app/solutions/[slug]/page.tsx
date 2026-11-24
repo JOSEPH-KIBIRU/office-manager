@@ -1,9 +1,54 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SOLUTIONS, getSolution } from "@/lib/solutions";
+import { siteUrl } from "@/lib/siteUrl";
 import { getSolutionPageJsonLd } from "@/lib/seo";
 
 // static paths aren't required; every slug is validated at render time
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const solution = getSolution(slug);
+  if (!solution) return { title: "Solution not found" };
+
+  const base = siteUrl();
+  const url = `${base}/solutions/${solution.slug}`;
+  const title = `${solution.title} — Office Manager`;
+  const description = `${solution.tagline}. ${solution.features.slice(0, 2).join(". ")}.`.slice(0, 160);
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "website",
+      url,
+      siteName: "Office Manager",
+      title,
+      description,
+      locale: "en_KE",
+      images: [
+        {
+          url: `${base}/opengraph-image.png`,
+          width: 1200,
+          height: 630,
+          alt: `${solution.title} — Office Manager`,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [`${base}/opengraph-image.png`],
+    },
+  };
+}
 
 export default async function SolutionPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

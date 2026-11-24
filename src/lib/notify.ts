@@ -272,9 +272,15 @@ const SUPERADMIN_ALERT_PHONES = ["0798118515", "0708769459"];export async functi
   message: string;
 }) {
   const from = enquiry.company ? `${enquiry.name} (${enquiry.company})` : enquiry.name;
-  const message = `New enquiry: ${from}\nEmail: ${enquiry.email}\nPhone: ${enquiry.phone}\n${
-    enquiry.subject ? "Subject: " + enquiry.subject + "\n" : ""
-  }Message: ${enquiry.message}`;
+  const message = [
+    `New enquiry: ${from}`,
+    enquiry.email ? `Email: ${enquiry.email}` : null,
+    `Phone: ${enquiry.phone}`,
+    enquiry.subject ? `Subject: ${enquiry.subject}` : null,
+    `Message: ${enquiry.message}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
   for (const phone of SUPERADMIN_ALERT_PHONES) {
     await sendSMS(phone, message);
   }

@@ -6,7 +6,7 @@ import Hero from "@/components/landing/Hero";
 import FeatureBento from "@/components/landing/FeatureBento";
 import ModuleGrid, { ALL_MODULE_NAMES } from "@/components/landing/ModuleGrid";
 import BackToTop from "@/components/landing/BackToTop";
-import { LogoStrip, ValueProps, Compliance, HowItWorks, SecuritySection } from "@/components/landing/Sections";
+import { LogoStrip, ValueProps, Compliance, HowItWorks, MigrationSection, SecuritySection } from "@/components/landing/Sections";
 import { Pricing, Faq, FinalCta, SiteFooter } from "@/components/landing/Closing";
 import { siteUrl } from "@/lib/siteUrl";
 import { FAQS } from "@/lib/faqs";
@@ -14,9 +14,10 @@ import { FAQS } from "@/lib/faqs";
 const BASE_URL = siteUrl();
 
 export const metadata: Metadata = {
-  title: "Office Manager — All-in-One Office Management Software in Kenya",
+  metadataBase: new URL(BASE_URL),
+  title: "Office Manager | Payroll & Office Software Kenya",
   description:
-    "Office Manager is Kenya's all-in-one office management software: KRA-compliant payroll (PAYE, NSSF, SHIF, Housing Levy, HELB), employee leave, attendance, documents, assets, visitors, petty cash, car logs, meetings with AI minutes, invoicing, KRA eTIMS e-invoicing, accounting and task tracking — built for SMEs across Kenya.",
+    "All-in-one office management software for Kenyan SMEs: KRA-ready payroll, leave, attendance, accounting, invoicing, eTIMS and more. Request a demo.",
   keywords: [
     "office management software Kenya",
     "office management system Kenya",
@@ -47,17 +48,31 @@ export const metadata: Metadata = {
     type: "website",
     url: `${BASE_URL}/`,
     siteName: "Office Manager",
-    title: "Office Manager — All-in-One Office Management Software in Kenya",
+    title: "Office Manager | Payroll & Office Software Kenya",
     description:
-      "Payroll that handles PAYE, NSSF, SHIF & Housing Levy, plus leave, attendance, documents, assets, visitors, petty cash, car logs, meeting minutes, KRA eTIMS e-invoicing, accounting and tasks — all in one platform for Kenyan businesses.",
+      "KRA-ready payroll, leave, attendance, accounting, invoicing and eTIMS for Kenyan SMEs. One secure workspace. Request a demo.",
     locale: "en_KE",
     countryName: "Kenya",
+    images: [
+      {
+        url: `${BASE_URL}/opengraph-image.png`,
+        width: 1200,
+        height: 630,
+        alt: "Office Manager — all-in-one office management for Kenyan SMEs",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Office Manager — All-in-One Office Management Software in Kenya",
+    title: "Office Manager | Payroll & Office Software Kenya",
     description:
-      "KRA-compliant payroll, employee leave, attendance, documents, assets, visitors, petty cash, car logs, meeting minutes, KRA eTIMS e-invoicing and accounting for Kenyan businesses.",
+      "KRA-ready payroll, leave, attendance, accounting, invoicing and eTIMS for Kenyan SMEs.",
+    images: [
+      {
+        url: `${BASE_URL}/opengraph-image.png`,
+        alt: "Office Manager — all-in-one office management for Kenyan SMEs",
+      },
+    ],
   },
   robots: { index: true, follow: true },
   category: "business",
@@ -70,10 +85,25 @@ const jsonLd = {
       "@type": "Organization",
       name: "Office Manager",
       url: `${BASE_URL}/`,
+      logo: `${BASE_URL}/icon-512.png`,
       description:
         "All-in-one office management software for Kenyan businesses — payroll, leave, attendance, documents, assets, visitors, petty cash, car logs, meetings, invoicing, KRA eTIMS e-invoicing, accounting and tasks.",
       address: { "@type": "PostalAddress", addressCountry: "KE" },
+      contactPoint: {
+        "@type": "ContactPoint",
+        telephone: "+254798118515",
+        contactType: "sales",
+        areaServed: "KE",
+        availableLanguage: ["en"],
+      },
       areaServed: "Kenya",
+    },
+    {
+      "@type": "WebSite",
+      name: "Office Manager",
+      url: `${BASE_URL}/`,
+      inLanguage: "en-KE",
+      publisher: { "@type": "Organization", name: "Office Manager" },
     },
     {
       "@type": "SoftwareApplication",
@@ -81,14 +111,17 @@ const jsonLd = {
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       url: `${BASE_URL}/`,
+      screenshot: `${BASE_URL}/opengraph-image.png`,
       description:
         "KRA-compliant payroll, employee leave management, attendance, document and asset registers, visitor management, petty cash, car logs, meetings, invoicing with KRA eTIMS e-invoicing, double-entry accounting and task tracking software for Kenyan businesses.",
+      publisher: { "@type": "Organization", name: "PigieCore Solutions" },
       offers: {
         "@type": "AggregateOffer",
         lowPrice: "3500",
         highPrice: "8000",
         priceCurrency: "KES",
         offerCount: "2",
+        availability: "https://schema.org/InStock",
       },
       countriesSupported: "KE",
       featureList: ALL_MODULE_NAMES,
@@ -126,23 +159,24 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
       <Compliance />
       <ProductShowcase />
       <HowItWorks />
+      <MigrationSection />
       <SecuritySection />
       <Pricing />
       <Faq />
       <FinalCta />
 
       {/* Contact */}
-      <section id="contact" className="section scroll-mt-20 border-t border-white/5">
+      <section id="contact" className="section scroll-mt-36 border-t border-white/5">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="grid gap-12 lg:grid-cols-2">
             <div>
-              <p className="eyebrow">Get in touch</p>
+              <p className="eyebrow">Request a demo</p>
               <h2 className="mt-4 text-3xl font-semibold tracking-[-0.02em] text-white sm:text-4xl">
-                Let&apos;s talk about your office
+                Request a callback
               </h2>
               <p className="mt-4 text-zinc-400">
-                Request a demo, ask about pricing, or tell us how Office Manager can help your
-                business. Our team will get back to you quickly.
+                Leave your phone number and we&apos;ll call you back within one business hour. No long
+                forms, no obligation — just a quick conversation about your office.
               </p>
 
               <div className="mt-8 space-y-4">

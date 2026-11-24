@@ -247,7 +247,7 @@ export default function ModuleGrid() {
   return (
     <section
       id="modules"
-      className="section scroll-mt-20 border-t border-white/5"
+      className="section scroll-mt-36 border-t border-white/5"
       aria-labelledby="modules-heading"
     >
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -266,13 +266,32 @@ export default function ModuleGrid() {
           </p>
         </div>
 
-        <div className="mt-14 space-y-14">
-          {MODULE_GROUPS.map((group) => (
-            <div key={group.id} id={group.id}>
-              <h3 className="text-xl font-semibold tracking-[-0.01em] text-white">{group.title}</h3>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-400">{group.summary}</p>
+        <div className="mt-10 space-y-3">
+          {MODULE_GROUPS.map((group, index) => (
+            <details
+              key={group.id}
+              id={group.id}
+              open={index < 2}
+              className="group rounded-2xl border border-white/10 bg-white/[0.02] px-5 py-4 open:bg-white/[0.03]"
+            >
+              <summary className="flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden">
+                <div>
+                  <h3 className="text-lg font-semibold tracking-[-0.01em] text-white">
+                    {group.title}
+                  </h3>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-zinc-400">{group.summary}</p>
+                </div>
+                <span
+                  aria-hidden="true"
+                  className="mt-1 flex h-7 w-7 flex-none items-center justify-center rounded-full border border-white/15 text-zinc-400 transition group-open:rotate-45 group-open:text-white"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                  </svg>
+                </span>
+              </summary>
 
-              <ul className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="mt-6 grid grid-cols-1 gap-x-8 gap-y-6 border-t border-white/5 pt-6 sm:grid-cols-2 lg:grid-cols-3">
                 {group.modules.map((m) => (
                   <li key={m.name}>
                     <h4 className="text-sm font-semibold text-zinc-100">{m.name}</h4>
@@ -280,7 +299,7 @@ export default function ModuleGrid() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </details>
           ))}
         </div>
       </div>

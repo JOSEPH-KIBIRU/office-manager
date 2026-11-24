@@ -11,7 +11,7 @@ import {
   hoverScale,
   tapScale,
 } from "@/lib/motion";
-import GlowOrbits from "./GlowOrbits";
+import DashboardMockup from "@/components/DashboardMockup";
 
 export default function Hero() {
   return (
@@ -56,7 +56,7 @@ export default function Hero() {
                 href="#contact"
                 className="inline-flex h-12 items-center justify-center rounded-xl bg-indigo-600 px-7 text-base font-medium text-white shadow-lg shadow-indigo-900/40 transition hover:bg-indigo-500"
               >
-                Request a Free Demo
+                Request a demo
               </Link>
             </motion.div>
 
@@ -70,12 +70,12 @@ export default function Hero() {
             </motion.div>
           </motion.div>
 
-          <motion.p variants={staggerItem} className="mt-7 text-sm text-zinc-500">
-            KRA-ready payroll · Isolated workspaces · Built for Kenyan SMEs
+          <motion.p variants={staggerItem} className="mt-7 text-sm text-zinc-400">
+            KRA-ready payroll · Isolated workspaces · Free onboarding &amp; Excel import
           </motion.p>
         </motion.div>
 
-        {/* Right visual — glowing orbits of the workspace modules */}
+        {/* Right visual — a real dashboard preview, framed like an app window */}
         <motion.div
           variants={scaleIn}
           initial="hidden"
@@ -83,7 +83,26 @@ export default function Hero() {
           viewport={viewportOnce}
           className="relative mx-auto w-full max-w-2xl lg:max-w-none"
         >
-          <GlowOrbits />
+          <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-blue-600/25 via-indigo-500/20 to-violet-600/20 blur-2xl" />
+          <div className="overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl shadow-black/50 ring-1 ring-white/10">
+            <div className="flex items-center gap-2 border-b border-slate-700 bg-slate-900 px-4 py-2.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
+              <span className="ml-3 hidden flex-1 sm:block">
+                <span className="inline-block rounded-md bg-white/10 px-3 py-1 text-[11px] font-medium text-slate-300 ring-1 ring-white/10">
+                  app.officemanager.co.ke/dashboard
+                </span>
+              </span>
+            </div>
+            <div className="relative max-h-[420px] overflow-hidden sm:max-h-[560px] lg:max-h-none">
+              <DashboardMockup />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-50 to-transparent lg:hidden" />
+            </div>
+          </div>
+          <p className="mt-3 text-center text-xs text-zinc-500">
+            Sample workspace — your company data stays private and isolated.
+          </p>
         </motion.div>
       </div>
     </section>

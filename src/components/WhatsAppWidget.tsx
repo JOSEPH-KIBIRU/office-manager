@@ -27,6 +27,7 @@ function WhatsAppIcon({ className = "h-6 w-6" }: { className?: string }) {
 export default function WhatsAppWidget() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [cookieOpen, setCookieOpen] = useState(false);
 
   const isPublic =
     pathname === "/" || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
@@ -35,10 +36,18 @@ export default function WhatsAppWidget() {
     if (!isPublic) setOpen(false);
   }, [pathname, isPublic]);
 
-  if (!isPublic) return null;
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      setCookieOpen(Boolean((event as CustomEvent<boolean>).detail));
+    };
+    window.addEventListener("om-cookie-banner", onChange);
+    return () => window.removeEventListener("om-cookie-banner", onChange);
+  }, []);
+
+  if (!isPublic || cookieOpen) return null;
 
   return (
-    <div className="no-print fixed bottom-6 left-4 z-50 flex flex-col items-start gap-3 sm:left-6">
+    <div className="no-print fixed bottom-6 right-4 z-50 flex flex-col items-end gap-3 sm:right-6">
       {open && (
         <div className="animate-[fadeup_.25s_ease-out_both] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl shadow-slate-900/20">
           <p className="border-b border-slate-100 bg-emerald-50/60 px-4 py-2 text-xs font-bold uppercase tracking-wide text-emerald-800">

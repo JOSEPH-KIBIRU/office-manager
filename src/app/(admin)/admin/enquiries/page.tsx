@@ -91,7 +91,7 @@ export default function EnquiriesPage() {
     <>
       <PageHeader
         title="Enquiries desk"
-        subtitle="Messages submitted from the website contact form. New enquiries also alert you by SMS."
+        subtitle="Demo requests and website enquiries. New submissions also alert you by SMS."
         action={
           <span className="badge bg-amber-100 text-amber-800">{counts.new} new</span>
         }
@@ -126,7 +126,11 @@ export default function EnquiriesPage() {
                   {e.company && <span className="text-sm text-slate-500">· {e.company}</span>}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
-                  <a href={`mailto:${e.email}`} className="hover:text-blue-600">{e.email}</a>
+                  {e.email ? (
+                    <a href={`mailto:${e.email}`} className="hover:text-blue-600">{e.email}</a>
+                  ) : (
+                    <span className="text-slate-400">No email supplied</span>
+                  )}
                   <a href={`tel:${e.phone}`} className="hover:text-blue-600">{e.phone}</a>
                   <span className="text-slate-400">{fmt(e.createdAt)}</span>
                 </div>

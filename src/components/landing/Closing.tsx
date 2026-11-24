@@ -11,7 +11,7 @@ import CookieSettingsButton from "@/components/CookieSettingsButton";
 
 export function Pricing() {
   return (
-    <section id="pricing" className="section scroll-mt-20">
+    <section id="pricing" className="section scroll-mt-36">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <Reveal>
           <div className="mx-auto max-w-2xl text-center">
@@ -21,7 +21,8 @@ export function Pricing() {
             </h2>
             <p className="mt-4 text-lg leading-relaxed text-zinc-400">
               Priced per business by team size — no hidden charges. Your first month is free, and
-              switching to annual billing saves you 5%.
+              switching to annual billing saves you 5%. Every plan includes free onboarding, Excel
+              import, SMS and email notifications, and role-based access.
             </p>
           </div>
         </Reveal>
@@ -101,7 +102,7 @@ export function Pricing() {
 
 export function Faq() {
   return (
-    <section id="faq" className="section scroll-mt-20 border-t border-white/5">
+    <section id="faq" className="section scroll-mt-36 border-t border-white/5">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
         <Reveal>
           <h2 className="text-center text-3xl font-semibold tracking-[-0.02em] text-white sm:text-4xl">
@@ -115,7 +116,7 @@ export function Faq() {
                 <summary className="cursor-pointer list-none font-semibold text-white marker:hidden">
                   <span className="flex items-center justify-between gap-3">
                     {f.q}
-                    <span className="text-zinc-500 transition group-open:rotate-45">＋</span>
+                    <span aria-hidden="true" className="text-zinc-500 transition group-open:rotate-45">＋</span>
                   </span>
                 </summary>
                 <p className="mt-3 text-sm leading-relaxed text-zinc-400">{f.a}</p>
@@ -145,7 +146,7 @@ export function FinalCta() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <a href="#contact" className="inline-flex items-center rounded-xl bg-white px-7 py-3.5 font-semibold text-zinc-900 shadow-lg shadow-black/20 transition hover:bg-zinc-100 active:scale-[0.98]">
-              Request a Free Demo
+              Request a demo
             </a>
             <Link href="/login" className="inline-flex items-center rounded-xl border border-white/25 bg-white/10 px-7 py-3.5 font-semibold text-white backdrop-blur transition hover:bg-white/20">
               Sign in
@@ -172,9 +173,10 @@ export function SiteFooter() {
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6">
         <div className="grid gap-10 text-center md:grid-cols-4 md:text-left">
           <div className="md:col-span-1">
-            <div className="flex items-center justify-center md:justify-start">
+            <div className="flex items-center justify-center gap-2 md:justify-start">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/office-manager-logo.svg" alt="Office Manager" className="h-14 w-auto" />
+              <img src="/office-manager-mark.svg" alt="" aria-hidden="true" className="h-10 w-10" />
+              <span className="text-lg font-bold tracking-tight text-white">Office Manager</span>
             </div>
             <p className="mt-4 text-sm leading-relaxed">
               All-in-one office management software for Kenyan businesses — payroll, leave, petty cash,
@@ -185,6 +187,11 @@ export function SiteFooter() {
           <div>
             <h3 className="text-sm font-semibold text-white">Solutions</h3>
             <ul className="mt-4 space-y-2.5 text-sm">
+              <li>
+                <Link href="/solutions" className="font-medium text-zinc-300 transition hover:text-indigo-400">
+                  All solutions
+                </Link>
+              </li>
               {SOLUTIONS.map((s) => (
                 <li key={s.slug}>
                   <Link href={`/solutions/${s.slug}`} className="transition hover:text-indigo-400">{s.title}</Link>

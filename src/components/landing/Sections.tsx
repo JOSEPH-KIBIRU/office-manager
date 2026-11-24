@@ -121,7 +121,7 @@ const STATUTORY = [
 
 export function Compliance() {
   return (
-    <section id="payroll" className="section scroll-mt-20">
+    <section id="payroll" className="section scroll-mt-36">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <Reveal>
@@ -213,6 +213,65 @@ export function HowItWorks() {
   );
 }
 
+/* ------------------------------ Data migration ------------------------------ */
+
+const MIGRATION = [
+  {
+    title: "Patients, staff & contacts",
+    body: "Patient registers, employee lists and contact books imported from Excel or CSV — without retyping.",
+  },
+  {
+    title: "Assets & documents",
+    body: "Bring across asset registers and document indexes, with the fields your team already uses.",
+  },
+  {
+    title: "Balances & history",
+    body: "We help verify opening balances and historical records so your reports start from a clean base.",
+  },
+];
+
+export function MigrationSection() {
+  return (
+    <section className="section border-t border-white/5">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <Reveal>
+          <SectionHeading
+            eyebrow="Bring your data"
+            title="Already have records in Excel?"
+            sub="We import and verify your existing registers, so your team doesn't start from scratch."
+          />
+        </Reveal>
+        <Stagger className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3">
+          {MIGRATION.map((item) => (
+            <StaggerItem key={item.title}>
+              <div className="card-premium h-full p-6">
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-500/15 text-emerald-400">
+                  <Icon d={ICONS.check} />
+                </span>
+                <h3 className="mt-5 text-base font-semibold text-white">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-zinc-400">{item.body}</p>
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
+        <Reveal delay={0.1}>
+          <div className="mt-8 text-center">
+            <a
+              href="#contact"
+              className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-900/30 transition hover:bg-indigo-500"
+            >
+              Request a demo
+            </a>
+            <p className="mt-2 text-xs text-zinc-500">
+              No obligation — just leave your phone number and we&apos;ll call you back.
+            </p>
+          </div>
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 /* -------------------------------- Security -------------------------------- */
 
 const SECURITY = [
@@ -226,7 +285,7 @@ const SECURITY = [
 
 export function SecuritySection() {
   return (
-    <section id="security" className="section scroll-mt-20">
+    <section id="security" className="section scroll-mt-36">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="grid items-center gap-12 lg:grid-cols-2">
           <Reveal>

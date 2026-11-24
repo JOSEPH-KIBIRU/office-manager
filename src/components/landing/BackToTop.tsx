@@ -19,7 +19,7 @@ export default function BackToTop() {
       aria-label="Back to top"
       aria-hidden={!show}
       tabIndex={show ? 0 : -1}
-      className={`no-print fixed bottom-6 right-4 z-50 grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-zinc-900/90 text-white shadow-lg shadow-black/40 backdrop-blur transition-all duration-300 hover:bg-zinc-800 active:scale-95 sm:right-6 ${
+      className={`no-print fixed bottom-24 right-4 z-50 grid h-12 w-12 place-items-center rounded-full border border-white/15 bg-zinc-900/90 text-white shadow-lg shadow-black/40 backdrop-blur transition-all duration-300 hover:bg-zinc-800 active:scale-95 sm:right-6 ${
         show ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"
       }`}
     >

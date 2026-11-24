@@ -34,7 +34,7 @@ export const PLANS: PlanDef[] = [
       "Invoicing & KRA eTIMS",
       "First month free",
     ],
-    cta: "Start free trial",
+    cta: "Request a trial",
     href: "#contact",
   },
   {

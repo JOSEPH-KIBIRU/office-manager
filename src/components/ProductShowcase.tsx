@@ -53,7 +53,7 @@ function EmployeesPanel() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-slate-800">{name}</div>
-              <div className="truncate text-xs text-slate-400">{role}</div>
+              <div className="truncate text-xs text-slate-500">{role}</div>
             </div>
             <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${cls as string}`}>{status}</span>
           </div>
@@ -84,13 +84,13 @@ function PayrollPanel() {
           <div key={name} className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-2.5">
             <span className="text-sm font-semibold text-slate-800">{name}</span>
             <div className="flex items-center gap-4 text-xs">
-              <span className="text-slate-400">Gross {gross}</span>
+              <span className="text-slate-500">Gross {gross}</span>
               <span className="font-bold text-slate-900">{net}</span>
             </div>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-slate-400">Payslips generated · P9 ready for filing</p>
+      <p className="mt-3 text-xs text-slate-500">Payslips generated · P9 ready for filing</p>
     </div>
   );
 }
@@ -112,13 +112,13 @@ function LeavePanel() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-slate-800">{name}</div>
-              <div className="truncate text-xs text-slate-400">{label}</div>
+              <div className="truncate text-xs text-slate-500">{label}</div>
             </div>
             <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${cls as string}`}>{action}</span>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-slate-400">Balances update automatically on approval.</p>
+      <p className="mt-3 text-xs text-slate-500">Balances update automatically on approval.</p>
     </div>
   );
 }
@@ -137,7 +137,7 @@ function FinancePanel() {
           <div key={num as string} className={`flex items-center justify-between px-4 py-3 ${i % 2 ? "bg-white" : "bg-slate-50"}`}>
             <div className="min-w-0">
               <div className="text-sm font-semibold text-slate-800">{num}</div>
-              <div className="text-xs text-slate-400">{client}</div>
+              <div className="text-xs text-slate-500">{client}</div>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-slate-600">{amt}</span>
@@ -167,7 +167,7 @@ function AccountingPanel() {
           <div key={acct} className={`flex items-center justify-between px-4 py-3 ${i % 2 ? "bg-white" : "bg-slate-50"}`}>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-slate-800">{acct}</div>
-              <div className="text-xs text-slate-400">{side === "Dr" ? "Debit" : "Credit"}</div>
+              <div className="text-xs text-slate-500">{side === "Dr" ? "Debit" : "Credit"}</div>
             </div>
             <span className="text-sm font-medium text-slate-600">{amt}</span>
           </div>
@@ -180,7 +180,7 @@ function AccountingPanel() {
           ["Net profit", "630,000", "text-emerald-700"],
         ].map(([label, val, cls]) => (
           <div key={label} className="rounded-lg bg-slate-50 px-2 py-3">
-            <div className="text-[10px] uppercase tracking-wide text-slate-400">{label}</div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
             <div className={`mt-0.5 text-sm font-bold ${cls}`}>{val}</div>
           </div>
         ))}
@@ -203,13 +203,13 @@ function TasksPanel() {
           <div key={task as string} className={`flex items-center gap-3 px-4 py-3 ${i % 2 ? "bg-white" : "bg-slate-50"}`}>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-slate-800">{task}</div>
-              <div className="truncate text-xs text-slate-400">Assigned to {who}</div>
+              <div className="truncate text-xs text-slate-500">Assigned to {who}</div>
             </div>
             <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${cls as string}`}>{status}</span>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-slate-400">Reports include photos; managers acknowledge or reopen.</p>
+      <p className="mt-3 text-xs text-slate-500">Reports include photos; managers acknowledge or reopen.</p>
     </div>
   );
 }
@@ -227,7 +227,7 @@ export default function ProductShowcase() {
   const [active, setActive] = useState<Tab>("Dashboard");
 
   return (
-    <section id="product-tour" className="section scroll-mt-20 overflow-hidden border-t border-white/5">
+    <section id="product-tour" className="section scroll-mt-36 overflow-hidden border-t border-white/5">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="eyebrow">Product tour</p>
@@ -245,8 +245,10 @@ export default function ProductShowcase() {
             {TABS.map((t) => (
               <button
                 key={t}
+                id={`product-tab-${t}`}
                 role="tab"
                 aria-selected={active === t}
+                aria-controls={`product-panel-${t}`}
                 onClick={() => setActive(t)}
                 className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${
                   active === t
@@ -265,19 +267,25 @@ export default function ProductShowcase() {
           <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-blue-600/20 via-indigo-500/20 to-violet-600/20 blur-2xl" />
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl shadow-black/50 ring-1 ring-white/10">
             {/* Window chrome */}
-            <div className="flex items-center gap-2 border-b border-white/10 bg-white/5 px-4 py-3">
+            <div className="flex items-center gap-2 border-b border-slate-700 bg-slate-900 px-4 py-3">
               <span className="h-2.5 w-2.5 rounded-full bg-red-400/80" />
               <span className="h-2.5 w-2.5 rounded-full bg-amber-400/80" />
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
               <div className="ml-3 hidden flex-1 sm:block">
-                <span className="inline-block rounded-md bg-white/10 px-3 py-1 text-[11px] font-medium text-zinc-400 ring-1 ring-white/10">
+                <span className="inline-block rounded-md bg-white/10 px-3 py-1 text-[11px] font-medium text-slate-300 ring-1 ring-white/10">
                   app.officemanager.co.ke{PATHS[active]}
                 </span>
               </div>
             </div>
 
             {/* Window body */}
-            <div key={active} className="animate-[fadeup_.35s_ease-out]">
+            <div
+              key={active}
+              id={`product-panel-${active}`}
+              role="tabpanel"
+              aria-labelledby={`product-tab-${active}`}
+              className="animate-[fadeup_.35s_ease-out]"
+            >
               {active === "Dashboard" ? (
                 <DashboardMockup />
               ) : (

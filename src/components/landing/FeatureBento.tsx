@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   WalletCards,
@@ -449,8 +450,11 @@ const features: Feature[] = [
 ];
 
 export default function FeatureBento() {
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? features : features.slice(0, 6);
+
   return (
-    <section id="features" className="relative section scroll-mt-20 overflow-hidden pt-6 sm:pt-8">
+    <section id="features" className="relative section scroll-mt-36 overflow-hidden pt-6 sm:pt-8">
       {/* Background atmosphere */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/2 top-40 h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-indigo-500/[0.035] blur-3xl" />
@@ -499,7 +503,7 @@ export default function FeatureBento() {
           viewport={viewportOnce}
           className="mt-16 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6"
         >
-          {features.map((feature) => {
+          {shown.map((feature) => {
             const Icon = feature.icon;
 
             return (
@@ -556,6 +560,18 @@ export default function FeatureBento() {
             );
           })}
         </motion.div>
+
+        {!showAll && features.length > shown.length && (
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="inline-flex items-center justify-center rounded-xl border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/10"
+            >
+              Show all {features.length} features
+            </button>
+          </div>
+        )}
 
         {/* Bottom statement */}
         <motion.div
