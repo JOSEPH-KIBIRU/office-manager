@@ -29,10 +29,10 @@ export default function Hero() {
         />
       </div>
       {/* Layered overlays keep the copy readable and the brand colours intact. */}
-      <div className="pointer-events-none absolute inset-0 z-0 bg-zinc-950/65" />
-      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-r from-zinc-950 via-zinc-950/85 to-zinc-950/30" />
-      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-zinc-950 via-transparent to-zinc-950/20" />
-      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(60%_50%_at_20%_10%,rgba(79,70,229,0.18),transparent_65%)]" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-zinc-950/25" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-r from-zinc-950/95 via-zinc-950/65 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-zinc-950/70 via-transparent to-zinc-950/10" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(60%_65%_at_25%_50%,rgba(9,9,11,0.45),transparent_72%)]" />
 
       <div className="relative z-10 mx-auto w-full max-w-7xl px-6 lg:px-8">
         {/* Copy */}
@@ -51,13 +51,13 @@ export default function Hero() {
 
           <motion.h1
             variants={fadeInUpStrong}
-            className="text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-[3.4rem] lg:leading-[1.05]"
+            className="text-4xl font-semibold tracking-tight text-white drop-shadow-[0_2px_20px_rgba(0,0,0,0.65)] sm:text-5xl lg:text-[3.4rem] lg:leading-[1.05]"
           >
             Run your whole office{" "}
             <span className="text-grad-light">from one secure workspace</span>
           </motion.h1>
 
-          <motion.p variants={staggerItem} className="mt-6 text-lg leading-relaxed text-zinc-400">
+          <motion.p variants={staggerItem} className="mt-6 text-lg leading-relaxed text-zinc-300 drop-shadow-[0_1px_12px_rgba(0,0,0,0.75)]">
             Payroll, leave, expenses, invoices, accounting, tasks and everyday operations — without
             the spreadsheets and paperwork. Built for Kenyan businesses.
           </motion.p>
@@ -85,7 +85,7 @@ export default function Hero() {
             </motion.div>
           </motion.div>
 
-          <motion.p variants={staggerItem} className="mt-7 text-sm text-zinc-400">
+          <motion.p variants={staggerItem} className="mt-7 text-sm text-zinc-300 drop-shadow-[0_1px_10px_rgba(0,0,0,0.7)]">
             KRA-ready payroll · Isolated workspaces · Free onboarding &amp; Excel import
           </motion.p>
         </motion.div>
