@@ -36,8 +36,8 @@ function EmployeesPanel() {
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-slate-800">Team directory</p>
         <div className="flex gap-1.5">
-          <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">Search</span>
-          <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">Filter</span>
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">Search</span>
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">Filter</span>
         </div>
       </div>
       <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
@@ -53,7 +53,7 @@ function EmployeesPanel() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-slate-800">{name}</div>
-              <div className="truncate text-xs text-slate-500">{role}</div>
+              <div className="truncate text-xs text-slate-600">{role}</div>
             </div>
             <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${cls as string}`}>{status}</span>
           </div>
@@ -84,13 +84,13 @@ function PayrollPanel() {
           <div key={name} className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-2.5">
             <span className="text-sm font-semibold text-slate-800">{name}</span>
             <div className="flex items-center gap-4 text-xs">
-              <span className="text-slate-500">Gross {gross}</span>
+              <span className="text-slate-600">Gross {gross}</span>
               <span className="font-bold text-slate-900">{net}</span>
             </div>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-slate-500">Payslips generated · P9 ready for filing</p>
+      <p className="mt-3 text-xs text-slate-600">Payslips generated · P9 ready for filing</p>
     </div>
   );
 }
@@ -112,13 +112,13 @@ function LeavePanel() {
             </span>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-slate-800">{name}</div>
-              <div className="truncate text-xs text-slate-500">{label}</div>
+              <div className="truncate text-xs text-slate-600">{label}</div>
             </div>
             <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${cls as string}`}>{action}</span>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-slate-500">Balances update automatically on approval.</p>
+      <p className="mt-3 text-xs text-slate-600">Balances update automatically on approval.</p>
     </div>
   );
 }
@@ -137,7 +137,7 @@ function FinancePanel() {
           <div key={num as string} className={`flex items-center justify-between px-4 py-3 ${i % 2 ? "bg-white" : "bg-slate-50"}`}>
             <div className="min-w-0">
               <div className="text-sm font-semibold text-slate-800">{num}</div>
-              <div className="text-xs text-slate-500">{client}</div>
+              <div className="text-xs text-slate-600">{client}</div>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-slate-600">{amt}</span>
@@ -167,7 +167,7 @@ function AccountingPanel() {
           <div key={acct} className={`flex items-center justify-between px-4 py-3 ${i % 2 ? "bg-white" : "bg-slate-50"}`}>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-slate-800">{acct}</div>
-              <div className="text-xs text-slate-500">{side === "Dr" ? "Debit" : "Credit"}</div>
+              <div className="text-xs text-slate-600">{side === "Dr" ? "Debit" : "Credit"}</div>
             </div>
             <span className="text-sm font-medium text-slate-600">{amt}</span>
           </div>
@@ -180,7 +180,7 @@ function AccountingPanel() {
           ["Net profit", "630,000", "text-emerald-700"],
         ].map(([label, val, cls]) => (
           <div key={label} className="rounded-lg bg-slate-50 px-2 py-3">
-            <div className="text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
+            <div className="text-[10px] uppercase tracking-wide text-slate-600">{label}</div>
             <div className={`mt-0.5 text-sm font-bold ${cls}`}>{val}</div>
           </div>
         ))}
@@ -203,13 +203,13 @@ function TasksPanel() {
           <div key={task as string} className={`flex items-center gap-3 px-4 py-3 ${i % 2 ? "bg-white" : "bg-slate-50"}`}>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-slate-800">{task}</div>
-              <div className="truncate text-xs text-slate-500">Assigned to {who}</div>
+              <div className="truncate text-xs text-slate-600">Assigned to {who}</div>
             </div>
             <span className={`rounded px-2 py-0.5 text-[11px] font-semibold ${cls as string}`}>{status}</span>
           </div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-slate-500">Reports include photos; managers acknowledge or reopen.</p>
+      <p className="mt-3 text-xs text-slate-600">Reports include photos; managers acknowledge or reopen.</p>
     </div>
   );
 }
