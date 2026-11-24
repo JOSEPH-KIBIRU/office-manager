@@ -59,7 +59,9 @@ post an adjustment journal or move the visit to an open period instead.
   register one inline in the same form.
 - **Patients** — patient number (`P-0001`…), name, contact, age/gender, visits,
   total billed and outstanding balance. **History** jumps to that patient's
-  consultations.
+  consultations. Age can be entered directly when the date of birth is unknown;
+  when a date of birth is supplied, age is calculated automatically and keeps
+  increasing over time.
 - **Reports** — patient register, consultation register and a per-patient
   statement/history. Every report can be filtered, exported to CSV/Excel and
   printed or saved as PDF.
@@ -84,6 +86,8 @@ Import rules:
 - Accepted files: `.xlsx`, `.xlsm`, `.csv` (legacy `.xls` must be saved as `.xlsx`).
 - Maximum 5,000 data rows per file; 20MB upload limit.
 - Dates: `YYYY-MM-DD` or `DD/MM/YYYY` (Excel date cells are also supported).
+- Age: optional when the date of birth is unknown; date of birth wins if both
+  are supplied.
 - Gender: `male` or `female`.
 - Payment method: cash, M-Pesa, card, bank transfer, insurance or other.
 - Payment status: paid or unpaid (default paid).

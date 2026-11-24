@@ -9,16 +9,18 @@ const SECRET = "test-secret";
 describe("patient import parser", () => {
   it("parses a patient sheet, normalises gender and dates", () => {
     const rows = [
-      ["Patient No.", "Full Name", "Phone", "Gender", "Date of Birth", "Notes"],
-      ["P-0001", "Jane Wanjiku", "0712345678", "Female", "1990-05-14", "No allergies"],
-      ["", "Peter Otieno", "0722000111", "M", "15/08/1985", ""],
+      ["Patient No.", "Full Name", "Phone", "Gender", "Date of Birth", "Age", "Notes"],
+      ["P-0001", "Jane Wanjiku", "0712345678", "Female", "1990-05-14", "", "No allergies"],
+      ["", "Peter Otieno", "0722000111", "M", "15/08/1985", "", ""],
+      ["", "Mary Achieng", "0733000222", "F", "", "41", ""],
     ];
     const parsed = parsePatientImport(rows, "patients");
 
-    expect(parsed.patients).toHaveLength(2);
+    expect(parsed.patients).toHaveLength(3);
     expect(parsed.patients[0].gender).toBe("female");
     expect(parsed.patients[1].gender).toBe("male");
     expect(parsed.patients[1].dateOfBirth).toBe("1985-08-15");
+    expect(parsed.patients[2].ageYears).toBe(41);
     expect(parsed.errors).toHaveLength(0);
   });
 
@@ -100,7 +102,7 @@ describe("convex bulk import", () => {
       viewerId: userId,
       rows: [
         { importKey: "no:P-0001", patientNumber: "P-0001", fullName: "Jane Wanjiku", phone: "0712345678", gender: "female" },
-        { importKey: "nm:Peter Otieno", fullName: "Peter Otieno", phone: "0722000111", gender: "male" },
+        { importKey: "nm:Peter Otieno", fullName: "Peter Otieno", phone: "0722000111", gender: "male", ageYears: 41 },
         { importKey: "nm:Jane Wanjiku", fullName: "Jane Wanjiku", phone: "0712345678" },
       ],
     });
@@ -110,6 +112,7 @@ describe("convex bulk import", () => {
 
     const list = await t.query(api.patients.listPatients, { secret: SECRET, orgId, viewerId: userId });
     expect(list).toHaveLength(2);
+    expect(list.find((p: any) => p.fullName === "Peter Otieno")?.ageYears).toBe(41);
     const jane = list.find((p: any) => p.fullName === "Jane Wanjiku")!;
 
     const consultations = await t.mutation(api.patients.bulkCreateConsultations, {

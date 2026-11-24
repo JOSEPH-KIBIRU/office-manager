@@ -13,6 +13,7 @@ interface PatientBody {
   email?: string;
   gender?: string;
   dateOfBirth?: string;
+  ageYears?: number | string | null;
   address?: string;
   notes?: string;
 }
@@ -42,13 +43,25 @@ function parsePatient(body: PatientBody) {
     }
   }
 
+  let ageYears: number | undefined;
+  if (!dateOfBirth && body.ageYears !== undefined && body.ageYears !== null) {
+    const raw = String(body.ageYears).trim();
+    if (raw) {
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0 || n > 150) {
+        throw new HttpError(400, "Age must be between 0 and 150");
+      }
+      ageYears = Math.round(n);
+    }
+  }
+
   const address = String(body.address ?? "").trim() || undefined;
   if (address) maxLen(address, "Address", 200);
 
   const notes = String(body.notes ?? "").trim() || undefined;
   if (notes) maxLen(notes, "Notes", 2000);
 
-  return { fullName, phone, email, gender, dateOfBirth, address, notes };
+  return { fullName, phone, email, gender, dateOfBirth, ageYears, address, notes };
 }
 
 /** List the patient register for the signed-in company. */

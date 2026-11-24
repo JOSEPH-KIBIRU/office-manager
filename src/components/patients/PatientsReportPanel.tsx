@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { OrgHeader, OrgFooter, type OrgBrandingData } from "@/components/OrgBranding";
 import { printDocument } from "@/lib/print";
 import { toCsv, htmlCell } from "@/lib/csv";
-import { formatDate, formatKes } from "@/lib/format";
+import { formatAge, formatDate, formatKes, patientAge } from "@/lib/format";
 import type { ConsultationRow, PatientRow } from "@/lib/types";
 
 type ReportType = "patient-register" | "consultation-register" | "patient-statement";
@@ -29,18 +29,6 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-function calcAge(dateOfBirth: string | null): string {
-  if (!dateOfBirth) return "—";
-  const dob = new Date(dateOfBirth + "T00:00:00");
-  if (Number.isNaN(dob.getTime())) return "—";
-  const now = new Date();
-  let age = now.getFullYear() - dob.getFullYear();
-  const beforeBirthday =
-    now.getMonth() < dob.getMonth() ||
-    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate());
-  if (beforeBirthday) age -= 1;
-  return age >= 0 ? `${age} yrs` : "—";
-}
 
 function triggerDownload(filename: string, content: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -178,6 +166,7 @@ export default function PatientsReportPanel({
           "Email",
           "Gender",
           "Date of Birth",
+          "Age",
           "Visits",
           "Billed",
           "Collected",
@@ -192,6 +181,7 @@ export default function PatientsReportPanel({
             p.email ?? "",
             p.gender ?? "",
             p.dateOfBirth ?? "",
+            patientAge(p) !== null ? String(patientAge(p)) : "",
             String(t.visits),
             t.billed.toFixed(2),
             t.collected.toFixed(2),
@@ -394,7 +384,7 @@ export default function PatientsReportPanel({
                     <td className="font-medium text-slate-800">{p.fullName}</td>
                     <td>{p.phone || p.email || "—"}</td>
                     <td>
-                      {p.gender || "—"} / {calcAge(p.dateOfBirth)}
+                      {p.gender || "—"} / {formatAge(p)}
                     </td>
                     <td className="text-right">{t.visits}</td>
                     <td className="text-right">{formatKes(t.billed)}</td>
@@ -430,7 +420,7 @@ export default function PatientsReportPanel({
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Details</p>
                 <p className="mt-1 text-slate-700">
-                  {selectedPatient.gender || "—"} · {calcAge(selectedPatient.dateOfBirth)}
+                  {selectedPatient.gender || "—"} · {formatAge(selectedPatient)}
                 </p>
                 <p className="text-slate-500">{selectedPatient.address || "No address"}</p>
               </div>

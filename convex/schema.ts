@@ -1230,6 +1230,10 @@ export default defineSchema(
     email: v.optional(v.string()),
     gender: v.optional(v.string()),
     dateOfBirth: v.optional(v.string()),
+    // Age captured when the date of birth is unknown. `ageRecordedAt` anchors
+    // it so the displayed age keeps increasing over time.
+    ageYears: v.optional(v.number()),
+    ageRecordedAt: v.optional(v.string()),
     address: v.optional(v.string()),
     notes: v.optional(v.string()),
     createdBy: v.optional(v.id("users")),

@@ -34,6 +34,10 @@ const paymentMethod = v.union(
 
 type PaymentMethod = "cash" | "mpesa" | "card" | "bank_transfer" | "insurance" | "other";
 
+function todayString(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /** Allocate the next per-company patient number (P-0001, P-0002, …). */
 async function nextPatientNumber(ctx: MutationCtx, orgId: Id<"organizations">): Promise<string> {
   for (let attempt = 0; attempt < 1000; attempt++) {
@@ -58,12 +62,17 @@ async function createPatientInternal(
     email?: string;
     gender?: string;
     dateOfBirth?: string;
+    ageYears?: number;
     address?: string;
     notes?: string;
   }
 ): Promise<{ id: Id<"patients">; patientNumber: string }> {
   const fullName = args.fullName.trim();
   if (fullName.length < 2) throw new Error("Please enter the patient's full name");
+
+  const dateOfBirth = args.dateOfBirth?.trim() || undefined;
+  const ageYears =
+    !dateOfBirth && args.ageYears !== undefined ? Math.round(args.ageYears) : undefined;
 
   const patientNumber = await nextPatientNumber(ctx, args.orgId);
   const id = await ctx.db.insert("patients", {
@@ -73,7 +82,9 @@ async function createPatientInternal(
     phone: args.phone?.trim() || undefined,
     email: args.email?.trim() || undefined,
     gender: args.gender?.trim() || undefined,
-    dateOfBirth: args.dateOfBirth?.trim() || undefined,
+    dateOfBirth,
+    ageYears,
+    ageRecordedAt: ageYears !== undefined ? todayString() : undefined,
     address: args.address?.trim() || undefined,
     notes: args.notes?.trim() || undefined,
     createdBy: args.userId,
@@ -181,6 +192,8 @@ export const listPatients = query({
       email: p.email ?? null,
       gender: p.gender ?? null,
       dateOfBirth: p.dateOfBirth ?? null,
+      ageYears: p.ageYears ?? null,
+      ageRecordedAt: p.ageRecordedAt ?? null,
       address: p.address ?? null,
       notes: p.notes ?? null,
       createdAt: p.createdAt,
@@ -199,6 +212,7 @@ export const createPatient = mutation({
     email: v.optional(v.string()),
     gender: v.optional(v.string()),
     dateOfBirth: v.optional(v.string()),
+    ageYears: v.optional(v.number()),
     address: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
@@ -215,6 +229,7 @@ export const createPatient = mutation({
       email: args.email,
       gender: args.gender,
       dateOfBirth: args.dateOfBirth,
+      ageYears: args.ageYears,
       address: args.address,
       notes: args.notes,
     });
@@ -233,6 +248,7 @@ export const updatePatient = mutation({
     email: v.optional(v.string()),
     gender: v.optional(v.string()),
     dateOfBirth: v.optional(v.string()),
+    ageYears: v.optional(v.union(v.number(), v.null())),
     address: v.optional(v.string()),
     notes: v.optional(v.string()),
   },
@@ -246,12 +262,29 @@ export const updatePatient = mutation({
     const fullName = args.fullName.trim();
     if (fullName.length < 2) throw new Error("Please enter the patient's full name");
 
+    const dateOfBirth = args.dateOfBirth?.trim() || undefined;
+    let ageYears: number | undefined;
+    let ageRecordedAt: string | undefined;
+    if (dateOfBirth) {
+      // Date of birth is the source of truth.
+    } else if (args.ageYears === null) {
+      // Explicitly cleared.
+    } else if (args.ageYears !== undefined) {
+      ageYears = Math.round(args.ageYears);
+      ageRecordedAt = todayString();
+    } else {
+      ageYears = patient.ageYears;
+      ageRecordedAt = patient.ageRecordedAt;
+    }
+
     await ctx.db.patch(args.id, {
       fullName,
       phone: args.phone?.trim() || undefined,
       email: args.email?.trim() || undefined,
       gender: args.gender?.trim() || undefined,
-      dateOfBirth: args.dateOfBirth?.trim() || undefined,
+      dateOfBirth,
+      ageYears,
+      ageRecordedAt,
       address: args.address?.trim() || undefined,
       notes: args.notes?.trim() || undefined,
       updatedAt: tsNow(),
@@ -358,6 +391,7 @@ export const createConsultation = mutation({
         phone: v.optional(v.string()),
         gender: v.optional(v.string()),
         dateOfBirth: v.optional(v.string()),
+        ageYears: v.optional(v.number()),
       })
     ),
     consultationDate: v.string(),
@@ -391,6 +425,7 @@ export const createConsultation = mutation({
         phone: args.newPatient.phone,
         gender: args.newPatient.gender,
         dateOfBirth: args.newPatient.dateOfBirth,
+        ageYears: args.newPatient.ageYears,
       });
       patientId = created.id;
     }
@@ -546,6 +581,7 @@ export const bulkCreatePatients = mutation({
         email: v.optional(v.string()),
         gender: v.optional(v.string()),
         dateOfBirth: v.optional(v.string()),
+        ageYears: v.optional(v.number()),
         address: v.optional(v.string()),
         notes: v.optional(v.string()),
       })
@@ -594,6 +630,12 @@ export const bulkCreatePatients = mutation({
         results.push({ importKey: row.importKey, status: "error", message: "Date of birth must be YYYY-MM-DD" });
         continue;
       }
+      const ageYears =
+        !dateOfBirth && row.ageYears !== undefined ? Math.round(row.ageYears) : undefined;
+      if (ageYears !== undefined && (ageYears < 0 || ageYears > 150)) {
+        results.push({ importKey: row.importKey, status: "error", message: "Age must be between 0 and 150" });
+        continue;
+      }
 
       const suppliedNumber = row.patientNumber?.trim().toUpperCase() || undefined;
       const phone = row.phone?.trim() || undefined;
@@ -624,6 +666,8 @@ export const bulkCreatePatients = mutation({
         email: row.email?.trim() || undefined,
         gender,
         dateOfBirth,
+        ageYears,
+        ageRecordedAt: ageYears !== undefined ? todayString() : undefined,
         address: row.address?.trim() || undefined,
         notes: row.notes?.trim() || undefined,
         createdBy: viewer._id,

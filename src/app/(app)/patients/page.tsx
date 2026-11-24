@@ -8,7 +8,13 @@ import { useSession } from "@/components/SessionProvider";
 import PatientsImportModal from "@/components/patients/PatientsImportModal";
 import PatientsReportPanel from "@/components/patients/PatientsReportPanel";
 import type { ApiOrg } from "@/components/OrgBranding";
-import { formatKes, formatDate } from "@/lib/format";
+import {
+  ageFromDateOfBirth,
+  formatAge,
+  formatKes,
+  formatDate,
+  patientAge,
+} from "@/lib/format";
 import { toCsv } from "@/lib/csv";
 import type {
   ConsultationPaymentMethod,
@@ -50,18 +56,6 @@ function parseAmount(value: string): number {
   return Number(value.replace(/,/g, "")) || 0;
 }
 
-function calcAge(dateOfBirth: string | null): string {
-  if (!dateOfBirth) return "—";
-  const dob = new Date(dateOfBirth + "T00:00:00");
-  if (Number.isNaN(dob.getTime())) return "—";
-  const now = new Date();
-  let age = now.getFullYear() - dob.getFullYear();
-  const beforeBirthday =
-    now.getMonth() < dob.getMonth() ||
-    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate());
-  if (beforeBirthday) age -= 1;
-  return age >= 0 ? `${age} yrs` : "—";
-}
 
 function downloadCsv(filename: string, rows: unknown[][]) {
   const csv = "\ufeff" + toCsv(rows);
@@ -84,12 +78,22 @@ interface PatientFormState {
   email: string;
   gender: string;
   dateOfBirth: string;
+  age: string;
   address: string;
   notes: string;
 }
 
 function emptyPatientForm(): PatientFormState {
-  return { fullName: "", phone: "", email: "", gender: "", dateOfBirth: "", address: "", notes: "" };
+  return {
+    fullName: "",
+    phone: "",
+    email: "",
+    gender: "",
+    dateOfBirth: "",
+    age: "",
+    address: "",
+    notes: "",
+  };
 }
 
 function PatientModal({
@@ -110,6 +114,10 @@ function PatientModal({
           email: initial.email ?? "",
           gender: initial.gender ?? "",
           dateOfBirth: initial.dateOfBirth ?? "",
+          age:
+            patientAge(initial) !== null
+              ? String(patientAge(initial))
+              : "",
           address: initial.address ?? "",
           notes: initial.notes ?? "",
         }
@@ -130,12 +138,20 @@ function PatientModal({
     }
     setSaving(true);
     setError(null);
+    const payload = {
+      ...form,
+      ageYears: form.dateOfBirth
+        ? null
+        : form.age.trim()
+        ? Number(form.age)
+        : null,
+    };
     try {
       if (initial) {
-        await api(`/api/patients/${initial.id}`, { method: "PATCH", json: form });
+        await api(`/api/patients/${initial.id}`, { method: "PATCH", json: payload });
         toast.success("Patient details updated.");
       } else {
-        await api("/api/patients", { method: "POST", json: form });
+        await api("/api/patients", { method: "POST", json: payload });
         toast.success("Patient registered.");
       }
       onSaved();
@@ -199,8 +215,34 @@ function PatientModal({
               type="date"
               max={today()}
               value={form.dateOfBirth}
-              onChange={(e) => set("dateOfBirth", e.target.value)}
+              onChange={(e) => {
+                const dob = e.target.value;
+                set("dateOfBirth", dob);
+                if (dob) set("age", String(ageFromDateOfBirth(dob) ?? ""));
+              }}
             />
+          </label>
+          <label className="block">
+            <span className="label">Age</span>
+            <input
+              className="input"
+              type="number"
+              min={0}
+              max={150}
+              value={
+                form.dateOfBirth
+                  ? String(ageFromDateOfBirth(form.dateOfBirth) ?? "")
+                  : form.age
+              }
+              onChange={(e) => set("age", e.target.value)}
+              disabled={Boolean(form.dateOfBirth)}
+              placeholder="e.g. 35"
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              {form.dateOfBirth
+                ? "Calculated from date of birth."
+                : "Use this when the date of birth is unknown."}
+            </p>
           </label>
           <label className="block sm:col-span-2">
             <span className="label">Address</span>
@@ -263,6 +305,7 @@ function ConsultationModal({
     phone: "",
     gender: "",
     dateOfBirth: "",
+    age: "",
   });
   const [consultationDate, setConsultationDate] = useState(initial?.consultationDate ?? today());
   const [procedureName, setProcedureName] = useState(initial?.procedureName ?? "");
@@ -312,8 +355,16 @@ function ConsultationModal({
       notes: notes.trim(),
     };
     if (!initial) {
-      if (mode === "new") payload.newPatient = newPatient;
-      else payload.patientId = patientId;
+      if (mode === "new") {
+        payload.newPatient = {
+          ...newPatient,
+          ageYears: newPatient.dateOfBirth
+            ? undefined
+            : newPatient.age.trim()
+            ? Number(newPatient.age)
+            : undefined,
+        };
+      } else payload.patientId = patientId;
     }
 
     setSaving(true);
@@ -410,7 +461,31 @@ function ConsultationModal({
                 type="date"
                 max={today()}
                 value={newPatient.dateOfBirth}
-                onChange={(e) => setNewPatient({ ...newPatient, dateOfBirth: e.target.value })}
+                onChange={(e) => {
+                  const dob = e.target.value;
+                  setNewPatient({
+                    ...newPatient,
+                    dateOfBirth: dob,
+                    age: dob ? String(ageFromDateOfBirth(dob) ?? "") : newPatient.age,
+                  });
+                }}
+              />
+            </label>
+            <label className="block">
+              <span className="label">Age</span>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={150}
+                value={
+                  newPatient.dateOfBirth
+                    ? String(ageFromDateOfBirth(newPatient.dateOfBirth) ?? "")
+                    : newPatient.age
+                }
+                onChange={(e) => setNewPatient({ ...newPatient, age: e.target.value })}
+                disabled={Boolean(newPatient.dateOfBirth)}
+                placeholder="e.g. 35"
               />
             </label>
           </div>
@@ -728,7 +803,7 @@ export default function PatientsPage() {
 
   function exportPatients() {
     downloadCsv(`patients-${today()}.csv`, [
-      ["Patient number", "Name", "Phone", "Email", "Gender", "Date of birth", "Visits", "Billed", "Outstanding", "Notes"],
+      ["Patient number", "Name", "Phone", "Email", "Gender", "Date of birth", "Age", "Visits", "Billed", "Outstanding", "Notes"],
       ...filteredPatients.map((p) => {
         const totals = patientTotals.get(p.id) ?? { billed: 0, outstanding: 0, visits: 0 };
         return [
@@ -738,6 +813,7 @@ export default function PatientsPage() {
           p.email ?? "",
           p.gender ?? "",
           p.dateOfBirth ?? "",
+          patientAge(p) !== null ? String(patientAge(p)) : "",
           totals.visits,
           totals.billed.toFixed(2),
           totals.outstanding.toFixed(2),
@@ -1172,7 +1248,7 @@ export default function PatientsPage() {
                       {p.phone || p.email || "—"}
                     </td>
                     <td className="whitespace-nowrap text-slate-600">
-                      {calcAge(p.dateOfBirth)}
+                      {formatAge(p)}
                       {p.gender ? ` / ${p.gender}` : ""}
                     </td>
                     <td className="text-right text-slate-700">{totals.visits}</td>

@@ -28,6 +28,55 @@ export function formatDateTime(value?: string | number | null): string {
   return d.toLocaleString("en-KE", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+/** Age in whole years from a YYYY-MM-DD date of birth, or null. */
+export function ageFromDateOfBirth(dateOfBirth?: string | null): number | null {
+  if (!dateOfBirth) return null;
+  const dob = new Date(String(dateOfBirth).slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(dob.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const beforeBirthday =
+    now.getMonth() < dob.getMonth() ||
+    (now.getMonth() === dob.getMonth() && now.getDate() < dob.getDate());
+  if (beforeBirthday) age -= 1;
+  return age >= 0 ? age : null;
+}
+
+/**
+ * Current age for a patient: date of birth wins, otherwise the recorded age is
+ * advanced by the number of years since it was captured.
+ */
+export function patientAge(patient: {
+  dateOfBirth?: string | null;
+  ageYears?: number | null;
+  ageRecordedAt?: string | null;
+}): number | null {
+  const fromDob = ageFromDateOfBirth(patient.dateOfBirth);
+  if (fromDob !== null) return fromDob;
+  if (patient.ageYears === null || patient.ageYears === undefined) return null;
+  if (!patient.ageRecordedAt) return patient.ageYears;
+
+  const recorded = new Date(String(patient.ageRecordedAt).slice(0, 10) + "T00:00:00");
+  if (Number.isNaN(recorded.getTime())) return patient.ageYears;
+  const now = new Date();
+  let extra = now.getFullYear() - recorded.getFullYear();
+  const beforeAnniversary =
+    now.getMonth() < recorded.getMonth() ||
+    (now.getMonth() === recorded.getMonth() && now.getDate() < recorded.getDate());
+  if (beforeAnniversary) extra -= 1;
+  return patient.ageYears + Math.max(0, extra);
+}
+
+/** "34 yrs" or "—". */
+export function formatAge(patient: {
+  dateOfBirth?: string | null;
+  ageYears?: number | null;
+  ageRecordedAt?: string | null;
+}): string {
+  const age = patientAge(patient);
+  return age === null ? "—" : `${age} yrs`;
+}
+
 /** Relative "3h ago" / "2d ago" from a millisecond timestamp. */
 export function timeAgo(ts: number): string {
   const secs = Math.max(0, Math.floor((Date.now() - ts) / 1000));

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Modal, Alert } from "@/components/ui";
 import { useToast } from "@/components/toast";
-import { formatKes } from "@/lib/format";
+import { formatKes, patientAge } from "@/lib/format";
 import type {
   ImportIssue,
   ParsedConsultation,
@@ -317,6 +317,7 @@ export default function PatientsImportModal({
                           <th>Phone</th>
                           <th>Gender</th>
                           <th>Date of birth</th>
+                          <th>Age</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -328,6 +329,9 @@ export default function PatientsImportModal({
                             <td className="text-slate-600">{p.phone || "—"}</td>
                             <td className="text-slate-600">{p.gender || "—"}</td>
                             <td className="text-slate-600">{p.dateOfBirth || "—"}</td>
+                            <td className="text-slate-600">
+                              {patientAge(p) !== null ? `${patientAge(p)} yrs` : "—"}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

@@ -31,6 +31,7 @@ export interface ParsedPatient {
   email?: string;
   gender?: "male" | "female";
   dateOfBirth?: string;
+  ageYears?: number;
   address?: string;
   notes?: string;
 }
@@ -74,6 +75,7 @@ const ALIASES: Record<string, string[]> = {
   email: ["email", "emailaddress", "mail"],
   gender: ["gender", "sex"],
   dateOfBirth: ["dateofbirth", "dob", "birthdate", "birthday"],
+  ageYears: ["age", "ageyears", "ageyrs", "years"],
   address: ["address", "location", "residence", "physicaladdress"],
   patientNotes: ["patientnotes", "patientnote", "allergies", "medicalnotes", "history"],
   consultationDate: ["visitdate", "consultationdate", "servicedate", "date", "visit", "transactiondate"],
@@ -235,6 +237,7 @@ export function parsePatientImport(rows: string[][], mode: PatientImportMode): P
     existing.email = existing.email || input.email;
     existing.gender = existing.gender || input.gender;
     existing.dateOfBirth = existing.dateOfBirth || input.dateOfBirth;
+    existing.ageYears = existing.ageYears ?? input.ageYears;
     existing.address = existing.address || input.address;
     existing.notes = existing.notes || input.notes;
     return key;
@@ -282,6 +285,7 @@ export function parsePatientImport(rows: string[][], mode: PatientImportMode): P
     const email = pick(row, map, "email");
     const genderRaw = pick(row, map, "gender");
     const dobRaw = pick(row, map, "dateOfBirth");
+    const ageRaw = pick(row, map, "ageYears");
     const address = pick(row, map, "address");
     const patientNotes = pick(row, map, "patientNotes");
 
@@ -294,7 +298,15 @@ export function parsePatientImport(rows: string[][], mode: PatientImportMode): P
 
     if (mode !== "consultations") {
       const hasPatientDetails = Boolean(
-        fullName || patientNumber || phone || email || genderRaw || dobRaw || address || patientNotes
+        fullName ||
+          patientNumber ||
+          phone ||
+          email ||
+          genderRaw ||
+          dobRaw ||
+          ageRaw ||
+          address ||
+          patientNotes
       );
 
       if (fullName && fullName.length >= 2) {
@@ -305,14 +317,25 @@ export function parsePatientImport(rows: string[][], mode: PatientImportMode): P
         if (dob.value && dob.value > new Date().toISOString().slice(0, 10)) {
           pushIssue(warnings, rowNumber, "Date of birth is in the future; left blank.");
         }
+        const validDob =
+          dob.value && dob.value <= new Date().toISOString().slice(0, 10) ? dob.value : undefined;
+        let ageYears: number | undefined;
+        if (!validDob && ageRaw) {
+          const parsedAge = Number(ageRaw.replace(/[^0-9.]/g, ""));
+          if (Number.isFinite(parsedAge) && parsedAge >= 0 && parsedAge <= 150) {
+            ageYears = Math.round(parsedAge);
+          } else {
+            pushIssue(warnings, rowNumber, `Age "${ageRaw}" is not valid; left blank.`);
+          }
+        }
         patientKeyForRow = mergePatient(rowNumber, {
           patientNumber: patientNumber || undefined,
           fullName: fullName.trim(),
           phone: phone || undefined,
           email: email || undefined,
           gender: gender.value,
-          dateOfBirth:
-            dob.value && dob.value <= new Date().toISOString().slice(0, 10) ? dob.value : undefined,
+          dateOfBirth: validDob,
+          ageYears,
           address: address || undefined,
           notes: patientNotes || undefined,
         });

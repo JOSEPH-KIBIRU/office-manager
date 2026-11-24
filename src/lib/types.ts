@@ -189,6 +189,8 @@ export interface PatientRow {
   email: string | null;
   gender: string | null;
   dateOfBirth: string | null;
+  ageYears: number | null;
+  ageRecordedAt: string | null;
   address: string | null;
   notes: string | null;
   createdAt: number;

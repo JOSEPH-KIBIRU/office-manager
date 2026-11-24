@@ -13,6 +13,7 @@ interface PatientBody {
   email?: string;
   gender?: string;
   dateOfBirth?: string;
+  ageYears?: number | string | null;
   address?: string;
   notes?: string;
 }
@@ -48,6 +49,24 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       }
     }
 
+    let ageYears: number | null | undefined;
+    if (body.ageYears !== undefined) {
+      if (dateOfBirth) {
+        // Date of birth is the source of truth.
+        ageYears = null;
+      } else {
+        const raw = String(body.ageYears ?? "").trim();
+        if (!raw) ageYears = null;
+        else {
+          const n = Number(raw);
+          if (!Number.isFinite(n) || n < 0 || n > 150) {
+            throw new HttpError(400, "Age must be between 0 and 150");
+          }
+          ageYears = Math.round(n);
+        }
+      }
+    }
+
     const address = String(body.address ?? "").trim() || undefined;
     if (address) maxLen(address, "Address", 200);
 
@@ -65,6 +84,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         email,
         gender,
         dateOfBirth,
+        ageYears,
         address,
         notes,
       });

@@ -12,6 +12,7 @@ interface NewPatientBody {
   phone?: string;
   gender?: string;
   dateOfBirth?: string;
+  ageYears?: number | string | null;
 }
 
 interface ConsultationBody {
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
     if (notes) maxLen(notes, "Notes", 2000);
 
     let newPatient:
-      | { fullName: string; phone?: string; gender?: string; dateOfBirth?: string }
+      | { fullName: string; phone?: string; gender?: string; dateOfBirth?: string; ageYears?: number }
       | undefined;
     if (!body.patientId) {
       const fullName = String(body.newPatient?.fullName ?? "").trim();
@@ -115,7 +116,19 @@ export async function POST(req: NextRequest) {
           throw new HttpError(400, "Date of birth cannot be in the future");
         }
       }
-      newPatient = { fullName, phone, gender, dateOfBirth };
+
+      let ageYears: number | undefined;
+      if (!dateOfBirth && body.newPatient?.ageYears !== undefined && body.newPatient?.ageYears !== null) {
+        const raw = String(body.newPatient.ageYears).trim();
+        if (raw) {
+          const n = Number(raw);
+          if (!Number.isFinite(n) || n < 0 || n > 150) {
+            throw new HttpError(400, "Age must be between 0 and 150");
+          }
+          ageYears = Math.round(n);
+        }
+      }
+      newPatient = { fullName, phone, gender, dateOfBirth, ageYears };
     }
 
     try {

@@ -60,6 +60,26 @@ describe("hospital patient consultations", () => {
     expect(list.map((p: any) => p.fullName)).toEqual(["Jane Wanjiku", "Peter Otieno"]);
   });
 
+  it("stores age when the date of birth is unknown", async () => {
+    const { t, orgId, userId } = await setup();
+    await t.mutation(api.patients.createPatient, {
+      secret: SECRET,
+      orgId,
+      viewerId: userId,
+      fullName: "Age Only Patient",
+      ageYears: 35,
+    });
+
+    const list = await t.query(api.patients.listPatients, {
+      secret: SECRET,
+      orgId,
+      viewerId: userId,
+    });
+    const row = list.find((p: any) => p.fullName === "Age Only Patient");
+    expect(row?.ageYears).toBe(35);
+    expect(row?.ageRecordedAt).toBeTruthy();
+  });
+
   it("posts a paid consultation to cash and consultation income", async () => {
     const { t, orgId, userId } = await setup();
     const patient = await registerPatient(t, orgId, userId);
