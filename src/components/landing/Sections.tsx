@@ -50,7 +50,7 @@ export function LogoStrip() {
 
   return (
     <section className="border-y border-white/5 py-9">
-      <p className="mx-auto max-w-7xl px-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 sm:px-6">
+      <p className="mx-auto max-w-7xl px-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 sm:px-6">
         Built for teams across every sector in Kenya
       </p>
       {/* Full-width marquee — the sector list scrolls continuously */}
@@ -141,7 +141,7 @@ export function Compliance() {
                   </span>
                   <div>
                     <p className="text-sm font-semibold text-white">{s.label}</p>
-                    <p className="text-sm text-zinc-500">{s.note}</p>
+                    <p className="text-sm text-zinc-400">{s.note}</p>
                   </div>
                 </li>
               ))}
@@ -152,7 +152,7 @@ export function Compliance() {
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 sm:p-7">
               <div className="rounded-2xl border border-white/10 bg-[#0b0b12] p-5">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Sample payslip · March 2026</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Sample payslip · March 2026</p>
                   <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">Ready to print</span>
                 </div>
                 <div className="mt-4 space-y-2">
@@ -164,7 +164,7 @@ export function Compliance() {
                     ["PAYE", "KSh 12,577.08"],
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between border-b border-white/5 py-1.5 text-sm">
-                      <span className="text-zinc-500">{k}</span>
+                      <span className="text-zinc-400">{k}</span>
                       <span className="font-medium text-zinc-200">{v}</span>
                     </div>
                   ))}
@@ -262,7 +262,7 @@ export function MigrationSection() {
             >
               Request a demo
             </a>
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className="mt-2 text-xs text-zinc-400">
               No obligation — just leave your phone number and we&apos;ll call you back.
             </p>
           </div>
@@ -311,7 +311,7 @@ export function SecuritySection() {
 
           <Reveal delay={0.1}>
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-              <p className="text-xs font-semibold text-zinc-500">How isolation works</p>
+              <p className="text-xs font-semibold text-zinc-400">How isolation works</p>
               <div className="mt-4 space-y-3">
                 {[
                   { name: "Your workspace", desc: "All staff, requests and records stay here", on: true },
@@ -328,7 +328,7 @@ export function SecuritySection() {
                     </span>
                     <div>
                       <p className="text-sm font-semibold text-zinc-100">{w.name}</p>
-                      <p className="text-xs text-zinc-500">{w.desc}</p>
+                      <p className="text-xs text-zinc-400">{w.desc}</p>
                     </div>
                   </div>
                 ))}

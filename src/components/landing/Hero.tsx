@@ -100,7 +100,7 @@ export default function Hero() {
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-50 to-transparent lg:hidden" />
             </div>
           </div>
-          <p className="mt-3 text-center text-xs text-zinc-500">
+          <p className="mt-3 text-center text-xs text-zinc-400">
             Sample workspace — your company data stays private and isolated.
           </p>
         </motion.div>

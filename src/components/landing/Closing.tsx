@@ -87,7 +87,7 @@ export function Pricing() {
         </div>
 
         <Reveal delay={0.1}>
-          <p className="mx-auto mt-8 max-w-3xl text-center text-sm text-zinc-500">
+          <p className="mx-auto mt-8 max-w-3xl text-center text-sm text-zinc-400">
             All prices in Kenyan Shillings. The first month is free. Subscriptions renew on the 1st of
             each month and are cancelled automatically if not paid. Annual billing is charged upfront
             with a 5% discount.
@@ -116,7 +116,7 @@ export function Faq() {
                 <summary className="cursor-pointer list-none font-semibold text-white marker:hidden">
                   <span className="flex items-center justify-between gap-3">
                     {f.q}
-                    <span aria-hidden="true" className="text-zinc-500 transition group-open:rotate-45">＋</span>
+                    <span aria-hidden="true" className="text-zinc-400 transition group-open:rotate-45">＋</span>
                   </span>
                 </summary>
                 <p className="mt-3 text-sm leading-relaxed text-zinc-400">{f.a}</p>
@@ -221,7 +221,7 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-zinc-500 sm:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-6 text-xs text-zinc-400 sm:flex-row">
           <p>© {new Date().getFullYear()} Office Manager · Made for Kenyan businesses</p>
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             <Link href="/terms" className="transition hover:text-indigo-300">Terms &amp; Conditions</Link>

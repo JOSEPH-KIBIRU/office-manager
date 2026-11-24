@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
 import { Alert, FieldError, inputCls } from "@/components/ui";
 import Spinner from "@/components/Spinner";
@@ -12,10 +12,21 @@ import Spinner from "@/components/Spinner";
  */
 export default function ContactForm({ initialSolution }: { initialSolution?: string }) {
   const [phone, setPhone] = useState("");
+  const [solution, setSolution] = useState(initialSolution ?? "");
   const [error, setError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    if (initialSolution) return;
+    try {
+      const fromQuery = new URLSearchParams(window.location.search).get("solution");
+      if (fromQuery) setSolution(fromQuery);
+    } catch {
+      /* ignore */
+    }
+  }, [initialSolution]);
 
   function validate(): boolean {
     const digits = phone.replace(/\D/g, "");
@@ -41,9 +52,9 @@ export default function ContactForm({ initialSolution }: { initialSolution?: str
           name: "Website demo request",
           email: "",
           company: "",
-          subject: initialSolution ? `Demo request — ${initialSolution}` : "Demo request",
-          message: initialSolution
-            ? `Requested a demo callback for ${initialSolution}.`
+          subject: solution ? `Demo request — ${solution}` : "Demo request",
+          message: solution
+            ? `Requested a demo callback for ${solution}.`
             : "Requested a demo callback from the website.",
         }),
       });

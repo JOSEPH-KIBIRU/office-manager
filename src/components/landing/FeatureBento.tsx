@@ -46,7 +46,7 @@ const features: Feature[] = [
     content: (
       <div className="mt-7 rounded-2xl border border-white/[0.07] bg-black/30 p-4 shadow-inner">
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-xs text-zinc-500">Payroll · September</span>
+          <span className="text-xs text-zinc-400">Payroll · September</span>
           <span className="flex items-center gap-1.5 text-[11px] text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             Ready
@@ -90,7 +90,7 @@ const features: Feature[] = [
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-zinc-200">J. Otieno</p>
-            <p className="mt-0.5 text-xs text-zinc-500">Annual leave · 3 days</p>
+            <p className="mt-0.5 text-xs text-zinc-400">Annual leave · 3 days</p>
           </div>
 
           <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
@@ -102,7 +102,7 @@ const features: Feature[] = [
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-zinc-200">A. Wanjiru</p>
-              <p className="mt-0.5 text-xs text-zinc-500">Sick leave · 1 day</p>
+              <p className="mt-0.5 text-xs text-zinc-400">Sick leave · 1 day</p>
             </div>
 
             <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-400">
@@ -121,7 +121,7 @@ const features: Feature[] = [
     iconClass: "text-emerald-400",
     content: (
       <div className="mt-7 rounded-2xl border border-white/[0.07] bg-black/30 p-4">
-        <p className="text-xs text-zinc-500">Available float</p>
+        <p className="text-xs text-zinc-400">Available float</p>
 
         <div className="mt-1 flex items-end justify-between">
           <span className="text-2xl font-semibold tracking-tight text-white">KES 42,300</span>
@@ -156,8 +156,8 @@ const features: Feature[] = [
       <div className="mt-7 rounded-2xl border border-white/[0.07] bg-black/30 p-4">
         <div className="rounded-xl border border-white/[0.06] bg-zinc-900/80 p-3">
           <div className="flex items-center gap-2">
-            <Clock3 className="h-3.5 w-3.5 text-zinc-500" />
-            <span className="text-[11px] text-zinc-500">10:30 AM · Meeting</span>
+            <Clock3 className="h-3.5 w-3.5 text-zinc-400" />
+            <span className="text-[11px] text-zinc-400">10:30 AM · Meeting</span>
           </div>
 
           <p className="mt-2 text-sm leading-5 text-zinc-400">
@@ -172,7 +172,7 @@ const features: Feature[] = [
 
           <div>
             <p className="text-xs font-medium text-zinc-200">AI minutes generated</p>
-            <p className="text-[11px] text-zinc-500">Decisions · Actions · Owners</p>
+            <p className="text-[11px] text-zinc-400">Decisions · Actions · Owners</p>
           </div>
         </div>
       </div>
@@ -193,7 +193,7 @@ const features: Feature[] = [
           <div key={vehicle} className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04]">
-                <CarFront className="h-4 w-4 text-zinc-500" />
+                <CarFront className="h-4 w-4 text-zinc-400" />
               </div>
 
               <span className="text-sm text-zinc-300">{vehicle}</span>
@@ -223,7 +223,7 @@ const features: Feature[] = [
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-zinc-200">INV-0042</p>
-            <p className="mt-0.5 text-xs text-zinc-500">KES 84,500</p>
+            <p className="mt-0.5 text-xs text-zinc-400">KES 84,500</p>
           </div>
 
           <div className="flex items-center gap-1.5 text-xs text-emerald-400">
@@ -236,7 +236,7 @@ const features: Feature[] = [
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-zinc-200">INV-0043</p>
-              <p className="mt-0.5 text-xs text-zinc-500">KES 42,000</p>
+              <p className="mt-0.5 text-xs text-zinc-400">KES 42,000</p>
             </div>
 
             <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-400">Pending</span>
@@ -257,18 +257,18 @@ const features: Feature[] = [
     content: (
       <div className="mt-7 rounded-2xl border border-white/[0.07] bg-black/30 p-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-zinc-500">Business overview</span>
-          <ArrowUpRight className="h-4 w-4 text-zinc-600" />
+          <span className="text-xs text-zinc-400">Business overview</span>
+          <ArrowUpRight className="h-4 w-4 text-zinc-400" />
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-white/[0.025] p-3">
-            <p className="text-[11px] text-zinc-500">Revenue</p>
+            <p className="text-[11px] text-zinc-400">Revenue</p>
             <p className="mt-1 text-sm font-medium text-white">KES 1.24M</p>
           </div>
 
           <div className="rounded-xl bg-white/[0.025] p-3">
-            <p className="text-[11px] text-zinc-500">Expenses</p>
+            <p className="text-[11px] text-zinc-400">Expenses</p>
             <p className="mt-1 text-sm font-medium text-white">KES 610K</p>
           </div>
         </div>
@@ -295,7 +295,7 @@ const features: Feature[] = [
 
           <div className="min-w-0">
             <p className="truncate text-sm text-zinc-300">Quarterly report</p>
-            <p className="text-[11px] text-zinc-500">Submitted</p>
+            <p className="text-[11px] text-zinc-400">Submitted</p>
           </div>
         </div>
 
@@ -306,7 +306,7 @@ const features: Feature[] = [
 
           <div className="min-w-0">
             <p className="truncate text-sm text-zinc-300">Fix printer</p>
-            <p className="text-[11px] text-zinc-500">Open</p>
+            <p className="text-[11px] text-zinc-400">Open</p>
           </div>
         </div>
       </div>
@@ -324,7 +324,7 @@ const features: Feature[] = [
     content: (
       <div className="mt-7 rounded-2xl border border-white/[0.07] bg-black/30 p-4">
         <div className="mb-4 flex items-center justify-between">
-          <span className="text-xs text-zinc-500">Today · time clock</span>
+          <span className="text-xs text-zinc-400">Today · time clock</span>
           <span className="flex items-center gap-1.5 text-[11px] text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             Clocked in
@@ -371,7 +371,7 @@ const features: Feature[] = [
         <div className="flex items-center justify-between border-t border-white/[0.06] pt-3">
           <div className="min-w-0">
             <p className="truncate text-sm text-zinc-200">NHIF medical card</p>
-            <p className="mt-0.5 text-xs text-zinc-500">Valid</p>
+            <p className="mt-0.5 text-xs text-zinc-400">Valid</p>
           </div>
 
           <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
@@ -391,7 +391,7 @@ const features: Feature[] = [
     iconClass: "text-lime-400",
     content: (
       <div className="mt-7 rounded-2xl border border-white/[0.07] bg-black/30 p-4">
-        <p className="text-xs text-zinc-500">Asset register</p>
+        <p className="text-xs text-zinc-400">Asset register</p>
 
         <div className="mt-3 space-y-2.5 text-sm">
           <div className="flex items-center justify-between">
@@ -426,7 +426,7 @@ const features: Feature[] = [
         <div className="flex items-center justify-between">
           <div className="min-w-0">
             <p className="truncate text-sm text-zinc-200">Brian K · Supplier</p>
-            <p className="mt-0.5 text-xs text-zinc-500">KDA 412G · Host: Sales</p>
+            <p className="mt-0.5 text-xs text-zinc-400">KDA 412G · Host: Sales</p>
           </div>
 
           <span className="shrink-0 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-400">
@@ -437,7 +437,7 @@ const features: Feature[] = [
         <div className="flex items-center justify-between border-t border-white/[0.06] pt-3">
           <div className="min-w-0">
             <p className="truncate text-sm text-zinc-200">Mercy A · Auditor</p>
-            <p className="mt-0.5 text-xs text-zinc-500">KCT 908B · Host: Finance</p>
+            <p className="mt-0.5 text-xs text-zinc-400">KCT 908B · Host: Finance</p>
           </div>
 
           <span className="shrink-0 rounded-full bg-zinc-500/10 px-2.5 py-1 text-[11px] font-medium text-zinc-400">
@@ -483,7 +483,7 @@ export default function FeatureBento() {
           >
             Everything your office needs.
             <br />
-            <span className="text-zinc-500">One platform.</span>
+            <span className="text-zinc-400">One platform.</span>
           </motion.h2>
 
           <motion.p
@@ -537,7 +537,7 @@ export default function FeatureBento() {
                     </div>
 
                     {feature.badge && (
-                      <span className="rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                      <span className="rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
                         {feature.badge}
                       </span>
                     )}
@@ -581,9 +581,9 @@ export default function FeatureBento() {
           transition={{ duration: 0.6, delay: 0.15 }}
           className="mt-20 text-center lg:mt-28"
         >
-          <p className="text-sm text-zinc-500">Built to replace spreadsheets, paperwork and disconnected tools.</p>
+          <p className="text-sm text-zinc-400">Built to replace spreadsheets, paperwork and disconnected tools.</p>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-zinc-600">
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-zinc-400">
             <span>Payroll</span>
             <span className="hidden sm:block">•</span>
             <span>Accounting</span>

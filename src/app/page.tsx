@@ -141,10 +141,7 @@ const jsonLd = {
   ],
 };
 
-export default async function LandingPage({ searchParams }: { searchParams: Promise<{ solution?: string }> }) {
-  const { solution: solutionParam } = await searchParams;
-  const solution = solutionParam?.length ? solutionParam : undefined;
-
+export default function LandingPage() {
   return (
     <main id="top" className="min-h-screen bg-zinc-950 text-zinc-300">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
@@ -191,7 +188,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                       </svg>
                     </span>
                     <div>
-                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{c.label}</p>
+                      <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">{c.label}</p>
                       <a href={c.href} className="text-sm font-semibold text-zinc-200 transition hover:text-indigo-300">{c.value}</a>
                     </div>
                   </div>
@@ -203,7 +200,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
                     </svg>
                   </span>
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Powered by</p>
+                    <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Powered by</p>
                     <a href="https://pigiecore.co.ke" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-indigo-400 hover:text-indigo-300">
                       PigieCore Solutions
                     </a>
@@ -213,7 +210,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Prom
             </div>
 
             <div className="landing-form rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:p-8">
-              <ContactForm initialSolution={solution} />
+              <ContactForm />
             </div>
           </div>
         </div>

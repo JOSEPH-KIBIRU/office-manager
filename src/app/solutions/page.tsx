@@ -80,7 +80,7 @@ export default function SolutionsPage() {
               Pricing
             </Link>
             <Link
-              href="/?solution=demo#contact"
+              href="/#contact"
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
             >
               Request a demo
@@ -105,7 +105,7 @@ export default function SolutionsPage() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link
-              href="/?solution=demo#contact"
+              href="/#contact"
               className="inline-flex items-center rounded-xl bg-blue-600 px-7 py-3 font-semibold text-white shadow-lg transition hover:bg-blue-500"
             >
               Request a demo
@@ -160,7 +160,7 @@ export default function SolutionsPage() {
             that fit your team — no long forms, no obligation.
           </p>
           <Link
-            href="/?solution=demo#contact"
+            href="/#contact"
             className="mt-6 inline-block rounded-lg bg-blue-600 px-8 py-3.5 font-semibold text-white transition hover:bg-blue-500"
           >
             Request a callback
