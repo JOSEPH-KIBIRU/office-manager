@@ -14,26 +14,27 @@ import {
 
 export default function Hero() {
   return (
-    <section className="relative flex min-h-[560px] items-center overflow-hidden py-16 sm:py-20 lg:min-h-[660px] lg:py-28">
-      {/* Real office photography as the hero backdrop */}
-      <div className="absolute inset-0 -z-20">
+    <section className="relative isolate flex min-h-[560px] items-center overflow-hidden py-16 sm:py-20 lg:min-h-[660px] lg:py-28">
+      {/* Real office photography as the hero backdrop (Polina Zimmerman / Pexels) */}
+      <div className="absolute inset-0 z-0">
         <Image
-          src="/images/hero/office-working.jpg"
+          src="/images/hero/office-clean.jpg"
           alt=""
           fill
           priority
           sizes="100vw"
-          quality={82}
-          className="object-cover object-center"
+          quality={85}
+          className="object-cover"
+          style={{ objectPosition: "center 68%" }}
         />
       </div>
       {/* Layered overlays keep the copy readable and the brand colours intact. */}
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-zinc-950/70" />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-r from-zinc-950 via-zinc-950/80 to-zinc-950/25" />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-zinc-950 via-transparent to-zinc-950/20" />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_50%_at_20%_10%,rgba(79,70,229,0.18),transparent_65%)]" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-zinc-950/65" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-r from-zinc-950 via-zinc-950/85 to-zinc-950/30" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-zinc-950 via-transparent to-zinc-950/20" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(60%_50%_at_20%_10%,rgba(79,70,229,0.18),transparent_65%)]" />
 
-      <div className="mx-auto w-full max-w-7xl px-6 lg:px-8">
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-6 lg:px-8">
         {/* Copy */}
         <motion.div
           variants={staggerContainer}
