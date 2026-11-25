@@ -8,7 +8,7 @@ const BASE_URL = siteUrl();
 export const metadata: Metadata = {
   title: "Office Management Solutions for Kenyan Businesses | Office Manager",
   description:
-    "Explore Office Manager solutions for payroll, leave, petty cash, car logs, meetings and invoicing — built for Kenyan SMEs and priced per business.",
+    "Explore Office Manager solutions for payroll, leave, accounting, KRA eTIMS, attendance, visitors, assets, CRM, healthcare and more — built for Kenyan SMEs.",
   alternates: { canonical: `${BASE_URL}/solutions` },
   openGraph: {
     type: "website",
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     siteName: "Office Manager",
     title: "Office Management Solutions for Kenyan Businesses",
     description:
-      "Payroll, leave, petty cash, car logs, meetings and invoicing — one secure workspace for Kenyan SMEs.",
+      "Payroll, leave, accounting, eTIMS, attendance, CRM and healthcare — one secure workspace for Kenyan SMEs.",
     locale: "en_KE",
     images: [
       {
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Office Management Solutions for Kenyan Businesses",
     description:
-      "Payroll, leave, petty cash, car logs, meetings and invoicing — one secure workspace for Kenyan SMEs.",
+      "Payroll, leave, accounting, eTIMS, attendance, CRM and healthcare — one secure workspace for Kenyan SMEs.",
     images: [`${BASE_URL}/opengraph-image.png`],
   },
 };
@@ -100,8 +100,8 @@ export default function SolutionsPage() {
             One workspace for every part of your office
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-slate-300">
-            Start with the area that hurts most — payroll, leave, expenses, fleet, meetings or
-            invoicing — and add the rest as your team grows.
+            Start with the area that hurts most — payroll, leave, accounting, eTIMS, attendance,
+            CRM, clinics or invoicing — and add the rest as your team grows.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <Link

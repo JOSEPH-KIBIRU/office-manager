@@ -99,6 +99,141 @@ export const SOLUTIONS: Solution[] = [
       "Receivables and payables that keep your cash flow visible",
     ],
   },
+  {
+    slug: "accounting",
+    title: "Accounting & Ledgers",
+    navLabel: "Accounting",
+    icon: "📒",
+    tagline: "A real double-entry ledger, not a spreadsheet",
+    summary:
+      "Keep every invoice, bill, payment, receipt and expense in one double-entry ledger. See your trial balance, profit and loss, balance sheet, VAT and cash flow without rebuilding spreadsheets at month end.",
+    features: [
+      "Double-entry general ledger with a configurable chart of accounts",
+      "Invoices, bills, payments, receipts and credit notes",
+      "Bank and M-Pesa reconciliation",
+      "Trial balance, P&L, balance sheet, VAT and management reports",
+    ],
+  },
+  {
+    slug: "etims",
+    title: "KRA eTIMS e-Invoicing",
+    navLabel: "eTIMS",
+    icon: "🛡️",
+    tagline: "Submit invoices to KRA without leaving the invoice screen",
+    summary:
+      "Generate VAT invoices and submit them to KRA's electronic Tax Invoice Management System (eTIMS). Office Manager stores the control number, prints the official verification QR code and lets you retry safely if a submission fails.",
+    features: [
+      "One-click submission from an invoice",
+      "Stores KRA control numbers and verification QR codes",
+      "Retry-safe if KRA is temporarily unavailable",
+      "VAT invoices and credit notes in one flow",
+    ],
+  },
+  {
+    slug: "attendance",
+    title: "Attendance & Time Clock",
+    navLabel: "Attendance",
+    icon: "⏱️",
+    tagline: "Know who is in, late or away",
+    summary:
+      "One-tap clock-in and clock-out for employees, with configurable working hours, grace periods and late detection. Managers get monthly attendance summaries, and casual staff can be tracked separately.",
+    features: [
+      "One-tap clock-in and clock-out",
+      "Configurable working hours, grace period and late detection",
+      "Monthly attendance summaries per employee",
+      "Separate casual attendance tracking",
+    ],
+  },
+  {
+    slug: "visitors",
+    title: "Visitor Management",
+    navLabel: "Visitors",
+    icon: "🛎️",
+    tagline: "A digital visitor book with host alerts",
+    summary:
+      "Register every visitor with name, phone, host, purpose and vehicle registration. The host is notified, reception can check them in and out, and footfall reports are ready when you need them.",
+    features: [
+      "Digital visitor book with searchable history",
+      "Host notifications when a visitor arrives",
+      "Check-in and sign-out trail",
+      "Visitor footfall reports",
+    ],
+  },
+  {
+    slug: "assets",
+    title: "Asset Register & Custody",
+    navLabel: "Assets",
+    icon: "📦",
+    tagline: "Know what you own and who has it",
+    summary:
+      "Track laptops, phones, furniture, vehicles and equipment with purchase value, serial numbers and custody. Check items out to staff, log returns and keep a full movement history for audits.",
+    features: [
+      "Asset register with values and serial numbers",
+      "Checkout and return to staff members",
+      "Custody and movement history",
+      "Audit-ready asset reports",
+    ],
+  },
+  {
+    slug: "documents",
+    title: "Document Management",
+    navLabel: "Documents",
+    icon: "📁",
+    tagline: "Contracts, IDs and permits in one place",
+    summary:
+      "Store contracts, IDs, work permits, medical cards and certificates against each employee. Automatic expiry reminders tell you before a document lapses, and access is controlled by role.",
+    features: [
+      "Employee document register",
+      "Expiry reminders before documents lapse",
+      "Role-based access to sensitive files",
+      "Secure cloud storage",
+    ],
+  },
+  {
+    slug: "crm",
+    title: "CRM & Sales Pipeline",
+    navLabel: "CRM",
+    icon: "🤝",
+    tagline: "Leads, deals and follow-ups in one view",
+    summary:
+      "Capture leads, manage companies and contacts, move deals through pipelines and send quotations from one place. Email integration and follow-up automation keep the team on top of every opportunity.",
+    features: [
+      "Companies, contacts and leads",
+      "Pipelines and deal stages",
+      "Quotations that convert into invoices",
+      "Email integration and follow-up automation",
+    ],
+  },
+  {
+    slug: "tasks",
+    title: "Tasks & Accountability",
+    navLabel: "Tasks",
+    icon: "✅",
+    tagline: "Assign work and see it through",
+    summary:
+      "Assign tasks with owners, due dates and priority. Staff report progress with comments and photos; managers acknowledge completed work or reopen it, so nothing gets lost in chat.",
+    features: [
+      "Assign tasks with due dates and priority",
+      "Progress updates with photos and comments",
+      "Acknowledge or reopen completed work",
+      "Task reports for managers",
+    ],
+  },
+  {
+    slug: "healthcare",
+    title: "Clinics & Patient Consultations",
+    navLabel: "Healthcare",
+    icon: "🩺",
+    tagline: "Patient records that post to your ledger",
+    summary:
+      "Register patients, record consultations and fees, and keep a full visit history. Every fee posts to the accounting ledger automatically, unpaid visits show as receivables, and existing Excel registers can be imported.",
+    features: [
+      "Patient register and full visit history",
+      "Consultation fees posted to accounting automatically",
+      "Paid/unpaid tracking with outstanding balances",
+      "Excel import and printable patient statements",
+    ],
+  },
 ];
 
 export function getSolution(slug: string): Solution | undefined {

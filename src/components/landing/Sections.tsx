@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { Reveal, Stagger, StaggerItem, HoverCard } from "./Reveal";
 
 function Icon({ d, className = "h-5 w-5" }: { d: string; className?: string }) {
@@ -31,36 +32,55 @@ function SectionHeading({ eyebrow, title, sub }: { eyebrow: string; title: React
 
 /* ------------------------------ Logo strip ------------------------------ */
 
-const SECTORS = ["Retail", "Logistics", "Professional services", "Hospitality", "Manufacturing", "NGOs"];
+const SECTORS = [
+  { label: "Retail & shops", note: "Invoices, cash and daily sales", icon: "🛒", slug: "invoicing" },
+  { label: "Logistics & fleet", note: "Vehicles, repairs and fuel", icon: "🚚", slug: "car-logs" },
+  { label: "Professional services", note: "Bills, ledgers and VAT", icon: "💼", slug: "accounting" },
+  { label: "Hospitality", note: "Payroll, leave and expenses", icon: "🍽️", slug: "payroll" },
+  { label: "Manufacturing", note: "Assets, costs and projects", icon: "🏭", slug: "assets" },
+  { label: "NGOs & non-profits", note: "Leave, documents and controls", icon: "🌍", slug: "documents" },
+  { label: "Clinics & hospitals", note: "Patients, consults and billing", icon: "🩺", slug: "healthcare" },
+  { label: "Schools & training", note: "Attendance and staff records", icon: "🎓", slug: "attendance" },
+];
+
+const INTEGRATIONS = ["M-Pesa", "KRA eTIMS", "Google Calendar", "Microsoft 365", "SMS", "Email", "Excel import"];
 
 export function LogoStrip() {
-  const row = (ariaHidden: boolean) => (
-    <ul
-      className="flex shrink-0 items-center gap-8 pr-8 sm:gap-12 sm:pr-12"
-      aria-hidden={ariaHidden || undefined}
-    >
-      {SECTORS.map((s) => (
-        <li key={s} className="flex items-center gap-8 sm:gap-12">
-          <span className="whitespace-nowrap text-lg font-semibold tracking-tight text-zinc-400">{s}</span>
-          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-indigo-400/50" />
-        </li>
-      ))}
-    </ul>
-  );
-
   return (
-    <section className="border-y border-white/5 py-9">
-      <p className="mx-auto max-w-7xl px-4 text-center text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400 sm:px-6">
-        Built for teams across every sector in Kenya
-      </p>
-      {/* Full-width marquee — the sector list scrolls continuously */}
-      <div className="relative mt-6 overflow-hidden">
-        <div className="marquee-track flex w-max">
-          {row(false)}
-          {row(true)}
+    <section className="border-y border-white/5 py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-zinc-400">
+          Built for teams across every sector in Kenya
+        </p>
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {SECTORS.map((sector) => (
+            <Link
+              key={sector.label}
+              href={`/solutions/${sector.slug}`}
+              className="group flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition hover:border-indigo-400/30 hover:bg-white/[0.05]"
+            >
+              <span aria-hidden="true" className="text-xl">
+                {sector.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-zinc-100 group-hover:text-white">
+                  {sector.label}
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-zinc-400">
+                  {sector.note}
+                </span>
+              </span>
+            </Link>
+          ))}
         </div>
-        <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-zinc-950 to-transparent sm:w-28" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-zinc-950 to-transparent sm:w-28" />
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-400">
+          <span className="font-semibold uppercase tracking-wide text-zinc-400">Works with</span>
+          {INTEGRATIONS.map((item) => (
+            <span key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1">
+              {item}
+            </span>
+          ))}
+        </div>
       </div>
     </section>
   );

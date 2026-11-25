@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Reveal } from "./Reveal";
 import { SOLUTIONS } from "@/lib/solutions";
@@ -10,6 +11,8 @@ import CookieSettingsButton from "@/components/CookieSettingsButton";
 /* -------------------------------- Pricing -------------------------------- */
 
 export function Pricing() {
+  const [annual, setAnnual] = useState(false);
+
   return (
     <section id="pricing" className="section scroll-mt-36">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -27,7 +30,34 @@ export function Pricing() {
           </div>
         </Reveal>
 
-        <div className="mt-12 grid gap-6 lg:grid-cols-3">
+        <Reveal delay={0.05}>
+          <div className="mt-8 flex justify-center">
+            <div className="inline-flex rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="Billing cycle">
+              <button
+                type="button"
+                aria-pressed={!annual}
+                onClick={() => setAnnual(false)}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  !annual ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                aria-pressed={annual}
+                onClick={() => setAnnual(true)}
+                className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                  annual ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                Annual · save 5%
+              </button>
+            </div>
+          </div>
+        </Reveal>
+
+        <div className="mt-10 grid gap-6 lg:grid-cols-3">
           {PLANS.map((plan, i) => (
             <Reveal key={plan.key} delay={0.05 * i}>
               <div
@@ -51,11 +81,15 @@ export function Pricing() {
                   ) : (
                     <>
                       <p className="text-4xl font-bold text-white">
-                        {formatKes(plan.monthly)}
-                        <span className="text-base font-normal text-zinc-400">/mo</span>
+                        {annual ? formatKes(annualPrice(plan.monthly)) : formatKes(plan.monthly)}
+                        <span className="text-base font-normal text-zinc-400">
+                          {annual ? "/year" : "/mo"}
+                        </span>
                       </p>
                       <p className="mt-1 text-xs font-medium text-emerald-400">
-                        {formatKes(annualPrice(plan.monthly))}/year — save 5%
+                        {annual
+                          ? "Save 5% vs paying monthly"
+                          : `${formatKes(annualPrice(plan.monthly))}/year — save 5%`}
                       </p>
                     </>
                   )}
@@ -192,7 +226,7 @@ export function SiteFooter() {
                   All solutions
                 </Link>
               </li>
-              {SOLUTIONS.map((s) => (
+              {SOLUTIONS.slice(0, 6).map((s) => (
                 <li key={s.slug}>
                   <Link href={`/solutions/${s.slug}`} className="transition hover:text-indigo-400">{s.title}</Link>
                 </li>
