@@ -237,16 +237,16 @@ export function HowItWorks() {
 
 const MIGRATION = [
   {
-    title: "Patients, staff & contacts",
-    body: "Patient registers, employee lists and contact books imported from Excel or CSV — without retyping.",
+    title: "Patient registers & history",
+    body: "Import patient records and consultation history from Excel or CSV, with duplicate detection and a preview before commit.",
   },
   {
-    title: "Assets & documents",
-    body: "Bring across asset registers and document indexes, with the fields your team already uses.",
+    title: "Opening balances & contacts",
+    body: "We help verify opening balances and prepare contact lists during onboarding, so your starting point is clean.",
   },
   {
-    title: "Balances & history",
-    body: "We help verify opening balances and historical records so your reports start from a clean base.",
+    title: "Guided onboarding",
+    body: "Our team helps map columns, validate rows and reconcile totals with you before go-live.",
   },
 ];
 
@@ -258,7 +258,7 @@ export function MigrationSection() {
           <SectionHeading
             eyebrow="Bring your data"
             title="Already have records in Excel?"
-            sub="We import and verify your existing registers, so your team doesn't start from scratch."
+            sub="We help you bring over the registers we support and verify the rest during onboarding, so your team doesn't start from scratch."
           />
         </Reveal>
         <Stagger className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-3">

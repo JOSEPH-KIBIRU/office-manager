@@ -238,6 +238,7 @@ export function SiteFooter() {
             <h3 className="text-sm font-semibold text-white">Company</h3>
             <ul className="mt-4 space-y-2.5 text-sm">
               <li><Link href="/login" className="transition hover:text-indigo-400">Sign in</Link></li>
+              <li><Link href="/resources" className="transition hover:text-indigo-400">Guides &amp; resources</Link></li>
               <li><a href="#features" className="transition hover:text-indigo-400">Features</a></li>
               <li><a href="#pricing" className="transition hover:text-indigo-400">Pricing</a></li>
               <li><a href="#faq" className="transition hover:text-indigo-400">FAQ</a></li>

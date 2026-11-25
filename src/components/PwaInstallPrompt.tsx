@@ -26,7 +26,9 @@ const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/terms", "/privacy", "
 export default function PwaInstallPrompt() {
   const pathname = usePathname();
   const onMarketingSite =
-    PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/solutions");
+    PUBLIC_PATHS.includes(pathname) ||
+    pathname.startsWith("/solutions") ||
+    pathname.startsWith("/resources");
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(true);
   const [help, setHelp] = useState(false);

@@ -174,6 +174,7 @@ export default function SolutionsPage() {
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
             <Link href="/" className="hover:text-blue-700">Home</Link>
             <Link href="/#pricing" className="hover:text-blue-700">Pricing</Link>
+            <Link href="/resources" className="hover:text-blue-700">Guides</Link>
             <Link href="/#contact" className="hover:text-blue-700">Contact</Link>
             <a href="https://pigiecore.co.ke" target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-700 hover:text-blue-600">
               PigieCore Solutions

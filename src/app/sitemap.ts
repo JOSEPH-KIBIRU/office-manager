@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
 import { SOLUTIONS } from "@/lib/solutions";
+import { GUIDES } from "@/lib/guides";
 
 const TODAY = new Date().toISOString().split("T")[0];
 
@@ -20,6 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${base}/`, lastModified: TODAY, changeFrequency: "weekly", priority: 1.0 },
     { url: `${base}/solutions`, lastModified: TODAY, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/resources`, lastModified: TODAY, changeFrequency: "weekly", priority: 0.7 },
     // llms.txt is the plain-text summary AI answer engines read; listing it here
     // helps crawlers discover it without guessing the well-known path.
     { url: `${base}/llms.txt`, lastModified: TODAY, changeFrequency: "weekly", priority: 0.5 },
@@ -35,5 +37,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  return [...staticPages, ...solutionPages];
+  const guidePages: MetadataRoute.Sitemap = GUIDES.map((guide) => ({
+    url: `${base}/resources/${guide.slug}`,
+    lastModified: guide.updated,
+    changeFrequency: "monthly",
+    priority: 0.6,
+  }));
+
+  return [...staticPages, ...solutionPages, ...guidePages];
 }

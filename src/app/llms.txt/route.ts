@@ -1,6 +1,7 @@
 import { MODULE_GROUPS, ALL_MODULE_NAMES } from "@/components/landing/ModuleGrid";
 import { FAQS } from "@/lib/faqs";
 import { SOLUTIONS } from "@/lib/solutions";
+import { GUIDES } from "@/lib/guides";
 import { siteUrl } from "@/lib/siteUrl";
 
 /**
@@ -70,6 +71,12 @@ function buildLlmsTxt(): string {
 
   for (const s of SOLUTIONS) {
     lines.push(`- [${s.title}](${base}/solutions/${s.slug}): ${s.summary}`);
+  }
+
+  lines.push(`- [Resources and guides](${base}/resources): practical guides for Kenyan offices`, "");
+
+  for (const g of GUIDES) {
+    lines.push(`- [${g.title}](${base}/resources/${g.slug}): ${g.description}`);
   }
 
   lines.push(

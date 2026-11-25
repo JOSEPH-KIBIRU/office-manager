@@ -199,6 +199,34 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     ],
   },
   {
+    id: "healthcare",
+    title: "Healthcare add-on: patient consultations",
+    summary:
+      "An opt-in module for clinics and hospitals that keeps patient records and posts every consultation fee to the same accounting ledger.",
+    modules: [
+      {
+        name: "Patient register & consultations",
+        description:
+          "Register patients with a patient number, contact details, age or date of birth, and record each visit with procedure, attending doctor, amount and notes.",
+      },
+      {
+        name: "Consultation fees & ledger",
+        description:
+          "Paid visits post to cash, bank or M-Pesa; unpaid visits post to receivables. Editing or deleting a visit reverses and re-posts the accounting entry automatically.",
+      },
+      {
+        name: "Excel import & patient reports",
+        description:
+          "Import existing patient and consultation registers from Excel or CSV with duplicate detection, then print patient statements, registers and visit reports.",
+      },
+      {
+        name: "Patient history & balances",
+        description:
+          "Search patients by name, number or phone, view full visit history, and track billed, collected and outstanding balances per patient.",
+      },
+    ],
+  },
+  {
     id: "platform",
     title: "Platform, branding & security",
     summary:

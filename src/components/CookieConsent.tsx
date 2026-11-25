@@ -17,7 +17,7 @@ const PUBLIC_PATHS = [
   "/cookie-policy",
   "/accept-terms",
 ];
-const PUBLIC_PREFIXES = ["/solutions"];
+const PUBLIC_PREFIXES = ["/solutions", "/resources"];
 
 export interface CookieConsent {
   necessary: true;

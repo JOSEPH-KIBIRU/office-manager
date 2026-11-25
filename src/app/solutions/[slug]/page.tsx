@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SOLUTIONS, getSolution } from "@/lib/solutions";
+import { GUIDES } from "@/lib/guides";
 import { siteUrl } from "@/lib/siteUrl";
 import { getSolutionPageJsonLd } from "@/lib/seo";
 
@@ -56,6 +57,9 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
   if (!solution) notFound();
 
   const more = SOLUTIONS.filter((s) => s.slug !== solution.slug);
+  const relatedGuides = GUIDES.filter((guide) =>
+    guide.relatedSolutions.includes(solution.slug)
+  ).slice(0, 3);
 
   return (
     <main className="min-h-screen bg-white text-slate-800">
@@ -142,6 +146,34 @@ export default async function SolutionPage({ params }: { params: Promise<{ slug:
             Request a demo
           </Link>
         </div>
+
+        {relatedGuides.length > 0 && (
+          <div className="mt-12 border-t border-slate-200 pt-8">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                Guides related to {solution.navLabel.toLowerCase()}
+              </h2>
+              <Link href="/resources" className="text-sm font-semibold text-blue-700 hover:text-blue-600">
+                All guides →
+              </Link>
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {relatedGuides.map((guide) => (
+                <Link
+                  key={guide.slug}
+                  href={`/resources/${guide.slug}`}
+                  className="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-blue-300 hover:shadow-sm"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
+                    {guide.category} · {guide.readingTime}
+                  </p>
+                  <p className="mt-2 font-semibold text-slate-900">{guide.title}</p>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600">{guide.description}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* More solutions */}
