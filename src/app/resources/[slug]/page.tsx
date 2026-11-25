@@ -8,8 +8,6 @@ import { formatDate } from "@/lib/format";
 
 const BASE_URL = siteUrl();
 
-export const dynamicParams = false;
-
 export function generateStaticParams() {
   return GUIDES.map((guide) => ({ slug: guide.slug }));
 }
