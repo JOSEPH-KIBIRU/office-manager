@@ -7,6 +7,7 @@ import WhatsAppWidget from "@/components/WhatsAppWidget";
 import CookieConsent from "@/components/CookieConsent";
 import MotionProvider from "@/components/MotionProvider";
 import { siteUrl } from "@/lib/siteUrl";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter", preload: false });
 
@@ -48,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <WhatsAppWidget />
         </MotionProvider>
         <CookieConsent />
+        <Analytics />
       </body>
     </html>
   );
