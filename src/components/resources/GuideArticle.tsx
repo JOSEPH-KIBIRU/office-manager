@@ -1,63 +1,12 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { GUIDES, getGuide } from "@/lib/guides";
+import { GUIDES, type Guide } from "@/lib/guides";
 import { getSolution } from "@/lib/solutions";
 import { siteUrl } from "@/lib/siteUrl";
 import { formatDate } from "@/lib/format";
 
 const BASE_URL = siteUrl();
 
-export function generateStaticParams() {
-  return GUIDES.map((guide) => ({ slug: guide.slug }));
-}
-
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
-  const guide = getGuide(slug);
-  if (!guide) return { title: "Guide not found" };
-
-  const url = `${BASE_URL}/resources/${guide.slug}`;
-  return {
-    title: `${guide.title} | Office Manager`,
-    description: guide.description,
-    alternates: { canonical: url },
-    openGraph: {
-      type: "article",
-      url,
-      siteName: "Office Manager",
-      title: guide.title,
-      description: guide.description,
-      locale: "en_KE",
-      publishedTime: guide.updated,
-      modifiedTime: guide.updated,
-      images: [
-        {
-          url: `${BASE_URL}/opengraph-image.png`,
-          width: 1200,
-          height: 630,
-          alt: guide.title,
-        },
-      ],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: guide.title,
-      description: guide.description,
-      images: [`${BASE_URL}/opengraph-image.png`],
-    },
-  };
-}
-
-export default async function GuidePage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const guide = getGuide(slug);
-  if (!guide) notFound();
-
+export default function GuideArticle({ guide }: { guide: Guide }) {
   const relatedSolutions = guide.relatedSolutions
     .map((s) => getSolution(s))
     .filter((s): s is NonNullable<typeof s> => Boolean(s));
