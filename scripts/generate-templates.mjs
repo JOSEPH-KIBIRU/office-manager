@@ -1,12 +1,14 @@
 /**
- * Generates the free Excel templates published on /templates.
+ * Generates the Excel starter pack that is sent to prospects after a short
+ * walkthrough. Output goes to internal/templates, which is gitignored and is
+ * never served by the website.
  * Run with: node scripts/generate-templates.mjs
  */
 import ExcelJS from "exceljs";
 import fs from "node:fs";
 import path from "node:path";
 
-const outDir = path.join(process.cwd(), "public", "templates");
+const outDir = path.join(process.cwd(), "internal", "templates");
 fs.mkdirSync(outDir, { recursive: true });
 
 const templates = [

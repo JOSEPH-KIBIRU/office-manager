@@ -7,7 +7,7 @@ type Status = "idle" | "sending" | "sent" | "error";
 
 export default function TemplateRequestForm() {
   const [phone, setPhone] = useState("");
-  const [template, setTemplate] = useState(TEMPLATES[0]?.name ?? "Free template");
+  const [template, setTemplate] = useState(TEMPLATES[0]?.name ?? "Excel starter pack");
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
 
@@ -22,8 +22,8 @@ export default function TemplateRequestForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phone,
-          subject: "Free template request",
-          message: `Requested the ${template} template from the website.`,
+          subject: "Excel starter pack request",
+          message: `Requested the Excel starter pack (${template}) from the website.`,
         }),
       });
 
@@ -48,8 +48,8 @@ export default function TemplateRequestForm() {
       <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6" role="status">
         <p className="font-semibold text-emerald-900">Request received</p>
         <p className="mt-2 text-sm leading-relaxed text-emerald-800">
-          We&apos;ll call you back shortly. You can download the template immediately using the link
-          above; no email is required.
+          We&apos;ll call you back shortly. We&apos;ll go through what you need and then send the
+          starter pack to you.
         </p>
       </div>
     );
@@ -91,7 +91,7 @@ export default function TemplateRequestForm() {
               {item.name}
             </option>
           ))}
-          <option value="Several templates">Several templates</option>
+          <option value="Several workbooks">Several workbooks</option>
         </select>
       </div>
 
@@ -110,8 +110,8 @@ export default function TemplateRequestForm() {
       )}
 
       <p className="text-xs leading-relaxed text-slate-500">
-        We only need your phone number. We&apos;ll use it to follow up about this request. Downloading
-        the templates does not require a phone number.
+        We only need your phone number. We&apos;ll use it to follow up and send the starter pack after
+        a short walkthrough. The pack is free with no obligation to subscribe.
       </p>
     </form>
   );

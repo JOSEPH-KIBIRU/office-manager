@@ -5,7 +5,6 @@ const NAV = [
   { href: "/industries", label: "Industries" },
   { href: "/pricing", label: "Pricing" },
   { href: "/security", label: "Security" },
-  { href: "/templates", label: "Templates" },
   { href: "/resources", label: "Guides" },
   { href: "/about", label: "About" },
 ];
@@ -93,7 +92,7 @@ export function MarketingFooter() {
               <li><Link href="/industries" className="hover:text-blue-700">Industries</Link></li>
               <li><Link href="/pricing" className="hover:text-blue-700">Pricing</Link></li>
               <li><Link href="/security" className="hover:text-blue-700">Security</Link></li>
-              <li><Link href="/templates" className="hover:text-blue-700">Free templates</Link></li>
+              <li><Link href="/templates" className="hover:text-blue-700">Excel starter pack</Link></li>
               <li><Link href="/resources" className="hover:text-blue-700">Guides</Link></li>
             </ul>
           </div>

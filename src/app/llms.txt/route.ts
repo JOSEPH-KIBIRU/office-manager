@@ -72,7 +72,7 @@ function buildLlmsTxt(): string {
     `- [Security & trust](${base}/security): data isolation, access control, authentication, audit trails and backups`,
     `- [Service status](${base}/status): live application and database health check`,
     `- [About](${base}/about): product background, principles and who we serve`,
-    `- [Free templates](${base}/templates): downloadable payroll, leave, asset, invoice and patient register workbooks`,
+    `- [Excel starter pack](${base}/templates): payroll, leave, asset, invoice and patient register workbooks, shared after a short walkthrough`,
     `- [Industries](${base}/industries): workflows for retail, logistics, clinics, NGOs and professional services`,
   );
 

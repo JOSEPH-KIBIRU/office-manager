@@ -556,7 +556,7 @@ export const GUIDES: Guide[] = [
   },
   {
     slug: "patient-register-excel-template",
-    title: "How to Build a Patient Register in Excel (Free Template)",
+    title: "How to Build a Patient Register in Excel",
     description:
       "A practical guide to building a patient register in Excel: the fields to capture, how to avoid duplicates, how to protect patient data, and how to prepare for import into a clinic system.",
     category: "Healthcare",
@@ -633,8 +633,8 @@ export const GUIDES: Guide[] = [
     ],
     faqs: [
       {
-        q: "Is there a free patient register template?",
-        a: "Yes. Office Manager publishes a free patient and visit register in Excel format, with a sample row and instructions. You can download it without giving an email address or phone number.",
+        q: "Is there a patient register template?",
+        a: "Yes. A patient and visit register is part of our Excel starter pack, with a sample row and instructions. Request the pack and we will share it after a short walkthrough so the columns match your clinic's workflow.",
       },
       {
         q: "What fields should a patient register include?",
