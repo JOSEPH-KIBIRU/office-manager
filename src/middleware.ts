@@ -156,7 +156,15 @@ export async function middleware(req: NextRequest) {
   const isAuthApi = pathname === "/api/auth" || pathname.startsWith("/api/auth/");
   const isChangePassword = pathname === "/change-password" || pathname === "/api/auth/change-password";
 
-  // ---- Origin guard (CSRF) for state-changing API requests ----
+  // ---- CSRF / cross-site guard for every state-changing request ----
+  // Browsers send Sec-Fetch-Site on modern requests. Blocking cross-site
+  // mutations also covers server actions and cases where Origin is stripped.
+  if (
+    MUTATING_METHODS.has(req.method) &&
+    req.headers.get("sec-fetch-site") === "cross-site"
+  ) {
+    return withCsp(new NextResponse("Cross-site request blocked", { status: 403 }));
+  }
   if (isApi && MUTATING_METHODS.has(req.method) && !originAllowed(req)) {
     return jsonRes({ error: "Cross-origin request blocked" }, { status: 403 });
   }

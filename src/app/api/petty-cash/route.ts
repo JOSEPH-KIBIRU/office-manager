@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireUser, HttpError } from "@/lib/auth";
 import { handle, ok, readJson, requireFields, maxLen, amountInRange, validDate } from "@/lib/api";
-import { notifyAdmins } from "@/lib/notify";
+import { notifyAdmins, escapeHtml } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 const AUTO_APPROVE_LIMIT = 5000;
@@ -66,8 +66,8 @@ export async function POST(req: NextRequest) {
       await notifyAdmins(
         session.orgId,
         "New Petty Cash Requests Awaiting Approval",
-        `<p><strong>${session.name}</strong> has submitted <strong>${pending.length}</strong> petty cash request(s) above KES ${AUTO_APPROVE_LIMIT.toLocaleString()} requiring approval:</p><ul>${pending
-          .map((p) => `<li>KES ${p.amount.toLocaleString()} — ${p.purpose} (needed by ${p.date_needed})</li>`)
+        `<p><strong>${escapeHtml(session.name)}</strong> has submitted <strong>${pending.length}</strong> petty cash request(s) above KES ${AUTO_APPROVE_LIMIT.toLocaleString()} requiring approval:</p><ul>${pending
+          .map((p) => `<li>KES ${p.amount.toLocaleString()} - ${escapeHtml(p.purpose)} (needed by ${escapeHtml(p.date_needed)})</li>`)
           .join("")}</ul><p>Log in to approve or reject.</p>`,
         `Petty cash: ${pending.length} request(s) totaling KES ${pending.reduce((s, i) => s + i.amount, 0).toLocaleString()} from ${session.name} need approval.`
       );

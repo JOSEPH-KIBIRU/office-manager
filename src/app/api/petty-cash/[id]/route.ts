@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
-import { notifyUser } from "@/lib/notify";
+import { notifyUser, escapeHtml } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -46,7 +46,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
         session.orgId,
         row.requested_by,
         "Petty Cash Request Rejected",
-        `<p>Your petty cash request <strong>${row.requisition_no}</strong> was rejected.</p>${body.note ? `<p>Note: ${body.note}</p>` : ""}`,
+        `<p>Your petty cash request <strong>${escapeHtml(row.requisition_no)}</strong> was rejected.</p>${body.note ? `<p>Note: ${escapeHtml(body.note)}</p>` : ""}`,
         `Petty cash ${row.requisition_no} rejected.${body.note ? " Note: " + body.note : ""}`
       );
     } else if (body.action === "paid") {

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { requireUser, HttpError } from "@/lib/auth";
 import { handle, ok, readJson, requireFields } from "@/lib/api";
-import { notifyAdmins } from "@/lib/notify";
+import { notifyAdmins, escapeHtml } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET() {
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     await notifyAdmins(
       session.orgId,
       "Profile Change Request",
-      `<p><strong>${me.name}</strong> requests a change to their <strong>${body.field}</strong>:</p><p>Current: <strong>${current}</strong><br/>Requested: <strong>${value}</strong></p><p>Approve or reject it in the Team section.</p>`,
+      `<p><strong>${escapeHtml(me.name)}</strong> requests a change to their <strong>${escapeHtml(body.field)}</strong>:</p><p>Current: <strong>${escapeHtml(current)}</strong><br/>Requested: <strong>${escapeHtml(value)}</strong></p><p>Approve or reject it in the Team section.</p>`,
       `${me.name} requested a ${body.field} change ("${value}"). Review it on the office system.`
     );
 

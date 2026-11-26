@@ -1,11 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cx, secret, api } from "@/lib/convex";
+import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 /**
  * Public health endpoint for external uptime monitors and the status page.
  * Returns 200 when the app and its Convex backend are reachable, 503 otherwise.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Public endpoint: keep it from being used to hammer the database.
+  if (!rateLimit({ key: `health:${clientIp(req)}`, limit: 120, windowMs: 60_000 })) {
+    return NextResponse.json(
+      { status: "rate_limited", time: new Date().toISOString() },
+      { status: 429, headers: { "Retry-After": "60" } }
+    );
+  }
+
   const t0 = Date.now();
   let convexUp = true;
   let error: string | null = null;

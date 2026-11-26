@@ -39,7 +39,9 @@ export async function POST(req: NextRequest) {
       secret: secret(),
       userId: user._id as never,
     });
-    if (!reset) throw new HttpError(400, "This reset code has expired. Please request a new one.");
+    // Keep the response generic when no reset exists so this endpoint cannot
+    // be used to confirm whether an email address has an account.
+    if (!reset) throw new HttpError(400, "Incorrect email or code");
     if (reset.attempts >= 5) throw new HttpError(400, "Too many incorrect attempts. Please request a new code.");
 
     if (!bcrypt.compareSync(code, reset.codeHash)) {

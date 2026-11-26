@@ -31,4 +31,16 @@ describe("cron authorization", () => {
     delete process.env.CRON_SECRET;
     expect(cronAuthorized(req({ authorization: "Bearer super-secret" }))).toBe(false);
   });
+
+  it("does not accept the secret in the query string", () => {
+    process.env.CRON_SECRET = "super-secret";
+    const r = new Request("https://example.test/api/cron/x?key=super-secret");
+    expect(cronAuthorized(r)).toBe(false);
+  });
+
+  it("rejects a longer token that merely contains the secret", () => {
+    process.env.CRON_SECRET = "super-secret";
+    expect(cronAuthorized(req({ authorization: "Bearer super-secret-extra" }))).toBe(false);
+    expect(cronAuthorized(req({ authorization: "Bearer  super-secret" }))).toBe(false);
+  });
 });

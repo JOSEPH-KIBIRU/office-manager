@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson, requireFields, fail } from "@/lib/api";
-import { notifyAdmins } from "@/lib/notify";
+import { notifyAdmins, escapeHtml } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function GET() {
@@ -65,8 +65,8 @@ export async function POST(req: NextRequest) {
     await notifyAdmins(
       session.orgId,
       `Car ${body.category} logged for approval`,
-      `<p>A new <strong>${body.category}</strong> entry has been logged and needs your approval.</p>
-       <p><strong>Vehicle:</strong> ${body.vehicle_reg}<br/><strong>Description:</strong> ${body.description}<br/><strong>Amount:</strong> KES ${Number(body.amount).toLocaleString()}</p>`,
+      `<p>A new <strong>${escapeHtml(body.category)}</strong> entry has been logged and needs your approval.</p>
+       <p><strong>Vehicle:</strong> ${escapeHtml(body.vehicle_reg)}<br/><strong>Description:</strong> ${escapeHtml(body.description)}<br/><strong>Amount:</strong> KES ${Number(body.amount).toLocaleString()}</p>`,
       `Car log ${row?.requisition_no}: ${body.category} for ${body.vehicle_reg}, KES ${Number(body.amount).toLocaleString()} awaits your approval.`
     );
 

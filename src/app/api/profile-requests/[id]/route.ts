@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
-import { notifyUser } from "@/lib/notify";
+import { notifyUser, escapeHtml } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       session.orgId,
       row.user_id,
       `Profile Change Request ${body.action === "approve" ? "Approved" : "Rejected"}`,
-      `<p>Your request to change your <strong>${row.field}</strong> to <strong>${row.requested_value}</strong> has been <strong>${body.action.toUpperCase()}</strong>.</p>`,
+      `<p>Your request to change your <strong>${escapeHtml(row.field)}</strong> to <strong>${escapeHtml(row.requested_value)}</strong> has been <strong>${escapeHtml(body.action.toUpperCase())}</strong>.</p>`,
       `Your ${row.field} change request was ${body.action}.`
     );
 

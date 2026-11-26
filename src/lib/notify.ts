@@ -34,10 +34,15 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
   }
   try {
     const resend = new Resend(key);
+    // Strip header-breaking characters and cap the subject. Recipients are
+    // normalised to a bounded string; Resend still validates the address.
+    const safeTo = String(to).trim().slice(0, 320);
+    const safeSubject = String(subject).replace(/[\r\n]+/g, " ").trim().slice(0, 180);
+    if (!safeTo || !safeSubject) return false;
     const { error } = await resend.emails.send({
       from: process.env.EMAIL_FROM || "Office Manager <onboarding@resend.dev>",
-      to,
-      subject,
+      to: safeTo,
+      subject: safeSubject,
       html,
     });
     if (error) {
@@ -58,6 +63,10 @@ export async function sendSMS(to: string | null | undefined, message: string): P
     console.warn(`[sms] TALKSASA_API_KEY not set — skipped SMS to ${to}`);
     return false;
   }
+  // Keep alert messages short: this limits SMS cost if a public form is abused
+  // and avoids sending multi-segment messages by accident.
+  const safeMessage = String(message).replace(/\s+/g, " ").trim().slice(0, 480);
+  if (!safeMessage) return false;
   try {
     const base = process.env.TALKSASA_BASE_URL || TALKSASA_DEFAULT_BASE;
     const res = await fetch(`${base.replace(/\/$/, "")}/sms/send`, {
@@ -71,7 +80,7 @@ export async function sendSMS(to: string | null | undefined, message: string): P
         recipient: toInternationalSMSNumber(to),
         sender_id: process.env.TALKSASA_SENDER_ID || "OFFICE",
         type: "plain",
-        message,
+        message: safeMessage,
       }),
     });
     if (!res.ok) {
@@ -85,10 +94,28 @@ export async function sendSMS(to: string | null | undefined, message: string): P
   }
 }
 
+/** Escape user-controlled values before inserting them into notification HTML. */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
+}
+
 function emailShell(title: string, bodyHtml: string): string {
   return `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:8px">
-    <h2 style="color:#1e3a5f;margin-top:0">${title}</h2>
+    <h2 style="color:#1e3a5f;margin-top:0">${escapeHtml(title)}</h2>
     ${bodyHtml}
     <p style="color:#6b7280;font-size:12px;margin-top:32px">This is an automated message from the Office Management System.</p>
   </div>`;
@@ -118,7 +145,7 @@ export async function notifyAdminsOfLeaveRequest(
   const admins = await getAdmins(orgId);
   const typeLabel = leaveType.charAt(0).toUpperCase() + leaveType.slice(1);
   const title = "New Leave Application";
-  const body = `<p><strong>${user.name}</strong> has applied for <strong>${typeLabel} leave</strong> — <strong>${days} day(s)</strong>, from <strong>${startDate}</strong> to <strong>${endDate}</strong>.</p>
+  const body = `<p><strong>${escapeHtml(user.name)}</strong> has applied for <strong>${escapeHtml(typeLabel)} leave</strong> — <strong>${escapeHtml(days)} day(s)</strong>, from <strong>${escapeHtml(startDate)}</strong> to <strong>${escapeHtml(endDate)}</strong>.</p>
   <p>Please log in to the Office Management System to approve or reject this request.</p>`;
   for (const admin of admins) {
     await sendEmail(admin.email, title, emailShell(title, body));
@@ -137,9 +164,9 @@ export async function notifyLeaveDecision(
   note?: string
 ) {
   const title = `Leave Application ${status === "approved" ? "Approved" : "Rejected"}`;
-  const body = `<p>Your leave application for <strong>${startDate}</strong> to <strong>${endDate}</strong> has been <strong>${status.toUpperCase()}</strong>.</p>
-  ${note ? `<p>Note: ${note}</p>` : ""}
-  <p>Remaining leave balance: <strong>${user.leave_balance ?? ""} day(s)</strong>.</p>`;
+  const body = `<p>Your leave application for <strong>${escapeHtml(startDate)}</strong> to <strong>${escapeHtml(endDate)}</strong> has been <strong>${escapeHtml(status.toUpperCase())}</strong>.</p>
+  ${note ? `<p>Note: ${escapeHtml(note)}</p>` : ""}
+  <p>Remaining leave balance: <strong>${escapeHtml(user.leave_balance ?? "")} day(s)</strong>.</p>`;
   await sendEmail(user.email, title, emailShell(title, body));
   await sendSMS(
     user.phone,
@@ -153,10 +180,10 @@ export async function sendNewUserCredentials(
 ): Promise<{ emailSent: boolean; smsSent: boolean }> {
   const loginUrl = `${siteUrl()}/login`;
   const title = "Your Office Account Has Been Created";
-  const body = `<p>Hello <strong>${user.name}</strong>,</p>
+  const body = `<p>Hello <strong>${escapeHtml(user.name)}</strong>,</p>
   <p>An account has been created for you on the Office Management System.</p>
-  <p><strong>Email:</strong> ${user.email}<br/><strong>Temporary password:</strong> ${tempPassword}</p>
-  <p>Log in at <a href="${loginUrl}">${loginUrl}</a>. You will be required to change your password immediately after logging in.</p>`;
+  <p><strong>Email:</strong> ${escapeHtml(user.email)}<br/><strong>Temporary password:</strong> ${escapeHtml(tempPassword)}</p>
+  <p>Log in at <a href="${escapeHtml(loginUrl)}">${escapeHtml(loginUrl)}</a>. You will be required to change your password immediately after logging in.</p>`;
   const emailSent = await sendEmail(user.email, title, emailShell(title, body));
   const smsSent = await sendSMS(
     user.phone,
@@ -212,7 +239,7 @@ export async function notifyMeetingScheduled(
       orgId,
       String(id),
       `Meeting Scheduled: ${title}`,
-      `<p>You have been invited to a meeting.</p><p><strong>${title}</strong><br/>When: ${scheduledAt}<br/>Where: ${location || "TBD"}</p>`,
+      `<p>You have been invited to a meeting.</p><p><strong>${escapeHtml(title)}</strong><br/>When: ${escapeHtml(scheduledAt)}<br/>Where: ${escapeHtml(location || "TBD")}</p>`,
       `Meeting: ${title} on ${scheduledAt}${location ? " at " + location : ""}. Check the office system for the agenda.`
     );
   }
@@ -235,9 +262,9 @@ export async function notifyTaskAssigned(
     orgId,
     assigneeId,
     `New task from ${issuerName}: ${title}`,
-    `<p><strong>${issuerName}</strong> has assigned you a task:</p>
-     <p style="font-size:16px"><strong>${title}</strong></p>
-     <p>Open the task here: <a href="${link}">${link}</a></p>`,
+    `<p><strong>${escapeHtml(issuerName)}</strong> has assigned you a task:</p>
+     <p style="font-size:16px"><strong>${escapeHtml(title)}</strong></p>
+     <p>Open the task here: <a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>`,
     `${issuerName} assigned you a task: "${title}". Open: ${link}`
   );
 }
@@ -255,9 +282,9 @@ export async function notifyTaskReportSubmitted(
     orgId,
     creatorId,
     `Task report from ${submitterName}: ${title}`,
-    `<p><strong>${submitterName}</strong> submitted a report for the task:</p>
-     <p style="font-size:16px"><strong>${title}</strong></p>
-     <p>Review and acknowledge it here: <a href="${link}">${link}</a></p>`,
+    `<p><strong>${escapeHtml(submitterName)}</strong> submitted a report for the task:</p>
+     <p style="font-size:16px"><strong>${escapeHtml(title)}</strong></p>
+     <p>Review and acknowledge it here: <a href="${escapeHtml(link)}">${escapeHtml(link)}</a></p>`,
     `${submitterName} submitted a report for "${title}". Review: ${link}`
   );
 }

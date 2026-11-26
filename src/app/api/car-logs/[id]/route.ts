@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { HttpError } from "@/lib/auth";
 import { requirePermission } from "@/lib/permissionGuard";
 import { handle, ok, readJson } from "@/lib/api";
-import { notifyUser } from "@/lib/notify";
+import { notifyUser, escapeHtml } from "@/lib/notify";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
           session.orgId,
           row.requested_by,
           `Car Log ${status === "approved" ? "Approved" : "Rejected"}`,
-          `<p>Your ${row.category} entry for <strong>${row.vehicle_reg}</strong> (${row.requisition_no}) has been <strong>${status.toUpperCase()}</strong>.</p>${body.note ? `<p>Note: ${body.note}</p>` : ""}`,
+          `<p>Your ${escapeHtml(row.category)} entry for <strong>${escapeHtml(row.vehicle_reg)}</strong> (${escapeHtml(row.requisition_no)}) has been <strong>${escapeHtml(status.toUpperCase())}</strong>.</p>${body.note ? `<p>Note: ${escapeHtml(body.note)}</p>` : ""}`,
           `Car log ${row.requisition_no} for ${row.vehicle_reg} was ${status}.${body.note ? " Note: " + body.note : ""}`
         );
       } else {

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { handle, ok } from "@/lib/api";
 import { cx, secret, api, mapConvexError } from "@/lib/convex";
-import { notifyAdmins } from "@/lib/notify";
+import { notifyAdmins, escapeHtml } from "@/lib/notify";
 import { cronAuthorized } from "@/lib/cronAuth";
 
 const NOTICE_DAYS = 30;
@@ -35,7 +35,13 @@ export async function POST(req: NextRequest) {
     let notified = 0;
     for (const [orgId, docs] of byOrg) {
       const lines = docs.map((d) => `${d.title}${d.userName ? ` (${d.userName})` : ""} — ${d.expired ? "EXPIRED" : "expires"} ${d.expiryDate}`);
-      const html = `<p>The following documents need attention:</p><ul>${lines.map((l) => `<li>${l}</li>`).join("")}</ul>`;
+      const safeLines = docs.map(
+        (d) =>
+          `${escapeHtml(d.title)}${d.userName ? ` (${escapeHtml(d.userName)})` : ""} — ${
+            d.expired ? "EXPIRED" : "expires"
+          } ${escapeHtml(d.expiryDate)}`
+      );
+      const html = `<p>The following documents need attention:</p><ul>${safeLines.map((l) => `<li>${l}</li>`).join("")}</ul>`;
       const sms = `Document expiry: ${lines.slice(0, 4).join("; ")}${lines.length > 4 ? ` (+${lines.length - 4} more)` : ""}`;
       try {
         await notifyAdmins(orgId, "Documents expiring soon", html, sms);
