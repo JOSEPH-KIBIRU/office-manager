@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { rateLimit, clientIp, rateLimitKey } from "./lib/rateLimit";
-import { SESSION_COOKIE_NAMES } from "./lib/sessionCookie";
+import { SESSION_COOKIE_NAMES, SESSION_MAX_AGE_SECONDS } from "./lib/sessionCookie";
 import { TERMS_VERSION } from "./lib/terms";
 
 const PUBLIC_PAGES = [
@@ -149,7 +149,12 @@ export async function middleware(req: NextRequest) {
   if (token) {
     try {
       const { payload } = await jwtVerify(token, secret());
-      session = payload as Record<string, unknown>;
+      const issuedAt = typeof payload.iat === "number" ? payload.iat : 0;
+      if (!issuedAt || Date.now() / 1000 - issuedAt > SESSION_MAX_AGE_SECONDS) {
+        session = null;
+      } else {
+        session = payload as Record<string, unknown>;
+      }
     } catch {
       session = null;
     }

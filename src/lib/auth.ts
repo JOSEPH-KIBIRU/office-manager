@@ -2,18 +2,18 @@ import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import type { Role, SessionPayload } from "./types";
-import { shouldUseSecureCookies, sessionCookieName, SESSION_COOKIE_NAMES } from "./sessionCookie";
+import {
+  shouldUseSecureCookies,
+  sessionCookieName,
+  SESSION_COOKIE_NAMES,
+  SESSION_MAX_AGE_SECONDS,
+} from "./sessionCookie";
 import { TERMS_VERSION } from "./terms";
 import { HttpError } from "./httpError";
 import { getValidatedSessionUser } from "./sessionValidation";
 import { subscriptionBlocked } from "./subscription";
 
 export { HttpError };
-
-// Sessions are intentionally short. Users sign in again each day; password,
-// role or deactivation changes also invalidate sessions immediately through the
-// database session version.
-const SESSION_DAYS = 1;
 
 function secret(): Uint8Array {
   const s = process.env.AUTH_SECRET;
@@ -25,7 +25,7 @@ export async function createSessionToken(payload: SessionPayload): Promise<strin
   return new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_DAYS}d`)
+    .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
     .sign(secret());
 }
 
@@ -33,6 +33,10 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   try {
     const { payload } = await jwtVerify(token, secret());
     if (!payload.id) return null;
+    // Enforce the absolute lifetime even for tokens issued before the policy
+    // changed, so an old 7-day cookie cannot outlive the current limit.
+    const issuedAt = typeof payload.iat === "number" ? payload.iat : 0;
+    if (!issuedAt || Date.now() / 1000 - issuedAt > SESSION_MAX_AGE_SECONDS) return null;
     return payload as unknown as SessionPayload;
   } catch {
     return null;
@@ -53,7 +57,7 @@ export async function setSessionCookie(payload: SessionPayload) {
     httpOnly: true,
     sameSite: "lax",
     secure: shouldUseSecureCookies(),
-    maxAge: SESSION_DAYS * 24 * 60 * 60,
+    maxAge: SESSION_MAX_AGE_SECONDS,
     path: "/",
   });
 }
