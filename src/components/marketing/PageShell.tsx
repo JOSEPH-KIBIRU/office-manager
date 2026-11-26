@@ -20,19 +20,41 @@ export function MarketingHeader() {
           </span>
           <span className="truncate font-semibold tracking-tight text-slate-900">Office Manager</span>
         </Link>
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Marketing">
+        <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Marketing">
           {NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-blue-700"
+              className="rounded-lg px-2.5 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-blue-700"
             >
               {item.label}
             </Link>
           ))}
         </nav>
         <div className="flex flex-none items-center gap-2">
-          <Link href="/login" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:text-blue-700 sm:block">
+          <details className="group relative lg:hidden">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
+              Menu
+            </summary>
+            <div className="absolute right-0 z-40 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+              {NAV.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="block rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-blue-700"
+                >
+                  {item.label}
+                </Link>
+              ))}
+              <Link
+                href="/login"
+                className="mt-1 block rounded-lg border-t border-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-blue-700"
+              >
+                Sign in
+              </Link>
+            </div>
+          </details>
+          <Link href="/login" className="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:text-blue-700 sm:block lg:block">
             Sign in
           </Link>
           <Link
