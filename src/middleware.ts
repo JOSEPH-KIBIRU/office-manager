@@ -93,24 +93,43 @@ export async function middleware(req: NextRequest) {
   // else (no external scripts, objects or framing). XSS is additionally
   // mitigated because the app renders untrusted data through React (no HTML
   // injection sinks).
+  const isApi = pathname.startsWith("/api");
+  const isPublic = isApi
+    ? PUBLIC_APIS.some((p) => pathname.startsWith(p))
+    : PUBLIC_PAGES.includes(pathname) || PUBLIC_PAGES_PREFIXES.some((p) => pathname.startsWith(p));
+
   const dev = process.env.NODE_ENV !== "production";
-  const csp = [
+
+  // Public marketing pages do not talk to the application backend directly, so
+  // they get a tighter policy that does not advertise backend/provider domains.
+  // Signed-in app pages keep the broader policy they need for file and data
+  // access. The marketing site's images and scripts are all first-party.
+  const baseCsp = [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.convex.cloud https://*.convex.site https://uploadthing.com https://*.uploadthing.com https://*.ufs.sh https://utfs.io",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.convex.cloud https://*.convex.site https://*.uploadthing.com https://*.ufs.sh https://utfs.io https://*.ingest.sentry.io https://*.sentry.io",
-    "media-src 'self' blob: https://*.convex.cloud https://uploadthing.com https://*.uploadthing.com https://*.ufs.sh https://utfs.io",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     "object-src 'none'",
-    "frame-src 'self' blob: https://*.convex.cloud",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-  ].join("; ");
+  ];
+  const appCsp = [
+    "img-src 'self' data: blob: https://*.convex.cloud https://*.convex.site https://uploadthing.com https://*.uploadthing.com https://*.ufs.sh https://utfs.io",
+    "connect-src 'self' https://*.convex.cloud https://*.convex.site https://*.uploadthing.com https://*.ufs.sh https://utfs.io https://*.ingest.sentry.io https://*.sentry.io",
+    "media-src 'self' blob: https://*.convex.cloud https://uploadthing.com https://*.uploadthing.com https://*.ufs.sh https://utfs.io",
+    "frame-src 'self' blob: https://*.convex.cloud",
+  ];
+  const publicCsp = [
+    "img-src 'self' data: blob:",
+    "connect-src 'self' https://*.ingest.sentry.io https://*.sentry.io",
+    "media-src 'self' blob:",
+    "frame-src 'self' blob:",
+  ];
+  const csp = [...baseCsp, ...(isPublic ? publicCsp : appCsp)].join("; ");
 
   const withCsp = (res: NextResponse) => {
     res.headers.set("Content-Security-Policy", csp);
@@ -134,10 +153,6 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  const isApi = pathname.startsWith("/api");
-  const isPublic = isApi
-    ? PUBLIC_APIS.some((p) => pathname.startsWith(p))
-    : PUBLIC_PAGES.includes(pathname) || PUBLIC_PAGES_PREFIXES.some((p) => pathname.startsWith(p));
   const isAuthApi = pathname === "/api/auth" || pathname.startsWith("/api/auth/");
   const isChangePassword = pathname === "/change-password" || pathname === "/api/auth/change-password";
 
