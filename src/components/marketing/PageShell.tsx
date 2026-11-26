@@ -80,6 +80,7 @@ export function MarketingFooter() {
             <ul className="mt-3 space-y-2 text-sm text-slate-600">
               <li><Link href="/about" className="hover:text-blue-700">About us</Link></li>
               <li><Link href="/subprocessors" className="hover:text-blue-700">Subprocessors</Link></li>
+              <li><Link href="/status" className="hover:text-blue-700">Service status</Link></li>
               <li><Link href="/#contact" className="hover:text-blue-700">Contact</Link></li>
               <li><Link href="/login" className="hover:text-blue-700">Sign in</Link></li>
               <li><a href="https://pigiecore.co.ke" target="_blank" rel="noopener noreferrer" className="hover:text-blue-700">PigieCore Solutions</a></li>

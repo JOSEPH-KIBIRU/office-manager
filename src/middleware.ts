@@ -16,6 +16,7 @@ const PUBLIC_PAGES = [
   "/about",
   "/templates",
   "/subprocessors",
+  "/status",
 ];
 const PUBLIC_PAGES_PREFIXES = ["/solutions", "/resources", "/industries", "/.well-known"];
 const PUBLIC_APIS = [

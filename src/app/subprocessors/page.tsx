@@ -216,6 +216,10 @@ export default function SubprocessorsPage() {
             Privacy Policy
           </Link>{" "}
           ·{" "}
+          <Link href="/status" className="inline-flex min-h-6 items-center font-semibold text-blue-700 hover:text-blue-600">
+            Service status
+          </Link>{" "}
+          ·{" "}
           <a
             href="/.well-known/security.txt"
             className="inline-flex min-h-6 items-center font-semibold text-blue-700 hover:text-blue-600"

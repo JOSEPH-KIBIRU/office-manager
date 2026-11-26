@@ -247,6 +247,7 @@ export function SiteFooter() {
               <li><Link href="/about" className="transition hover:text-indigo-400">About us</Link></li>
               <li><Link href="/security" className="transition hover:text-indigo-400">Security</Link></li>
               <li><Link href="/subprocessors" className="transition hover:text-indigo-400">Subprocessors</Link></li>
+              <li><Link href="/status" className="transition hover:text-indigo-400">Service status</Link></li>
               <li><a href="#features" className="transition hover:text-indigo-400">Features</a></li>
               <li><Link href="/pricing" className="transition hover:text-indigo-400">Pricing</Link></li>
               <li><a href="#faq" className="transition hover:text-indigo-400">FAQ</a></li>

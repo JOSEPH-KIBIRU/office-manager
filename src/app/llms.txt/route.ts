@@ -71,6 +71,7 @@ function buildLlmsTxt(): string {
     `- [Pricing](${base}/pricing): plans, billing cycle, inclusions and healthcare add-on`,
     `- [Security & trust](${base}/security): data isolation, access control, authentication, audit trails and backups`,
     `- [Subprocessors](${base}/subprocessors): hosting, database, storage, email, SMS and AI providers`,
+    `- [Service status](${base}/status): live application and database health check`,
     `- [About](${base}/about): product background, principles and who we serve`,
     `- [Free templates](${base}/templates): downloadable payroll, leave, asset, invoice and patient register workbooks`,
     `- [Industries](${base}/industries): workflows for retail, logistics, clinics, NGOs and professional services`,
