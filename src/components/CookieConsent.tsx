@@ -16,6 +16,9 @@ const PUBLIC_PATHS = [
   "/privacy",
   "/cookie-policy",
   "/accept-terms",
+  "/pricing",
+  "/security",
+  "/about",
 ];
 const PUBLIC_PREFIXES = ["/solutions", "/resources"];
 

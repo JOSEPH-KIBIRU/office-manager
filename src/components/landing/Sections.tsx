@@ -317,6 +317,12 @@ export function SecuritySection() {
               Every organization is a separate workspace. Roles, records and requests stay completely
               separated — your data never bleeds into another company.
             </p>
+            <Link
+              href="/security"
+              className="mt-4 inline-flex text-sm font-semibold text-indigo-300 transition hover:text-indigo-200"
+            >
+              Read our full security approach →
+            </Link>
             <ul className="mt-6 grid gap-2.5 text-sm sm:grid-cols-2">
               {SECURITY.map((item) => (
                 <li key={item} className="flex items-start gap-2 text-zinc-300">

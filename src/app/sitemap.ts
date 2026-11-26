@@ -21,6 +21,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${base}/`, lastModified: TODAY, changeFrequency: "weekly", priority: 1.0 },
     { url: `${base}/solutions`, lastModified: TODAY, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/pricing`, lastModified: TODAY, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${base}/security`, lastModified: TODAY, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${base}/about`, lastModified: TODAY, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/resources`, lastModified: TODAY, changeFrequency: "weekly", priority: 0.7 },
     // llms.txt is the plain-text summary AI answer engines read; listing it here
     // helps crawlers discover it without guessing the well-known path.

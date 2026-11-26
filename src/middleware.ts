@@ -4,7 +4,17 @@ import { rateLimit, clientIp, rateLimitKey } from "./lib/rateLimit";
 import { SESSION_COOKIE_NAMES } from "./lib/sessionCookie";
 import { TERMS_VERSION } from "./lib/terms";
 
-const PUBLIC_PAGES = ["/", "/login", "/forgot-password", "/terms", "/privacy", "/cookie-policy"];
+const PUBLIC_PAGES = [
+  "/",
+  "/login",
+  "/forgot-password",
+  "/terms",
+  "/privacy",
+  "/cookie-policy",
+  "/pricing",
+  "/security",
+  "/about",
+];
 const PUBLIC_PAGES_PREFIXES = ["/solutions", "/resources"];
 const PUBLIC_APIS = [
   "/api/auth/login",

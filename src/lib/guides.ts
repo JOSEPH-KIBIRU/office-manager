@@ -456,6 +456,104 @@ export const GUIDES: Guide[] = [
     ],
     relatedSolutions: ["payroll", "accounting", "etims", "healthcare"],
   },
+  {
+    slug: "spreadsheets-vs-office-software",
+    title: "Spreadsheets vs Office Management Software: What Changes?",
+    description:
+      "An honest comparison of spreadsheets and office management software — where spreadsheets break down, what one workspace changes, and how to migrate without disruption.",
+    category: "Buying guide",
+    readingTime: "6 min read",
+    updated: "2026-11-26",
+    intro:
+      "Spreadsheets are excellent for analysis. They are much weaker as a shared operating system for payroll, approvals, invoices and staff records. This guide compares the two honestly — including where spreadsheets still make sense — and outlines a practical migration path.",
+    sections: [
+      {
+        heading: "1. Where spreadsheets start to break",
+        body: [
+          "A spreadsheet works well when one person owns it and the data is simple. Problems appear when several people edit the same file, when approvals happen in chat, and when the same number is copied into three different sheets.",
+        ],
+        bullets: [
+          "Multiple versions with no clear source of truth.",
+          "Approvals and changes with no audit trail.",
+          "Manual re-entry between payroll, invoices and the ledger.",
+          "Month-end reports rebuilt from scratch every time.",
+          "A single person who knows how the formulas work.",
+        ],
+      },
+      {
+        heading: "2. The hidden cost",
+        body: [
+          "The licence cost of a spreadsheet is low, but the operating cost is not. Time spent reconciling, correcting and chasing approvals is real. So is the risk of a payroll error or an invoice that never reaches the ledger.",
+          "The cost grows with headcount and transaction volume. A ten-person office may cope; a thirty-person office usually needs a system.",
+        ],
+      },
+      {
+        heading: "3. What one workspace changes",
+        body: [
+          "An office management system gives every process a defined place and a shared source of truth. Instead of emailing a file around, each person sees the records and actions their role allows.",
+        ],
+        bullets: [
+          "One record per employee, patient, asset or invoice.",
+          "Approvals recorded with who, what and when.",
+          "Payroll, invoices and expenses posting to one ledger.",
+          "Live reports without rebuilding a spreadsheet.",
+          "Role-based access instead of a shared password.",
+        ],
+      },
+      {
+        heading: "4. When spreadsheets still make sense",
+        body: [
+          "Spreadsheets are still the right tool for one-off analysis, modelling, budgets and ad-hoc reports. A good system should let you export data so you can keep using Excel where it genuinely helps.",
+          "The goal is not to ban spreadsheets. It is to stop using them as the database and approval workflow for the whole office.",
+        ],
+      },
+      {
+        heading: "5. A practical migration path",
+        bullets: [
+          "Pick one painful process first — usually payroll, leave or invoicing.",
+          "Clean the source data and agree which fields are required.",
+          "Import a small batch, verify it, then import the rest.",
+          "Run the old and new process in parallel for one cycle if needed.",
+          "Retire the spreadsheet only after the first successful run.",
+        ],
+        body: [
+          "Trying to move everything at once is the most common reason migrations stall. A staged rollout keeps the business running while the team learns the new system.",
+        ],
+      },
+      {
+        heading: "6. What to compare in a system",
+        body: [
+          "Use the same checklist you would use for any critical business software: compliance, accounting depth, permissions, data isolation, onboarding and support.",
+        ],
+        bullets: [
+          "Does it calculate Kenyan statutory payroll?",
+          "Is there a real double-entry ledger and eTIMS support?",
+          "Can access be restricted by role and module?",
+          "How does it import existing Excel data?",
+          "Can you export your data if you leave?",
+        ],
+      },
+    ],
+    faqs: [
+      {
+        q: "Can we still use Excel with Office Manager?",
+        a: "Yes. You can export data for analysis and reporting, and keep spreadsheets for modelling or one-off work. The system replaces spreadsheets as the shared database and approval trail.",
+      },
+      {
+        q: "Will we lose our historical records?",
+        a: "The built-in importer supports patient and consultation registers; other data can be mapped with our onboarding team. Keep the original files until the migration has been verified.",
+      },
+      {
+        q: "Is a system worth it for a 10-person team?",
+        a: "It depends on the pain. If payroll, approvals and finance already cause errors or take days each month, a system pays for itself quickly. If the office runs on a few static lists, a spreadsheet may still be enough.",
+      },
+      {
+        q: "How long does migration take?",
+        a: "A focused rollout can start with one process and a small verified import. The timeline depends on data quality, the number of records and how many people need training.",
+      },
+    ],
+    relatedSolutions: ["payroll", "accounting", "tasks"],
+  },
 ];
 
 export function getGuide(slug: string): Guide | undefined {

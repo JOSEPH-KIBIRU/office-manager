@@ -124,7 +124,10 @@ export function Pricing() {
           <p className="mx-auto mt-8 max-w-3xl text-center text-sm text-zinc-400">
             All prices in Kenyan Shillings. The first month is free. Subscriptions renew on the 1st of
             each month and are cancelled automatically if not paid. Annual billing is charged upfront
-            with a 5% discount.
+            with a 5% discount.{" "}
+            <Link href="/pricing" className="font-semibold text-indigo-300 hover:text-indigo-200">
+              See full pricing details →
+            </Link>
           </p>
         </Reveal>
       </div>
@@ -239,8 +242,10 @@ export function SiteFooter() {
             <ul className="mt-4 space-y-2.5 text-sm">
               <li><Link href="/login" className="transition hover:text-indigo-400">Sign in</Link></li>
               <li><Link href="/resources" className="transition hover:text-indigo-400">Guides &amp; resources</Link></li>
+              <li><Link href="/about" className="transition hover:text-indigo-400">About us</Link></li>
+              <li><Link href="/security" className="transition hover:text-indigo-400">Security</Link></li>
               <li><a href="#features" className="transition hover:text-indigo-400">Features</a></li>
-              <li><a href="#pricing" className="transition hover:text-indigo-400">Pricing</a></li>
+              <li><Link href="/pricing" className="transition hover:text-indigo-400">Pricing</Link></li>
               <li><a href="#faq" className="transition hover:text-indigo-400">FAQ</a></li>
               <li><a href="#contact" className="transition hover:text-indigo-400">Contact us</a></li>
             </ul>

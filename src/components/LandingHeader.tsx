@@ -10,8 +10,8 @@ const NAV = [
   { label: "Modules", href: "#modules" },
   { label: "Payroll", href: "#payroll" },
   { label: "Solutions", href: "/solutions" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "Security", href: "#security" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Security", href: "/security" },
   { label: "FAQ", href: "#faq" },
 ];
 
