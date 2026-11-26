@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { cx, secret, api } from "@/lib/convex";
 import { decryptToken } from "@/lib/email/crypto";
 import { uploadThingProxyPath } from "@/lib/fileUrls";
+import { requireFileKindAccess } from "@/lib/fileAccess";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
     url: string;
     name: string | null;
     type: string | null;
+    kind: string;
     encrypted: boolean;
     encKeyEnc: string | null;
     encIv: string | null;
@@ -45,6 +47,14 @@ export async function GET(req: NextRequest) {
   }
   if (!row) {
     return NextResponse.json({ error: "File not found" }, { status: 404, headers: NO_STORE });
+  }
+  try {
+    await requireFileKindAccess(row.kind);
+  } catch {
+    return NextResponse.json(
+      { error: "You do not have permission to access this file" },
+      { status: 403, headers: NO_STORE }
+    );
   }
   if (row.scanStatus === "infected") {
     return NextResponse.json(

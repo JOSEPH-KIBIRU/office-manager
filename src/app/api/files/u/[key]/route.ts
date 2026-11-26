@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { cx, secret, api } from "@/lib/convex";
 import { privateUploadThingAclEnabled, signedUploadThingUrl } from "@/lib/uploadthingServer";
 import { INLINE_MIME, safeMime } from "@/lib/mime";
+import { requireFileKindAccess } from "@/lib/fileAccess";
 
 const ALLOWED_HOSTS = /(^|\.)(ufs\.sh|utfs\.io|uploadthing\.com)$/i;
 
@@ -32,18 +33,26 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ key: string
     return NextResponse.json({ error: "Invalid file key" }, { status: 400 });
   }
 
-  let file: { url: string; name: string | null; type: string | null; encrypted: boolean; scanStatus: "pending" | "clean" | "infected" | "error" | null; scanReason: string | null } | null;
+  let file: { url: string; name: string | null; type: string | null; kind: string; encrypted: boolean; scanStatus: "pending" | "clean" | "infected" | "error" | null; scanReason: string | null } | null;
   try {
     file = (await cx().query(api.storage.getFileByKey, {
       secret: secret(),
       orgId: session.orgId as never,
       key,
-    })) as { url: string; name: string | null; type: string | null; encrypted: boolean; scanStatus: "pending" | "clean" | "infected" | "error" | null; scanReason: string | null } | null;
+    })) as { url: string; name: string | null; type: string | null; kind: string; encrypted: boolean; scanStatus: "pending" | "clean" | "infected" | "error" | null; scanReason: string | null } | null;
   } catch {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
   if (!file) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
+  }
+  try {
+    await requireFileKindAccess(file.kind);
+  } catch {
+    return NextResponse.json(
+      { error: "You do not have permission to access this file" },
+      { status: 403 }
+    );
   }
   if (file.scanStatus === "infected") {
     return NextResponse.json(

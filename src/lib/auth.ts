@@ -10,7 +10,10 @@ import { subscriptionBlocked } from "./subscription";
 
 export { HttpError };
 
-const SESSION_DAYS = 7;
+// Sessions are intentionally short. Users sign in again each day; password,
+// role or deactivation changes also invalidate sessions immediately through the
+// database session version.
+const SESSION_DAYS = 1;
 
 function secret(): Uint8Array {
   const s = process.env.AUTH_SECRET;

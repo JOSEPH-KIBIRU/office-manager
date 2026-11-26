@@ -82,6 +82,7 @@ export const getFileByKey = query({
         url: row.url ?? "",
         name: row.name ?? null,
         type: row.type ?? null,
+        kind: row.kind,
         encrypted: !!row.encrypted,
         encKeyEnc: row.encKeyEnc ?? null,
         encIv: row.encIv ?? null,
@@ -102,6 +103,7 @@ export const getFileByKey = query({
         url: doc.fileUrl,
         name: doc.fileName ?? null,
         type: null,
+        kind: "other",
         encrypted: false,
         encKeyEnc: null,
         encIv: null,
@@ -120,6 +122,7 @@ export const getFileByKey = query({
         url: minute.fileUrl,
         name: minute.fileName ?? null,
         type: null,
+        kind: "minutes",
         encrypted: false,
         encKeyEnc: null,
         encIv: null,
@@ -134,6 +137,7 @@ export const getFileByKey = query({
         url: org.logoUrl,
         name: "logo",
         type: null,
+        kind: "logo",
         encrypted: false,
         encKeyEnc: null,
         encIv: null,
@@ -209,34 +213,52 @@ export const setFileScanStatus = mutation({
 });
 
 /**
- * Org-scoped file URL lookup. Returns a signed URL only when the blob belongs
- * to the requesting organization. Legacy files (uploaded before the registry
- * existed) are honoured when the blob is referenced by the org's own logo or
- * minutes and is not registered to another organization.
+ * Resolve an org-owned storage id to a URL plus its file kind. Legacy files
+ * (uploaded before the registry existed) are honoured when the blob is
+ * referenced by the org's own logo or minutes and is not registered to another
+ * organization.
  */
+async function resolveFileForStorage(ctx: any, orgId: any, id: any) {
+  const row = await ctx.db
+    .query("storedFiles")
+    .withIndex("by_storage", (q: any) => q.eq("storageId", id))
+    .first();
+  if (row) {
+    if (row.orgId !== orgId) return null;
+    const url = row.url ?? (row.storageId ? await ctx.storage.getUrl(row.storageId) : null);
+    return url ? { url, kind: row.kind as string } : null;
+  }
+
+  const org = await ctx.db.get(orgId);
+  if (org && org.logoFileId === id) {
+    return { url: await ctx.storage.getUrl(id), kind: "logo" };
+  }
+  const minute = await ctx.db
+    .query("minutes")
+    .withIndex("by_org", (q: any) => q.eq("orgId", orgId))
+    .filter((q: any) => q.eq(q.field("fileId"), id))
+    .first();
+  if (minute) {
+    return { url: await ctx.storage.getUrl(id), kind: "minutes" };
+  }
+  return null;
+}
+
+/** Backwards-compatible URL lookup used by older clients. */
 export const getFileUrl = mutation({
   args: { secret: v.string(), orgId: v.id("organizations"), id: v.id("_storage") },
   handler: async (ctx, args) => {
     assertSecret(args.secret);
-    const row = await ctx.db
-      .query("storedFiles")
-      .withIndex("by_storage", (q) => q.eq("storageId", args.id))
-      .first();
-    if (row) {
-      if (row.orgId !== args.orgId) return null;
-      if (row.url) return row.url;
-      return row.storageId ? await ctx.storage.getUrl(row.storageId) : null;
-    }
+    const file = await resolveFileForStorage(ctx, args.orgId, args.id);
+    return file?.url ?? null;
+  },
+});
 
-    // Legacy fallback: not yet registered to any org, but referenced by this org.
-    const org = await ctx.db.get(args.orgId);
-    if (org && org.logoFileId === args.id) return await ctx.storage.getUrl(args.id);
-    const minute = await ctx.db
-      .query("minutes")
-      .withIndex("by_org", (q) => q.eq("orgId", args.orgId))
-      .filter((q) => q.eq(q.field("fileId"), args.id))
-      .first();
-    if (minute) return await ctx.storage.getUrl(args.id);
-    return null;
+/** URL lookup plus the file kind, used to enforce module-level access. */
+export const getFileWithKind = mutation({
+  args: { secret: v.string(), orgId: v.id("organizations"), id: v.id("_storage") },
+  handler: async (ctx, args) => {
+    assertSecret(args.secret);
+    return await resolveFileForStorage(ctx, args.orgId, args.id);
   },
 });

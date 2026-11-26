@@ -70,7 +70,7 @@ export default function CookiePolicyPage() {
                     <td className="py-2 pr-4 font-mono text-slate-200">om_session</td>
                     <td className="py-2 pr-4">Necessary</td>
                     <td className="py-2 pr-4">Signed session cookie that keeps you signed in securely.</td>
-                    <td className="py-2">7 days</td>
+                    <td className="py-2">1 day</td>
                   </tr>
                   <tr className="border-b border-white/5">
                     <td className="py-2 pr-4 font-mono text-slate-200">om_cookie_consent</td>
@@ -84,6 +84,11 @@ export default function CookiePolicyPage() {
             <p className="mt-3">
               In production the session cookie is named with the <code>__Host-</code> prefix and the <code>Secure</code>{" "}
               attribute, which restricts it to this site over HTTPS.
+            </p>
+            <p>
+              Public demo forms may use a CAPTCHA service to prevent automated abuse. That service
+              processes your IP address and may set its own short-lived security cookies, governed by
+              the provider&apos;s policy.
             </p>
           </section>
 

@@ -34,6 +34,8 @@ export default function PrivacyPage() {
               We collect information you or your administrator provide in operating the Service, including names,
               emails, phone numbers, payroll and leave data, meeting minutes, vehicle logs and account credentials.
               We also collect technical data such as IP addresses for security and rate limiting.
+              Public demo forms may use a CAPTCHA service, which processes your IP address and may set
+              a short-lived security cookie, to prevent automated abuse.
             </p>
           </section>
 

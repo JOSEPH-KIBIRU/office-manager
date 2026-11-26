@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import path from "path";
 import { requireUser } from "@/lib/auth";
 import { cx, secret, api } from "@/lib/convex";
+import { requireFileKindAccess } from "@/lib/fileAccess";
 
 const MIME: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -28,9 +29,9 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ name: stri
     return NextResponse.json({ error: "Invalid file name" }, { status: 400 });
   }
 
-  let url: string | null;
+  let file: { url: string | null; kind: string } | null;
   try {
-    url = await cx().mutation(api.storage.getFileUrl, {
+    file = await cx().mutation(api.storage.getFileWithKind, {
       secret: secret(),
       orgId: session.orgId as never,
       id: name as never,
@@ -38,8 +39,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ name: stri
   } catch {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
   }
-  if (!url) {
+  if (!file?.url) {
     return NextResponse.json({ error: "File not found" }, { status: 404 });
+  }
+  const url = file.url;
+  try {
+    await requireFileKindAccess(file.kind);
+  } catch {
+    return NextResponse.json(
+      { error: "You do not have permission to access this file" },
+      { status: 403 }
+    );
   }
 
   const upstream = await fetch(url);

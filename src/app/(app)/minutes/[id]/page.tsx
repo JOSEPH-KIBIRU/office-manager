@@ -103,7 +103,13 @@ export default function MinutesEditorPage({ params }: { params: Promise<{ id: st
       if (!result) throw new Error("Upload failed");
       await api("/api/files/encrypt", {
         method: "POST",
-        json: { key: result.key, encKey: encrypted.key, iv: encrypted.iv, name: encrypted.name },
+        json: {
+          key: result.key,
+          encKey: encrypted.key,
+          iv: encrypted.iv,
+          name: encrypted.name,
+          kind: "minutes",
+        },
       });
       await api(`/api/minutes/${id}`, {
         method: "PATCH",

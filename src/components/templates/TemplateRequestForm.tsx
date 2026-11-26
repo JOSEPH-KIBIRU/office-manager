@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { TEMPLATES } from "@/lib/templates";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -10,11 +11,21 @@ export default function TemplateRequestForm() {
   const [template, setTemplate] = useState(TEMPLATES[0]?.name ?? "Excel starter pack");
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  const captchaRequired = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setStatus("sending");
     setMessage("");
+
+    if (captchaRequired && !captchaToken) {
+      setStatus("error");
+      setMessage("Please complete the verification below.");
+      return;
+    }
+
+    setStatus("sending");
 
     try {
       const res = await fetch("/api/enquiries", {
@@ -24,12 +35,15 @@ export default function TemplateRequestForm() {
           phone,
           subject: "Excel starter pack request",
           message: `Requested the Excel starter pack (${template}) from the website.`,
+          turnstileToken: captchaToken ?? "",
         }),
       });
 
       const data = (await res.json().catch(() => ({}))) as { error?: string };
 
       if (!res.ok) {
+        setCaptchaToken(null);
+        setCaptchaReset((n) => n + 1);
         setStatus("error");
         setMessage(data.error || "Could not send your request. Please try again.");
         return;
@@ -38,6 +52,8 @@ export default function TemplateRequestForm() {
       setStatus("sent");
       setPhone("");
     } catch {
+      setCaptchaToken(null);
+      setCaptchaReset((n) => n + 1);
       setStatus("error");
       setMessage("Could not send your request. Please check your connection and try again.");
     }
@@ -94,6 +110,13 @@ export default function TemplateRequestForm() {
           <option value="Several workbooks">Several workbooks</option>
         </select>
       </div>
+
+      <TurnstileWidget
+        onToken={setCaptchaToken}
+        theme="light"
+        resetKey={captchaReset}
+        className="min-h-[65px]"
+      />
 
       <button
         type="submit"

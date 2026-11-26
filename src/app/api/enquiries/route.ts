@@ -5,6 +5,7 @@ import { cx, secret, api, mapConvexError } from "@/lib/convex";
 import { notifySuperAdminOfEnquiry } from "@/lib/notify";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
 import { allowDistributed } from "@/lib/distributedRateLimit";
+import { verifyTurnstile } from "@/lib/turnstile";
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
       company?: string;
       subject?: string;
       message?: string;
+      turnstileToken?: string;
     }>(req);
 
     const phone = String(body.phone ?? "").trim().replace(/[^0-9+]/g, "");
@@ -57,6 +59,14 @@ export async function POST(req: NextRequest) {
     const subject =
       String(body.subject ?? "").trim().replace(/[\r\n]+/g, " ") || "Demo request";
     maxLen(subject, "Subject", 120);
+
+    // Cloudflare Turnstile is enforced once TURNSTILE_SECRET_KEY is configured.
+    // Without the keys the form still works, but per-IP and per-phone limits
+    // remain the only protection.
+    const captcha = await verifyTurnstile(body.turnstileToken, ip);
+    if (!captcha.ok) {
+      throw new HttpError(400, captcha.error || "Verification failed. Please try again.");
+    }
 
     // One phone number cannot trigger unlimited SMS alerts. This is separate
     // from the per-IP limit so rotating IPs does not bypass it.

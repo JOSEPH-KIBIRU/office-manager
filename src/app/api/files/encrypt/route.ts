@@ -23,8 +23,18 @@ function decodeBase64(value: string, expectedBytes: number, label: string): void
 export async function POST(req: NextRequest) {
   return handle(async () => {
     const session = await requireUser();
-    const body = await readJson<{ key: string; encKey: string; iv: string; name: string }>(req);
+    const body = await readJson<{
+      key: string;
+      encKey: string;
+      iv: string;
+      name: string;
+      kind?: string;
+    }>(req);
     requireFields(body, ["key", "encKey", "iv", "name"]);
+    const kind =
+      body.kind === "task" || body.kind === "minutes" || body.kind === "logo"
+        ? body.kind
+        : "other";
 
     const key = String(body.key);
     if (!key || key.length > 512 || /[\/\\\x00-\x1f]/.test(key)) {
@@ -45,7 +55,7 @@ export async function POST(req: NextRequest) {
     const row = (await ensureUploadFileRegistered({
       key,
       orgId: session.orgId as string,
-      kind: "other",
+      kind,
       name,
       type,
     })) as FileRow | null;

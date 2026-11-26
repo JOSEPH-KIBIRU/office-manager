@@ -106,7 +106,9 @@ export async function middleware(req: NextRequest) {
   // access. The marketing site's images and scripts are all first-party.
   const baseCsp = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}${
+      isPublic ? " https://challenges.cloudflare.com" : ""
+    }`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
@@ -125,9 +127,9 @@ export async function middleware(req: NextRequest) {
   ];
   const publicCsp = [
     "img-src 'self' data: blob:",
-    "connect-src 'self' https://*.ingest.sentry.io https://*.sentry.io",
+    "connect-src 'self' https://*.ingest.sentry.io https://*.sentry.io https://challenges.cloudflare.com",
     "media-src 'self' blob:",
-    "frame-src 'self' blob:",
+    "frame-src 'self' blob: https://challenges.cloudflare.com",
   ];
   const csp = [...baseCsp, ...(isPublic ? publicCsp : appCsp)].join("; ");
 

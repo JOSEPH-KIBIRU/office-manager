@@ -135,6 +135,7 @@ export default function TaskDetailPage() {
               encKey: encrypted[i].key,
               iv: encrypted[i].iv,
               name: encrypted[i].name,
+              kind: "task",
             },
           })
         )

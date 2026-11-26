@@ -4,6 +4,7 @@ import { useEffect, useState, FormEvent } from "react";
 import Link from "next/link";
 import { Alert, FieldError, inputCls } from "@/components/ui";
 import Spinner from "@/components/Spinner";
+import TurnstileWidget from "@/components/TurnstileWidget";
 
 /**
  * Low-friction demo request: only a phone number is required. We fill the
@@ -17,6 +18,9 @@ export default function ContactForm({ initialSolution }: { initialSolution?: str
   const [phoneError, setPhoneError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  const captchaRequired = Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY);
 
   useEffect(() => {
     if (initialSolution) return;
@@ -42,6 +46,10 @@ export default function ContactForm({ initialSolution }: { initialSolution?: str
     e.preventDefault();
     setError(null);
     if (!validate()) return;
+    if (captchaRequired && !captchaToken) {
+      setError("Please complete the verification below.");
+      return;
+    }
     setBusy(true);
     try {
       const res = await fetch("/api/enquiries", {
@@ -56,6 +64,7 @@ export default function ContactForm({ initialSolution }: { initialSolution?: str
           message: solution
             ? `Requested a demo callback for ${solution}.`
             : "Requested a demo callback from the website.",
+          turnstileToken: captchaToken ?? "",
         }),
       });
       const data = await res.json();
@@ -63,6 +72,8 @@ export default function ContactForm({ initialSolution }: { initialSolution?: str
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setCaptchaToken(null);
+      setCaptchaReset((n) => n + 1);
     } finally {
       setBusy(false);
     }
@@ -123,6 +134,13 @@ export default function ContactForm({ initialSolution }: { initialSolution?: str
           We only use this number to call you about your demo.
         </p>
       </div>
+
+      <TurnstileWidget
+        onToken={setCaptchaToken}
+        theme="dark"
+        resetKey={captchaReset}
+        className="min-h-[65px]"
+      />
 
       {error && <Alert kind="error">{error}</Alert>}
 
