@@ -158,7 +158,7 @@ export default function PricingPage() {
             <Link href="/solutions/healthcare" className="mt-4 inline-block text-sm font-semibold text-blue-700 hover:text-blue-600">
               Explore the healthcare module →
             </Link>
-            <p className="mt-4 text-xs text-slate-500">Contact us for add-on pricing.</p>
+            <p className="mt-4 text-xs text-slate-600">Contact us for add-on pricing.</p>
           </div>
         </div>
       </section>

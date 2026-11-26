@@ -168,8 +168,8 @@ export default function AboutPage() {
             </ul>
             <div className="mt-5 border-t border-slate-200 pt-4 text-sm text-slate-600">
               <p>Talk to us:</p>
-              <p className="mt-1"><a href="tel:+254798118515" className="font-semibold text-blue-700 hover:text-blue-600">0798 118 515</a></p>
-              <p><a href="mailto:support@pigiecore.co.ke" className="font-semibold text-blue-700 hover:text-blue-600">support@pigiecore.co.ke</a></p>
+              <p className="mt-1"><a href="tel:+254798118515" className="inline-flex min-h-6 items-center font-semibold text-blue-700 hover:text-blue-600">0798 118 515</a></p>
+              <p><a href="mailto:support@pigiecore.co.ke" className="inline-flex min-h-6 items-center font-semibold text-blue-700 hover:text-blue-600">support@pigiecore.co.ke</a></p>
             </div>
           </div>
         </div>
