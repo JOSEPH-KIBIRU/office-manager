@@ -91,9 +91,9 @@ export default function GuideArticle({ guide }: { guide: Guide }) {
         </div>
         <div className="relative mx-auto max-w-4xl px-4 py-16 sm:py-20">
           <nav aria-label="Breadcrumb" className="text-sm text-slate-400">
-            <Link href="/" className="hover:text-white">Home</Link>
+            <Link href="/" className="underline underline-offset-2 hover:text-white">Home</Link>
             <span aria-hidden="true" className="mx-2">/</span>
-            <Link href="/resources" className="hover:text-white">Resources</Link>
+            <Link href="/resources" className="underline underline-offset-2 hover:text-white">Resources</Link>
             <span aria-hidden="true" className="mx-2">/</span>
             <span className="text-slate-300">{guide.category}</span>
           </nav>
