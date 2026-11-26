@@ -2,6 +2,7 @@ import { MODULE_GROUPS, ALL_MODULE_NAMES } from "@/components/landing/ModuleGrid
 import { FAQS } from "@/lib/faqs";
 import { SOLUTIONS } from "@/lib/solutions";
 import { GUIDES } from "@/lib/guides";
+import { INDUSTRIES } from "@/lib/industries";
 import { siteUrl } from "@/lib/siteUrl";
 
 /**
@@ -69,8 +70,15 @@ function buildLlmsTxt(): string {
     `- [Home](${base}/): product overview, all modules, pricing and FAQ`,
     `- [Pricing](${base}/pricing): plans, billing cycle, inclusions and healthcare add-on`,
     `- [Security & trust](${base}/security): data isolation, access control, authentication, audit trails and backups`,
+    `- [Subprocessors](${base}/subprocessors): hosting, database, storage, email, SMS and AI providers`,
     `- [About](${base}/about): product background, principles and who we serve`,
+    `- [Free templates](${base}/templates): downloadable payroll, leave, asset, invoice and patient register workbooks`,
+    `- [Industries](${base}/industries): workflows for retail, logistics, clinics, NGOs and professional services`,
   );
+
+  for (const i of INDUSTRIES) {
+    lines.push(`- [${i.name}](${base}/industries/${i.slug}): ${i.description}`);
+  }
 
   for (const s of SOLUTIONS) {
     lines.push(`- [${s.title}](${base}/solutions/${s.slug}): ${s.summary}`);

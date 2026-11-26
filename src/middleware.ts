@@ -14,8 +14,10 @@ const PUBLIC_PAGES = [
   "/pricing",
   "/security",
   "/about",
+  "/templates",
+  "/subprocessors",
 ];
-const PUBLIC_PAGES_PREFIXES = ["/solutions", "/resources"];
+const PUBLIC_PAGES_PREFIXES = ["/solutions", "/resources", "/industries", "/.well-known"];
 const PUBLIC_APIS = [
   "/api/auth/login",
   "/api/enquiries",
@@ -229,5 +231,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\\.(?:png|jpg|jpeg|svg|ico|webp|webmanifest|js|css|json|txt|xml|woff2?|ttf|map|mp4|webm|ogv|ogg|mp3|wav|m4a|mov)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|.*\\.(?:png|jpg|jpeg|svg|ico|webp|webmanifest|js|css|json|txt|xml|xlsx|xls|csv|pdf|woff2?|ttf|map|mp4|webm|ogv|ogg|mp3|wav|m4a|mov)$).*)"],
 };

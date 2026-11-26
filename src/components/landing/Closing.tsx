@@ -242,8 +242,11 @@ export function SiteFooter() {
             <ul className="mt-4 space-y-2.5 text-sm">
               <li><Link href="/login" className="transition hover:text-indigo-400">Sign in</Link></li>
               <li><Link href="/resources" className="transition hover:text-indigo-400">Guides &amp; resources</Link></li>
+              <li><Link href="/templates" className="transition hover:text-indigo-400">Free templates</Link></li>
+              <li><Link href="/industries" className="transition hover:text-indigo-400">Industries</Link></li>
               <li><Link href="/about" className="transition hover:text-indigo-400">About us</Link></li>
               <li><Link href="/security" className="transition hover:text-indigo-400">Security</Link></li>
+              <li><Link href="/subprocessors" className="transition hover:text-indigo-400">Subprocessors</Link></li>
               <li><a href="#features" className="transition hover:text-indigo-400">Features</a></li>
               <li><Link href="/pricing" className="transition hover:text-indigo-400">Pricing</Link></li>
               <li><a href="#faq" className="transition hover:text-indigo-400">FAQ</a></li>

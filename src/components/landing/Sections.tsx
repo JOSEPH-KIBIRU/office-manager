@@ -45,6 +45,15 @@ const SECTORS = [
 
 const INTEGRATIONS = ["M-Pesa", "KRA eTIMS", "Google Calendar", "Microsoft 365", "SMS", "Email", "Excel import"];
 
+/** Sectors with a dedicated industry workflow page. */
+const SECTOR_INDUSTRY_LINKS: Record<string, string> = {
+  "Retail & shops": "/industries/retail",
+  "Logistics & fleet": "/industries/logistics",
+  "Professional services": "/industries/professional-services",
+  "NGOs & non-profits": "/industries/ngos",
+  "Clinics & hospitals": "/industries/clinics",
+};
+
 export function LogoStrip() {
   return (
     <section className="border-y border-white/5 py-12">
@@ -56,7 +65,7 @@ export function LogoStrip() {
           {SECTORS.map((sector) => (
             <Link
               key={sector.label}
-              href={`/solutions/${sector.slug}`}
+              href={SECTOR_INDUSTRY_LINKS[sector.label] ?? `/solutions/${sector.slug}`}
               className="group flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 transition hover:border-indigo-400/30 hover:bg-white/[0.05]"
             >
               <span aria-hidden="true" className="text-xl">
@@ -73,7 +82,15 @@ export function LogoStrip() {
             </Link>
           ))}
         </div>
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-400">
+        <div className="mt-6 text-center">
+          <Link
+            href="/industries"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-indigo-300 transition hover:text-indigo-200"
+          >
+            Explore workflows by industry →
+          </Link>
+        </div>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-xs text-zinc-400">
           <span className="font-semibold uppercase tracking-wide text-zinc-400">Works with</span>
           {INTEGRATIONS.map((item) => (
             <span key={item} className="rounded-full border border-white/10 bg-white/5 px-3 py-1">

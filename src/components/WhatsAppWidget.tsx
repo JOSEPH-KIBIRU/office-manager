@@ -14,7 +14,7 @@ const LINES: WaLine[] = [
   { label: "Office line", phone: "0708 769 459", wa: "254708769459" },
 ];
 
-const PUBLIC_PREFIXES = ["/solutions", "/resources", "/pricing", "/security", "/about", "/terms", "/privacy", "/cookie-policy", "/login", "/forgot-password", "/change-password", "/accept-terms"];
+const PUBLIC_PREFIXES = ["/solutions", "/resources", "/industries", "/templates", "/subprocessors", "/pricing", "/security", "/about", "/terms", "/privacy", "/cookie-policy", "/login", "/forgot-password", "/change-password", "/accept-terms"];
 
 function WhatsAppIcon({ className = "h-6 w-6" }: { className?: string }) {
   return (

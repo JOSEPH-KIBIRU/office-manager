@@ -181,7 +181,19 @@ export default function SecurityPage() {
           ))}
         </div>
 
-        <div className="mt-12 rounded-2xl border border-amber-200 bg-amber-50 p-6">
+        <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-6">
+          <h2 className="text-base font-bold text-slate-900">Who processes data for us</h2>
+          <p className="mt-2 text-sm leading-relaxed text-slate-600">
+            We use a small set of providers for hosting, database, file storage, email, SMS and
+            optional AI features. The{" "}
+            <Link href="/subprocessors" className="font-semibold text-blue-700 hover:text-blue-600">
+              subprocessors page
+            </Link>{" "}
+            lists each one, what it does and what data it handles.
+          </p>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-6">
           <h2 className="text-lg font-bold text-slate-900">Responsible disclosure</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-700">
             If you believe you have found a security issue, email{" "}

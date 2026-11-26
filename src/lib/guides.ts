@@ -554,6 +554,107 @@ export const GUIDES: Guide[] = [
     ],
     relatedSolutions: ["payroll", "accounting", "tasks"],
   },
+  {
+    slug: "patient-register-excel-template",
+    title: "How to Build a Patient Register in Excel (Free Template)",
+    description:
+      "A practical guide to building a patient register in Excel: the fields to capture, how to avoid duplicates, how to protect patient data, and how to prepare for import into a clinic system.",
+    category: "Healthcare",
+    readingTime: "6 min read",
+    updated: "2026-11-26",
+    intro:
+      "A patient register is the backbone of a clinic's records. Built well, it answers who was seen, what was done and what was paid — without hunting through paper files. Built badly, it creates duplicate patients, missing visits and a data protection problem. This guide shows a practical Excel layout and how to prepare it for import into a clinic system.",
+    sections: [
+      {
+        heading: "1. Start with two connected registers",
+        body: [
+          "Keep patient details separate from visit details. A patient is registered once; each visit is a new row. This avoids repeating (and gradually corrupting) the same phone number, date of birth and address on every visit.",
+          "In a spreadsheet, the simplest workable approach is one sheet for patients and one for visits, linked by a patient number. If you need a single sheet for import, repeat the patient fields on each visit row but keep the patient number consistent.",
+        ],
+        bullets: [
+          "Patients: patient number, full name, phone, alternative contact, gender, date of birth or age, address and notes.",
+          "Visits: visit date, patient number, procedure or service, clinician, amount, payment method and payment status.",
+          "Payments: receipt number, date, amount, method and the visit it settles.",
+        ],
+      },
+      {
+        heading: "2. Capture age even when the date of birth is unknown",
+        body: [
+          "Many adult patients do not know their exact date of birth. Forcing a fake date creates bad clinical data. Record the date of birth when it is known, and otherwise record the age in years together with the date the age was recorded.",
+          "Storing the age and the date it was captured means the record can be corrected later and still make sense. A bare age with no date silently drifts out of date.",
+        ],
+      },
+      {
+        heading: "3. Use one patient number, permanently",
+        body: [
+          "Duplicate patients are the most common failure in clinic registers. They split a patient's history, double-count visits and make billing confusing. Assign one patient number at registration and never reuse it.",
+          "Before adding a patient, search by phone number and by name. Phone numbers are the strongest practical identifier in most Kenyan clinics, with names as a secondary check. Record the number on every visit rather than re-typing the patient's details.",
+        ],
+        bullets: [
+          "Use a consistent format such as P-0001, padded so records sort correctly.",
+          "Never renumber existing patients when you change systems.",
+          "Keep a merge note if two records are found to be the same person.",
+        ],
+      },
+      {
+        heading: "4. Treat the file as personal and health data",
+        body: [
+          "A patient register contains personal and health information, which is sensitive under Kenya's Data Protection Act. Access should be limited to staff who need it, and the file should not be shared over open channels or stored on a personal device.",
+          "If you email the file, use a protected or encrypted method. Keep a record of who has access, remove leavers promptly, and avoid putting clinical details in file names that appear in shared folders.",
+        ],
+        bullets: [
+          "Restrict the folder to named staff, not the whole organisation.",
+          "Password-protect the workbook if it must be moved.",
+          "Back up regularly, and test that the backup can be restored.",
+          "Avoid sending patient lists through WhatsApp groups.",
+        ],
+      },
+      {
+        heading: "5. Keep the money and the clinical record consistent",
+        body: [
+          "A visit and its payment should agree. If a consultation is recorded as KES 1,500 but the payment sheet shows KES 1,000, month-end reconciliation becomes guesswork. Record the amount on the visit and the settlement in the payments sheet.",
+          "Use a small, fixed list of payment methods — cash, M-Pesa, card, bank transfer, insurance and other — so reports can be grouped reliably. Do the same for payment status: paid, partly paid or unpaid.",
+        ],
+      },
+      {
+        heading: "6. Preparing the file for import",
+        body: [
+          "If you plan to move to a clinic system, the layout matters more than the formatting. Keep one header row, avoid merged cells, avoid totals rows inside the data, and use dates in a consistent format such as YYYY-MM-DD.",
+          "Run a small test import first — perhaps ten patients and twenty visits — and check that names, dates, amounts and payment status arrived correctly. Only then import the full file. Keep the original spreadsheet unchanged as your source of truth until the migration is verified.",
+        ],
+        bullets: [
+          "One header row, no merged cells, no blank spacer rows.",
+          "One record per row, with no subtotal rows in the data area.",
+          "Dates in YYYY-MM-DD or DD/MM/YYYY, used consistently.",
+          "Gender recorded as male or female, matching the system's options.",
+          "A patient number that is unique and never reused.",
+        ],
+      },
+    ],
+    faqs: [
+      {
+        q: "Is there a free patient register template?",
+        a: "Yes. Office Manager publishes a free patient and visit register in Excel format, with a sample row and instructions. You can download it without giving an email address or phone number.",
+      },
+      {
+        q: "What fields should a patient register include?",
+        a: "At minimum: a unique patient number, full name, phone number, gender, date of birth or age, and visit details such as date, service, clinician, amount, payment method and payment status.",
+      },
+      {
+        q: "How do I stop duplicate patients?",
+        a: "Search by phone number and name before registering, assign one permanent patient number, and use that number on every visit instead of re-entering the patient's details.",
+      },
+      {
+        q: "Can Office Manager import an existing patient register?",
+        a: "The built-in importer accepts patient and consultation registers from Excel or CSV, with a preview and duplicate detection before anything is saved. Column mapping and any cleanup are handled during onboarding.",
+      },
+      {
+        q: "Is it safe to keep patient data in Excel?",
+        a: "Excel can work for a small clinic if access is restricted, the file is protected and backups are reliable. As the clinic grows, a system with role-based access, an audit trail and controlled backups is safer and easier to reconcile.",
+      },
+    ],
+    relatedSolutions: ["healthcare", "accounting", "documents"],
+  },
 ];
 
 export function getGuide(slug: string): Guide | undefined {

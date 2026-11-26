@@ -19,8 +19,10 @@ const PUBLIC_PATHS = [
   "/pricing",
   "/security",
   "/about",
+  "/templates",
+  "/subprocessors",
 ];
-const PUBLIC_PREFIXES = ["/solutions", "/resources"];
+const PUBLIC_PREFIXES = ["/solutions", "/resources", "/industries"];
 
 export interface CookieConsent {
   necessary: true;
