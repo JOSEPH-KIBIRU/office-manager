@@ -28,7 +28,7 @@ const FAQS = [
   },
   {
     q: "Where is the data hosted?",
-    a: "The application runs on Vercel, with the database, functions and file storage on Convex cloud. Data is transmitted over HTTPS.",
+    a: "The application and its database run on reputable cloud infrastructure, and data is transmitted over HTTPS. We do not publish our vendor stack publicly. A current list of service providers is available to customers and prospective customers on request.",
   },
   {
     q: "How do we report a security issue?",
@@ -182,14 +182,20 @@ export default function SecurityPage() {
         </div>
 
         <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-6">
-          <h2 className="text-base font-bold text-slate-900">Who processes data for us</h2>
+          <h2 className="text-base font-bold text-slate-900">Data processing &amp; service providers</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            We use a small set of providers for hosting, database, file storage, email, SMS and
-            optional AI features. The{" "}
-            <Link href="/subprocessors" className="font-semibold text-blue-700 hover:text-blue-600">
-              subprocessors page
-            </Link>{" "}
-            lists each one, what it does and what data it handles.
+            We use a small, vetted set of providers for hosting, database, file storage, email, SMS
+            and optional AI features. We do not publish the vendor list on this website. Customers and
+            prospective customers can request the current list, with what each provider does and what
+            data it handles, by emailing{" "}
+            <a
+              href="mailto:support@pigiecore.co.ke"
+              className="inline-flex min-h-6 items-center font-semibold text-blue-700 hover:text-blue-600"
+            >
+              support@pigiecore.co.ke
+            </a>
+            . We share it under confidentiality and can provide a data processing addendum where
+            needed.
           </p>
         </div>
 

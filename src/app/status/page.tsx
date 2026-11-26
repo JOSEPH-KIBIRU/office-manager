@@ -117,13 +117,16 @@ export default function StatusPage() {
 
         <p className="mt-8 text-sm text-slate-600">
           Related:{" "}
-          <Link href="/subprocessors" className="inline-flex min-h-6 items-center font-semibold text-blue-700 hover:text-blue-600">
-            Subprocessors
-          </Link>{" "}
-          ·{" "}
           <Link href="/security" className="inline-flex min-h-6 items-center font-semibold text-blue-700 hover:text-blue-600">
             Security &amp; trust
-          </Link>
+          </Link>{" "}
+          ·{" "}
+          <a
+            href="mailto:support@pigiecore.co.ke"
+            className="inline-flex min-h-6 items-center font-semibold text-blue-700 hover:text-blue-600"
+          >
+            Contact support
+          </a>
         </p>
       </section>
 

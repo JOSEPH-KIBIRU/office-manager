@@ -15,7 +15,6 @@ const PUBLIC_PAGES = [
   "/security",
   "/about",
   "/templates",
-  "/subprocessors",
   "/status",
 ];
 const PUBLIC_PAGES_PREFIXES = ["/solutions", "/resources", "/industries", "/.well-known"];

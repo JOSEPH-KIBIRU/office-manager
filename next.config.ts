@@ -2,12 +2,25 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
+  // Do not advertise the framework in response headers.
+  poweredByHeader: false,
   serverExternalPackages: ["better-sqlite3", "pdfjs-dist", "xlsx"],
   outputFileTracingIncludes: {
     "/api/accounting/bank/pdf": [
       "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
       "./node_modules/pdfjs-dist/standard_fonts/**",
     ],
+  },
+  async redirects() {
+    return [
+      // The vendor list is no longer public; keep old links working without
+      // republishing the information.
+      {
+        source: "/subprocessors",
+        destination: "/security",
+        permanent: true,
+      },
+    ];
   },
   async headers() {
     return [

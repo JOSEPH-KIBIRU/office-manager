@@ -20,7 +20,6 @@ const PUBLIC_PATHS = [
   "/security",
   "/about",
   "/templates",
-  "/subprocessors",
   "/status",
 ];
 const PUBLIC_PREFIXES = ["/solutions", "/resources", "/industries"];

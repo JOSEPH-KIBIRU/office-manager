@@ -21,7 +21,7 @@ function isStandalone(): boolean {
  * page until the app is installed. Falls back to browser-specific instructions
  * when the browser does not expose beforeinstallprompt (notably iOS).
  */
-const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/terms", "/privacy", "/cookie-policy", "/accept-terms", "/pricing", "/security", "/about", "/templates", "/subprocessors", "/status"];
+const PUBLIC_PATHS = ["/", "/login", "/forgot-password", "/terms", "/privacy", "/cookie-policy", "/accept-terms", "/pricing", "/security", "/about", "/templates", "/status"];
 
 export default function PwaInstallPrompt() {
   const pathname = usePathname();
